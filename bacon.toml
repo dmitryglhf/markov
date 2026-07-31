@@ -1,0 +1,35 @@
+default_job = "clippy"
+
+# these override bacon builtins of the same name, which would run with default
+# features and pull in V8 and llama-cpp
+[jobs.check]
+command = ["cargo", "check", "--color", "always", "-p", "goose-cli",
+           "--no-default-features", "--features", "portable-default", "--all-targets"]
+need_stdout = false
+
+[jobs.clippy]
+command = ["cargo", "clippy", "--color", "always", "-p", "goose-cli",
+           "--no-default-features", "--features", "portable-default", "--all-targets"]
+need_stdout = false
+
+# goose has empty default features, cheapest loop for core work
+[jobs.lib]
+command = ["cargo", "clippy", "--color", "always", "-p", "goose", "--all-targets"]
+need_stdout = false
+
+[jobs.test]
+command = ["cargo", "nextest", "run", "--color", "always", "-p", "goose-cli",
+           "--no-default-features", "--features", "portable-default"]
+need_stdout = true
+
+# for work on code_execution, pulls in V8
+[jobs.full]
+command = ["cargo", "clippy", "--color", "always", "-p", "goose-cli", "--all-targets"]
+need_stdout = false
+
+[keybindings]
+c = "job:check"
+l = "job:clippy"
+t = "job:test"
+shift-l = "job:lib"
+shift-f = "job:full"
