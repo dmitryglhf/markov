@@ -2370,7 +2370,7 @@
     "defaultMessage": "Sunucu başlatılıyor veya geçici olarak kullanılamıyor olabilir."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Goose sunucusuna bağlanılamıyor"
+    "defaultMessage": "Markov sunucusuna bağlanılamıyor"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Yeniden dene"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "Yerel AI temsilciniz. Başlamak için bir AI model sağlayıcısına bağlanın."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "goose'a hoş geldiniz"
+    "defaultMessage": "Markov'a hoş geldiniz"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "goose'yi kullanmaya başlamaya hazırsınız."
+    "defaultMessage": "Markov'yi kullanmaya başlamaya hazırsınız."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "{providerName}'ye bağlanıldı"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Başlayın"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Daha fazla bilgi edinin"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Yerli model hazır"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Anonim kullanım verileri goose'nin iyileştirilmesine yardımcı olur. Konuşmalarınızı, kodlarınızı veya kişisel verilerinizi asla toplamıyoruz."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Gizlilik"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Anonim kullanım verilerini paylaşın"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Varsayılan Değer"

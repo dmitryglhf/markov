@@ -75,7 +75,7 @@ export const findGooseBinaryPath = (options: FindGooseBinaryOptions = {}): strin
     throw new Error(`Invalid GOOSE_BINARY path: ${pathFromEnv} (pwd is ${process.cwd()})`);
   }
 
-  const binaryName = process.platform === 'win32' ? 'goose.exe' : 'goose';
+  const binaryName = process.platform === 'win32' ? 'markov.exe' : 'markov';
   const possiblePaths: string[] = [];
 
   if (isPackaged && resourcesPath) {

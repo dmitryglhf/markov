@@ -53,7 +53,13 @@ import { UPDATES_ENABLED } from './updates';
 import './utils/recipeHash';
 import type { GooseApp } from './types/apps';
 import installExtension, { REACT_DEVELOPER_TOOLS } from 'electron-devtools-installer';
-import { BLOCKED_PROTOCOLS, WEB_PROTOCOLS } from './utils/urlSecurity';
+import {
+  BLOCKED_PROTOCOLS,
+  WEB_PROTOCOLS,
+  isProtocolSafe,
+  getProtocol,
+  isLoopbackUrl,
+} from './utils/urlSecurity';
 import { buildCSP } from './utils/csp';
 
 function shouldSetupUpdater(): boolean {
@@ -99,7 +105,7 @@ const MENU_TRANSLATIONS_ZH_CN: Record<string, string> = {
   'Quick Launcher': '快速启动器',
   'Always on Top': '窗口置顶',
   'Toggle Navigation': '切换导航',
-  'About Goose': '关于 Goose',
+  'About Markov': '关于 Markov',
   // Electron's default role-based labels we want to translate as well.
   // (The menu role itself still provides the correct behaviour; only the
   // display string is overridden.)
@@ -415,28 +421,10 @@ if (process.env.ENABLE_PLAYWRIGHT) {
   app.commandLine.appendSwitch('remote-debugging-port', debugPort);
 }
 
-// In development mode, force registration as the default protocol client
-// In production, register normally
-if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-  // Development mode - force registration
-  console.log('[Main] Development mode: Forcing protocol registration for goose://');
-  app.setAsDefaultProtocolClient('goose');
-
-  if (process.platform === 'darwin') {
-    try {
-      // Reset the default handler to ensure dev version takes precedence
-      spawn('open', ['-a', process.execPath, '--args', '--reset-protocol-handler', 'goose'], {
-        detached: true,
-        stdio: 'ignore',
-      });
-    } catch {
-      console.warn('[Main] Could not reset protocol handler');
-    }
-  }
-} else {
-  // Production mode - normal registration
-  app.setAsDefaultProtocolClient('goose');
-}
+// fork: схему не регистрируем. Рецепт из ссылки поднимает объявленные им
+// расширения в session/new, а доверительный диалог показывается позже и
+// гейтит только автоотправку первого сообщения. Обработчики ниже оставлены
+// живыми, чтобы дельта против upstream оставалась в одну эту врезку.
 
 // Apply single instance lock on Windows and Linux where it's needed for deep links
 // macOS uses the 'open-url' event instead
@@ -819,7 +807,7 @@ async function handleFileOpen(filePath: string) {
 
     // Show user-friendly error notification
     new Notification({
-      title: 'Goose',
+      title: 'Markov',
       body: `Could not open directory: ${path.basename(filePath)}`,
     }).show();
   }
@@ -1191,7 +1179,7 @@ const createChat = async (
       log.error('goose serve failed to start', error);
       dialog.showMessageBoxSync({
         type: 'error',
-        title: 'Goose Failed to Start',
+        title: 'Markov Failed to Start',
         message: 'The backend server failed to start.',
         detail: [
           'Backend: goose serve',
@@ -1889,10 +1877,9 @@ ipcMain.on('react-ready', (event) => {
 });
 
 ipcMain.handle('open-external', async (_event, url: string) => {
-  const parsedUrl = new URL(url);
-
-  if (BLOCKED_PROTOCOLS.includes(parsedUrl.protocol)) {
-    console.warn(`[Main] Blocked dangerous protocol: ${parsedUrl.protocol}`);
+  // белый список вместо чёрного: url приходит из вывода модели
+  if (!isProtocolSafe(url)) {
+    log.warn(`[Main] Blocked protocol not on the allowlist: ${getProtocol(url) ?? 'unparsable'}`);
     return;
   }
 
@@ -2439,14 +2426,13 @@ async function appMain() {
 
   // Handle microphone permission requests
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    console.log('Permission requested:', permission);
-    // Allow microphone and media access
+    // media нужен диктовке, остальное приложению не требуется
     if (permission === 'media') {
       callback(true);
-    } else {
-      // Default behavior for other permissions
-      callback(true);
+      return;
     }
+    log.info(`[Main] Denied permission request: ${permission}`);
+    callback(false);
   });
 
   // Add CSP headers to all sessions, recomputed on every response so external
@@ -2473,8 +2459,12 @@ async function appMain() {
   // Register global shortcuts based on settings
   registerGlobalShortcuts();
 
+  // подменять Origin нужно только ради CORS у goose serve на петле,
+  // на прочие хосты он уходил как ложный признак происхождения
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['Origin'] = 'http://localhost:5173';
+    if (isLoopbackUrl(details.url)) {
+      details.requestHeaders['Origin'] = 'http://localhost:5173';
+    }
     callback({ cancel: false, requestHeaders: details.requestHeaders });
   });
 
@@ -2763,7 +2753,7 @@ async function appMain() {
 
       // Create the About Goose menu item with a submenu
       const aboutGooseMenuItem = new MenuItem({
-        label: menuT('About Goose'),
+        label: menuT('About Markov'),
         submenu: Menu.buildFromTemplate([]), // Start with an empty submenu for About
       });
 

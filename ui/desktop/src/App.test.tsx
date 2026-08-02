@@ -262,7 +262,7 @@ describe('App Component - Brand New State', () => {
       expect(mockElectron.reactReady).toHaveBeenCalled();
     });
 
-    expect(screen.getByText(/^Welcome to goose/)).toBeInTheDocument();
+    expect(screen.getByText(/^Welcome to Markov/)).toBeInTheDocument();
   });
 
   it('should not redirect when provider is configured', async () => {

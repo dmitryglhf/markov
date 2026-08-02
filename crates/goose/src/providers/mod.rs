@@ -67,6 +67,7 @@ pub mod openai_compatible {
     pub use goose_providers::openai_compatible::*;
 }
 pub mod openrouter;
+pub mod pgpro;
 pub mod pi_acp;
 mod private_file;
 pub mod provider_registry;

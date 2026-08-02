@@ -2370,7 +2370,7 @@
     "defaultMessage": "Pelayan mungkin sedang dimulakan atau tidak tersedia buat sementara waktu."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Tidak dapat menyambung ke pelayan Goose"
+    "defaultMessage": "Tidak dapat menyambung ke pelayan Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Cuba Semula"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "Ejen AI tempatan anda. Sambungkan penyedia model AI untuk bermula."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Selamat datang ke goose"
+    "defaultMessage": "Selamat datang ke Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Anda sudah bersedia untuk mula menggunakan goose."
+    "defaultMessage": "Anda sudah bersedia untuk mula menggunakan Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Disambungkan ke {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Mulakan"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Ketahui lebih lanjut"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Model setempat sedia"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Data penggunaan tanpa nama membantu menambah baik goose. Kami tidak sekali-kali mengumpul perbualan, kod atau data peribadi anda."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Privasi"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Kongsi data penggunaan tanpa nama"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Nilai Lalai"

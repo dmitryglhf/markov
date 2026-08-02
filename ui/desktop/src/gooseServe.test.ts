@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildLocalServeUrls, findGooseBinaryPath, startGooseServe } from './gooseServe';
 
-const binaryName = process.platform === 'win32' ? 'goose.exe' : 'goose';
+const binaryName = process.platform === 'win32' ? 'markov.exe' : 'markov';
 const tempDirs: string[] = [];
 const originalCwd = process.cwd();
 type ReadinessFetchInit = Parameters<typeof globalThis.fetch>[1];

@@ -18,7 +18,7 @@ fn format_date(date: DateTime<chrono::Utc>) -> String {
 pub fn handle_project_default() -> Result<()> {
     let goose_bin = std::env::current_exe()
         .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| "goose".to_string());
+        .unwrap_or_else(|_| "markov".to_string());
     let tracker = ProjectTracker::load()?;
     let mut projects = tracker.list_projects();
 
@@ -30,7 +30,7 @@ pub fn handle_project_default() -> Result<()> {
         let status = command.status()?;
 
         if !status.success() {
-            println!("Failed to run goose. Exit code: {:?}", status.code());
+            println!("Failed to run markov. Exit code: {:?}", status.code());
         }
         return Ok(());
     }
@@ -68,7 +68,7 @@ pub fn handle_project_default() -> Result<()> {
     };
 
     // Ask the user what they want to do
-    let _ = intro("goose Project Manager");
+    let _ = intro("markov Project Manager");
 
     let current_dir = std::env::current_dir()?;
     let current_dir_display = current_dir.display();
@@ -117,7 +117,7 @@ pub fn handle_project_default() -> Result<()> {
             let status = command.status()?;
 
             if !status.success() {
-                println!("Failed to run goose. Exit code: {:?}", status.code());
+                println!("Failed to run markov. Exit code: {:?}", status.code());
             }
         }
         "fresh" => {
@@ -137,7 +137,7 @@ pub fn handle_project_default() -> Result<()> {
             let status = command.status()?;
 
             if !status.success() {
-                println!("Failed to run goose. Exit code: {:?}", status.code());
+                println!("Failed to run markov. Exit code: {:?}", status.code());
             }
         }
         "new" => {
@@ -151,7 +151,7 @@ pub fn handle_project_default() -> Result<()> {
             let status = command.status()?;
 
             if !status.success() {
-                println!("Failed to run goose. Exit code: {:?}", status.code());
+                println!("Failed to run markov. Exit code: {:?}", status.code());
             }
         }
         _ => {
@@ -168,7 +168,7 @@ pub fn handle_project_default() -> Result<()> {
 pub fn handle_projects_interactive() -> Result<()> {
     let goose_bin = std::env::current_exe()
         .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| "goose".to_string());
+        .unwrap_or_else(|_| "markov".to_string());
     let tracker = ProjectTracker::load()?;
     let mut projects = tracker.list_projects();
 
@@ -219,7 +219,7 @@ pub fn handle_projects_interactive() -> Result<()> {
         .collect();
 
     // Let the user select a project
-    let _ = intro("goose Project Manager");
+    let _ = intro("markov Project Manager");
     let mut select = cliclack::select("Select a project:");
 
     // Add each project as an option
@@ -303,7 +303,7 @@ pub fn handle_projects_interactive() -> Result<()> {
     let status = command.status()?;
 
     if !status.success() {
-        println!("Failed to run goose. Exit code: {:?}", status.code());
+        println!("Failed to run markov. Exit code: {:?}", status.code());
     }
 
     Ok(())

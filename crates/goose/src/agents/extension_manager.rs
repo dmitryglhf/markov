@@ -1037,7 +1037,7 @@ impl ExtensionManager {
                                 .arg("exec")
                                 .arg("-i")
                                 .arg(container_id)
-                                .arg("goose")
+                                .arg("markov")
                                 .arg("mcp")
                                 .arg(&normalized_name);
                         });

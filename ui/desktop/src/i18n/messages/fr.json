@@ -2370,7 +2370,7 @@
     "defaultMessage": "Le serveur est peut-être en cours de démarrage ou temporairement indisponible."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Impossible de se connecter au serveur Goose"
+    "defaultMessage": "Impossible de se connecter au serveur Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Réessayer"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "Votre agent IA local. Connectez un fournisseur de modèle IA pour commencer."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Bienvenue dans goose"
+    "defaultMessage": "Bienvenue dans Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Vous êtes prêt à commencer à utiliser goose."
+    "defaultMessage": "Vous êtes prêt à commencer à utiliser Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Connecté à {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Commencer"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "En savoir plus"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Modèle local prêt"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Les données d'utilisation anonymes contribuent à améliorer goose. Nous ne collectons jamais vos conversations, votre code ni vos données personnelles."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Confidentialité"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Partager des données d'utilisation anonymes"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Valeur par défaut"

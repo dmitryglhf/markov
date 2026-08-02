@@ -3559,7 +3559,7 @@ impl Agent {
         let config = Config::global();
         let provider_name: String = config
             .get_goose_provider()
-            .expect("No provider configured. Run 'goose configure' first");
+            .expect("No provider configured. Run 'markov configure' first");
 
         let settings = Settings {
             goose_provider: Some(provider_name.clone()),
