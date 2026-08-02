@@ -35,6 +35,42 @@
         
         buildInputs = commonInputs
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinInputs;
+
+        # Electron dlopens these at runtime, npm ships it as a prebuilt ELF
+        electronLibs = with pkgs; [
+          alsa-lib
+          at-spi2-core
+          cairo
+          cups
+          dbus
+          expat
+          fontconfig
+          freetype
+          gdk-pixbuf
+          glib
+          gtk3
+          libGL
+          libdrm
+          libgbm
+          libx11
+          libxcb
+          libxcomposite
+          libxcursor
+          libxdamage
+          libxext
+          libxfixes
+          libxi
+          libxkbcommon
+          libxrandr
+          libxrender
+          libxscrnsaver
+          libxtst
+          mesa
+          nspr
+          nss
+          pango
+          udev
+        ];
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
@@ -116,6 +152,7 @@
             go_1_25 # 'just' run-ui
             just # used in dev/test
             nodejs_24 # 'just' run-ui
+            pnpm_10 # ui/desktop wants >=10.30, plain pnpm is 11 and rewrites the lockfile
             ripgrep
             rustfmt
             libxcb
@@ -124,6 +161,9 @@
           ]);
           
           shellHook = ''
+            # only used on NixOS, where nix-ld provides the loader Electron asks for
+            export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath electronLibs}''${NIX_LD_LIBRARY_PATH:+:$NIX_LD_LIBRARY_PATH}"
+
             echo "goose development environment"
             echo "Rust version: $(rustc --version)"
             echo ""
@@ -132,6 +172,7 @@
             echo "  nix run             - Run goose CLI"
             echo "  cargo build -p goose-cli - Build with cargo"
             echo "  cargo run -p goose-cli   - Run with cargo"
+            echo "  just run-ui              - Build the CLI and start the desktop"
           '';
         };
       }

@@ -167,6 +167,7 @@ async fn load_extensions(
         set.spawn(async move { (id, agent_ptr.add_extension(cfg, &sid).await) });
     }
 
+    let total = extensions_to_load.len();
     let get_message = |waiting_ids: &BTreeSet<usize>| {
         let labels: Vec<String> = waiting_ids
             .iter()
@@ -178,8 +179,9 @@ async fn load_extensions(
             })
             .collect();
         format!(
-            "starting {} extensions: {}",
+            "waiting for {} of {} extensions: {}",
             waiting_ids.len(),
+            total,
             labels.join(", ")
         )
     };
@@ -217,7 +219,7 @@ async fn load_extensions(
         eprintln!(
             "{}",
             style(format!(
-                "  Hint: once the session starts, ask goose to help debug the '{}' extension",
+                "  Hint: once the session starts, ask markov to help debug the '{}' extension",
                 label
             ))
             .dim()
@@ -251,7 +253,7 @@ fn resolve_provider_and_model(
         .or_else(|| recipe_settings.and_then(|s| s.goose_provider.clone()))
         .or_else(|| config.get_goose_provider().ok())
         .unwrap_or_else(|| {
-            output::render_error("No provider configured. Run 'goose configure' first.");
+            output::render_error("No provider configured. Run 'markov configure' first.");
             process::exit(1);
         });
 
@@ -262,7 +264,7 @@ fn resolve_provider_and_model(
         .or_else(|| recipe_settings.and_then(|s| s.goose_model.clone()))
         .or_else(|| config.get_goose_model().ok())
         .unwrap_or_else(|| {
-            output::render_error("No model configured. Run 'goose configure' first.");
+            output::render_error("No model configured. Run 'markov configure' first.");
             process::exit(1);
         });
 
@@ -561,11 +563,11 @@ pub async fn build_session(session_config: SessionBuilderConfig) -> CliSession {
                     && is_provider_unavailable_error(&e) =>
             {
                 let fallback_provider = config.get_goose_provider().unwrap_or_else(|_| {
-                    output::render_error("No provider configured. Run 'goose configure' first.");
+                    output::render_error("No provider configured. Run 'markov configure' first.");
                     process::exit(1);
                 });
                 let fallback_model = config.get_goose_model().unwrap_or_else(|_| {
-                    output::render_error("No model configured. Run 'goose configure' first.");
+                    output::render_error("No model configured. Run 'markov configure' first.");
                     process::exit(1);
                 });
                 eprintln!(

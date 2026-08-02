@@ -110,7 +110,7 @@ async fn ensure_working_provider(
     let preamble = log.join("\n");
     Ok(Some(Message::assistant().with_text(format!(
         "**Goose Doctor**\n\n{}\n\n\
-         No working provider found. Run `goose configure` to set one up.",
+         No working provider found. Run `markov configure` to set one up.",
         preamble,
     ))))
 }
@@ -244,7 +244,7 @@ async fn try_other_providers(
 fn describe_error(e: &ProviderError) -> String {
     match e {
         ProviderError::Authentication(_) => {
-            "Authentication failed — check your API key. Run `goose configure` to update it."
+            "Authentication failed — check your API key. Run `markov configure` to update it."
                 .to_string()
         }
         ProviderError::CreditsExhausted { top_up_url, .. } => {

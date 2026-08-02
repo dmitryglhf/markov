@@ -145,8 +145,8 @@ impl Drop for CursorRestoreGuard {
 pub async fn handle_configure() -> anyhow::Result<()> {
     if !std::io::stdin().is_terminal() {
         anyhow::bail!(
-            "goose configure requires an interactive terminal.\n\
-             If you installed via 'curl ... | bash', run 'goose configure' separately after installation."
+            "markov configure requires an interactive terminal.\n\
+             If you installed via 'curl ... | bash', run 'markov configure' separately after installation."
         );
     }
 
@@ -203,7 +203,7 @@ pub fn configure_telemetry_consent_dialog() -> anyhow::Result<bool> {
     );
     println!(
         "{}",
-        style("or any personal data. You can change this anytime with 'goose configure'.").dim()
+        style("or any personal data. You can change this anytime with 'markov configure'.").dim()
     );
     println!();
 
@@ -224,7 +224,7 @@ pub fn configure_telemetry_consent_dialog() -> anyhow::Result<bool> {
 
 async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
     println!();
-    println!("{}", style("Welcome to goose! Let's get you set up.").dim());
+    println!("{}", style("Welcome to Markov! Let's get you set up.").dim());
     println!(
         "{}",
         style("  you can rerun this command later to update your configuration").dim()
@@ -235,7 +235,7 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
     configure_telemetry_consent_dialog()?;
 
     println!();
-    cliclack::intro(style(" goose-configure ").on_cyan().black())?;
+    cliclack::intro(style(" markov-configure ").on_cyan().black())?;
 
     let setup_method = cliclack::select("How would you like to set up your provider?")
         .item(
@@ -288,7 +288,7 @@ async fn handle_manual_provider_setup(config: &Config) {
             println!(
                 "\n  {}: Run '{}' again to adjust your config or add extensions",
                 style("Tip").green().italic(),
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
             set_extension(ExtensionEntry {
                 enabled: true,
@@ -298,9 +298,9 @@ async fn handle_manual_provider_setup(config: &Config) {
         Ok(false) => {
             let _ = config.clear();
             println!(
-                "\n  {}: We did not save your config, inspect your credentials\n   and run '{}' again to ensure goose can connect",
+                "\n  {}: We did not save your config, inspect your credentials\n   and run '{}' again to ensure markov can connect",
                 style("Warning").yellow().italic(),
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Err(e) => {
@@ -317,7 +317,7 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Required configuration key '{}' not found \n  Please provide this value and run '{}' again",
                 style("Error").red().italic(),
                 key,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Some(ConfigError::KeyringError(msg)) => {
@@ -328,7 +328,7 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Invalid configuration value: {} \n  Please check your input and run '{}' again",
                 style("Error").red().italic(),
                 msg,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Some(ConfigError::FileError(err)) => {
@@ -336,7 +336,7 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Failed to access config file: {} \n  Please check file permissions and run '{}' again",
                 style("Error").red().italic(),
                 err,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Some(ConfigError::DirectoryError(msg)) => {
@@ -344,15 +344,15 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Failed to access config directory: {} \n  Please check directory permissions and run '{}' again",
                 style("Error").red().italic(),
                 msg,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         _ => {
             println!(
-                "\n  {} {} \n  We did not save your config, inspect your credentials\n   and run '{}' again to ensure goose can connect",
+                "\n  {} {} \n  We did not save your config, inspect your credentials\n   and run '{}' again to ensure markov can connect",
                 style("Error").red().italic(),
                 e,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
     }
@@ -364,7 +364,7 @@ fn print_keyring_error(msg: &str) {
         "\n  {} Failed to access secure storage (keyring): {} \n  Please check your system keychain and run '{}' again. \n  If your system is unable to use the keyring, please try setting secret key(s) via environment variables.",
         style("Error").red().italic(),
         msg,
-        style("goose configure").cyan()
+        style("markov configure").cyan()
     );
 }
 
@@ -374,7 +374,7 @@ fn print_keyring_error(msg: &str) {
         "\n  {} Failed to access Windows Credential Manager: {} \n  Please check Windows Credential Manager and run '{}' again. \n  If your system is unable to use the Credential Manager, please try setting secret key(s) via environment variables.",
         style("Error").red().italic(),
         msg,
-        style("goose configure").cyan()
+        style("markov configure").cyan()
     );
 }
 
@@ -384,7 +384,7 @@ fn print_keyring_error(msg: &str) {
         "\n  {} Failed to access secure storage: {} \n  Please check your system's secure storage and run '{}' again. \n  If your system is unable to use secure storage, please try setting secret key(s) via environment variables.",
         style("Error").red().italic(),
         msg,
-        style("goose configure").cyan()
+        style("markov configure").cyan()
     );
 }
 
@@ -403,7 +403,7 @@ async fn handle_existing_config() -> anyhow::Result<()> {
     );
     println!();
 
-    cliclack::intro(style(" goose-configure ").on_cyan().black())?;
+    cliclack::intro(style(" markov-configure ").on_cyan().black())?;
     let action = cliclack::select("What would you like to configure?")
         .item(
             "providers",
@@ -424,8 +424,8 @@ async fn handle_existing_config() -> anyhow::Result<()> {
         .item("remove", "Remove Extension", "Remove an extension")
         .item(
             "settings",
-            "goose settings",
-            "Set the goose mode, Tool Output, Tool Permissions, Experiment, goose recipe github repo and more",
+            "markov settings",
+            "Set the markov mode, Tool Output, Tool Permissions, Experiment, markov recipe github repo and more",
         )
         .interact()?;
 
@@ -1321,7 +1321,7 @@ pub fn configure_extensions_dialog() -> anyhow::Result<()> {
         .item(
             "built-in",
             "Built-in Extension",
-            "Use an extension that comes with goose",
+            "Use an extension that comes with markov",
         )
         .item(
             "stdio",
@@ -1411,8 +1411,8 @@ pub async fn configure_settings_dialog() -> anyhow::Result<()> {
     #[allow(unused_mut)]
     let mut setting_select = cliclack::select("What setting would you like to configure?").item(
         "goose_mode",
-        "goose mode",
-        "Configure goose mode",
+        "markov mode",
+        "Configure markov mode",
     );
     #[cfg(feature = "telemetry")]
     {
@@ -1450,8 +1450,8 @@ pub async fn configure_settings_dialog() -> anyhow::Result<()> {
         )
         .item(
             "recipe",
-            "goose recipe github repo",
-            "goose will pull recipes from this repo if not found locally.",
+            "markov recipe github repo",
+            "markov will pull recipes from this repo if not found locally.",
         )
         .interact()?;
 
@@ -1504,7 +1504,7 @@ pub fn configure_goose_mode_dialog() -> anyhow::Result<()> {
         );
     }
 
-    let mode = cliclack::select("Which goose mode would you like to configure?")
+    let mode = cliclack::select("Which markov mode would you like to configure?")
         .item(
             GooseMode::Auto,
             "Auto Mode",
@@ -1648,7 +1648,7 @@ pub fn configure_keyring_dialog() -> anyhow::Result<()> {
             config.set_param("GOOSE_DISABLE_KEYRING", Value::String("".to_string()))?;
             cliclack::outro("Secret storage set to system keyring (secure)")?;
             let _ =
-                cliclack::log::info("You may need to restart goose for this change to take effect");
+                cliclack::log::info("You may need to restart markov for this change to take effect");
         }
         "file" => {
             // Set the disable flag to use file storage
@@ -1658,7 +1658,7 @@ pub fn configure_keyring_dialog() -> anyhow::Result<()> {
                 secrets_path.display(),
             ))?;
             let _ =
-                cliclack::log::info("You may need to restart goose for this change to take effect");
+                cliclack::log::info("You may need to restart markov for this change to take effect");
         }
         _ => unreachable!(),
     };
@@ -1885,7 +1885,7 @@ fn configure_recipe_dialog() -> anyhow::Result<()> {
         .ok()
         .or_else(|| config.get_param(key_name).unwrap_or(None));
     let mut recipe_repo_input = cliclack::input(
-        "Enter your goose recipe GitHub repo (owner/repo): eg: my_org/goose-recipes",
+        "Enter your markov recipe GitHub repo (owner/repo): eg: my_org/goose-recipes",
     )
     .required(false);
     if let Some(recipe_repo) = default_recipe_repo {
@@ -1925,7 +1925,7 @@ pub fn configure_max_turns_dialog() -> anyhow::Result<()> {
     config.set_param("GOOSE_MAX_TURNS", max_turns)?;
 
     cliclack::outro(format!(
-        "Set maximum turns to {} - goose will ask for input after {} consecutive actions",
+        "Set maximum turns to {} - markov will ask for input after {} consecutive actions",
         max_turns, max_turns
     ))?;
 

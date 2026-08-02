@@ -2370,7 +2370,7 @@
     "defaultMessage": "O servidor pode estar a iniciar ou temporariamente indisponível."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Não foi possível ligar ao servidor Goose"
+    "defaultMessage": "Não foi possível ligar ao servidor Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Tentar novamente"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "O seu agente de IA local. Ligue um fornecedor de modelos de IA para começar."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Bem-vindo ao goose"
+    "defaultMessage": "Bem-vindo ao Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Está tudo pronto para começar a usar o goose."
+    "defaultMessage": "Está tudo pronto para começar a usar o Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Ligado a {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Começar"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Saber mais"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Modelo local pronto"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Os dados de utilização anónimos ajudam a melhorar o goose. Nunca recolhemos as suas conversas, código ou dados pessoais."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Privacidade"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Partilhar dados de utilização anónimos"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Valor predefinido"

@@ -2370,7 +2370,7 @@
     "defaultMessage": "服务器可能正在启动或暂时不可用。"
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "无法连接到 Goose 服务器"
+    "defaultMessage": "无法连接到 Markov 服务器"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "重试"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "你的本地 AI agent。连接 AI 模型提供商即可开始。"
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "欢迎使用 goose"
+    "defaultMessage": "欢迎使用 Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "一切就绪，可以开始使用 goose 了。"
+    "defaultMessage": "一切就绪，可以开始使用 Markov 了。"
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "已连接到 {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "开始使用"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "了解更多"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "本地模型就绪"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "匿名使用数据有助于改善 goose。我们绝不采集你的对话、代码或个人数据。"
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "隐私"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "分享匿名使用数据"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "默认值"

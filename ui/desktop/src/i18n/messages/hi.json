@@ -2370,7 +2370,7 @@
     "defaultMessage": "सर्वर चालू हो सकता है या अस्थायी रूप से अनुपलब्ध हो सकता है।"
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Goose सर्वर से कनेक्ट करने में असमर्थ"
+    "defaultMessage": "Markov सर्वर से कनेक्ट करने में असमर्थ"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "पुनः प्रयास करें"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "आपका स्थानीय एआई एजेंट। आरंभ करने के लिए किसी AI मॉडल प्रदाता से कनेक्ट करें।"
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "goose में आपका स्वागत है"
+    "defaultMessage": "Markov में आपका स्वागत है"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "आप goose का उपयोग शुरू करने के लिए पूरी तरह तैयार हैं।"
+    "defaultMessage": "आप Markov का उपयोग शुरू करने के लिए पूरी तरह तैयार हैं।"
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "{providerName} से कनेक्टेड"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "आरंभ करें"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "और जानें"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "स्थानीय मॉडल तैयार"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "अनाम उपयोग डेटा goose को बेहतर बनाने में मदद करता है। हम कभी भी आपकी बातचीत, कोड या व्यक्तिगत डेटा एकत्र नहीं करते हैं।"
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "गोपनीयता"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "अनाम उपयोग डेटा साझा करें"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "डिफ़ॉल्ट मान"

@@ -702,7 +702,7 @@ impl CliSession {
                     None => {
                         output::render_error(
                             "No editor found. Set one with:\n  \
-                                 goose configure set goose_prompt_editor \"vim\"\n  \
+                                 markov configure set goose_prompt_editor \"vim\"\n  \
                                  or set $VISUAL or $EDITOR in your shell.",
                         );
                     }
@@ -2098,7 +2098,7 @@ fn prompt_tool_confirmation(security_prompt: &Option<String>) -> Result<Permissi
         println!("\n{}", security_message);
         "Do you allow this tool call?".to_string()
     } else {
-        "Goose would like to call the above tool, do you allow?".to_string()
+        "Markov would like to call the above tool, do you allow?".to_string()
     };
 
     let permission_result = if security_prompt.is_none() {
@@ -2473,7 +2473,7 @@ async fn get_reasoner(
         println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
         config
             .get_goose_provider()
-            .expect("No provider configured. Run 'goose configure' first")
+            .expect("No provider configured. Run 'markov configure' first")
     };
 
     // Try planner-specific model first, fall back to default model
@@ -2483,7 +2483,7 @@ async fn get_reasoner(
         println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
         config
             .get_goose_model()
-            .expect("No model configured. Run 'goose configure' first")
+            .expect("No model configured. Run 'markov configure' first")
     };
 
     let planner_context_limit = match env::var(GOOSE_PLANNER_CONTEXT_LIMIT)

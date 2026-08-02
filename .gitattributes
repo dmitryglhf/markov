@@ -1,1 +1,4 @@
 crates/goose/src/agents/snapshots/*.snap linguist-language=Text
+
+# fork pins its own inputs, upstream churn here is never worth a conflict
+flake.lock merge=ours

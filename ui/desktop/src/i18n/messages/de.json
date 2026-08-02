@@ -2370,7 +2370,7 @@
     "defaultMessage": "Der Server startet möglicherweise gerade oder ist vorübergehend nicht verfügbar."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Verbindung zum Goose-Server nicht möglich"
+    "defaultMessage": "Verbindung zum Markov-Server nicht möglich"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Erneut versuchen"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "Ihr lokaler KI-Agent. Verbinden Sie einen KI-Modellanbieter, um zu beginnen."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Willkommen bei goose"
+    "defaultMessage": "Willkommen bei Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Sie können jetzt mit goose loslegen."
+    "defaultMessage": "Sie können jetzt mit Markov loslegen."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Verbunden mit {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Loslegen"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Mehr erfahren"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Lokales Modell bereit"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Anonyme Nutzungsdaten helfen, goose zu verbessern. Wir erfassen niemals Ihre Konversationen, Ihren Code oder Ihre persönlichen Daten."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Datenschutz"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Anonyme Nutzungsdaten teilen"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Standardwert"

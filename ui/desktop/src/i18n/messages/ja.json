@@ -2370,7 +2370,7 @@
     "defaultMessage": "サーバーの起動中、または一時的に利用できない可能性があります。"
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "gooseサーバーに接続できません"
+    "defaultMessage": "Markovサーバーに接続できません"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "再試行"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "ローカルAIエージェントです。始めるにはAIモデルプロバイダーに接続してください。"
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "gooseへようこそ"
+    "defaultMessage": "Markovへようこそ"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "gooseを使い始める準備ができました。"
+    "defaultMessage": "Markovを使い始める準備ができました。"
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "{providerName}に接続しました"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "始める"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "詳しく見る"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "ローカルモデルの準備ができました"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "匿名の使用データはgooseの改善に役立ちます。会話、コード、個人データは収集しません。"
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "プライバシー"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "匿名の使用データを共有"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "デフォルト値"

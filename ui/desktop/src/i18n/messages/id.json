@@ -2370,7 +2370,7 @@
     "defaultMessage": "Server mungkin sedang dimulai atau tidak tersedia untuk sementara."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Tidak dapat terhubung ke server Goose"
+    "defaultMessage": "Tidak dapat terhubung ke server Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Coba Lagi"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "Agen AI lokal Anda. Hubungkan penyedia model AI untuk memulai."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Selamat datang di goose"
+    "defaultMessage": "Selamat datang di Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Anda siap untuk mulai menggunakan goose."
+    "defaultMessage": "Anda siap untuk mulai menggunakan Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Terhubung ke {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Mulai"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Pelajari selengkapnya"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Model lokal siap"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Data penggunaan anonim membantu meningkatkan goose. Kami tidak pernah mengumpulkan percakapan, kode, atau data pribadi Anda."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Privasi"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Bagikan data penggunaan anonim"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Nilai Default"

@@ -2370,7 +2370,7 @@
     "defaultMessage": "Máy chủ có thể đang khởi động hoặc tạm thời không khả dụng."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Không thể kết nối với máy chủ Goose"
+    "defaultMessage": "Không thể kết nối với máy chủ Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Thử lại"
@@ -2379,10 +2379,10 @@
     "defaultMessage": "Tác nhân AI cục bộ của bạn. Kết nối một nhà cung cấp mô hình AI để bắt đầu."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Chào mừng đến với goose"
+    "defaultMessage": "Chào mừng đến với Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Bạn đã sẵn sàng bắt đầu sử dụng goose."
+    "defaultMessage": "Bạn đã sẵn sàng bắt đầu sử dụng Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Đã kết nối với {providerName}"
@@ -2390,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Bắt đầu"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Tìm hiểu thêm"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Mô hình cục bộ đã sẵn sàng"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Dữ liệu sử dụng ẩn danh giúp cải thiện goose. Chúng tôi không bao giờ thu thập cuộc trò chuyện, mã nguồn hoặc dữ liệu cá nhân của bạn."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Quyền riêng tư"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Chia sẻ dữ liệu sử dụng ẩn danh"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Giá trị mặc định"
