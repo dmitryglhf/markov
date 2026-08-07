@@ -39,6 +39,7 @@ use goose::agents::types::RetryConfig;
 use goose::agents::{Agent, SessionConfig, COMPACT_TRIGGERS};
 use goose::config::extensions::name_to_key;
 use goose::config::{Config, GooseMode};
+use goose::slash_commands::types::SlashCommandEntry;
 use input::InputResult;
 use rmcp::model::ServerNotification;
 use rmcp::model::{ElicitationAction, PromptMessage};
@@ -63,6 +64,22 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
 const GOOSE_PLANNER_CONTEXT_LIMIT: &str = "GOOSE_PLANNER_CONTEXT_LIMIT";
+
+/// How long a closing session waits for the name the model is still writing.
+const SESSION_NAME_GRACE: Duration = Duration::from_secs(3);
+
+/// Appends the models the cache does not have yet. What is already there came
+/// from the provider metadata in a deliberate order, so it keeps its place and
+/// only the newcomers are sorted.
+fn merge_fetched_models(known: &mut Vec<String>, fetched: Vec<String>) {
+    let mut fresh: Vec<String> = fetched
+        .into_iter()
+        .filter(|model| !known.contains(model))
+        .collect();
+    fresh.sort();
+    fresh.dedup();
+    known.extend(fresh);
+}
 
 fn planner_provider_messages(plan_messages: &Conversation) -> Conversation {
     let projected_messages = plan_messages.agent_visible_messages();
@@ -211,11 +228,14 @@ pub enum HintStatus {
 pub struct CompletionCache {
     pub prompts: HashMap<String, Vec<String>>,
     pub prompt_info: HashMap<String, output::PromptInfo>,
+    pub slash_commands: Vec<SlashCommandEntry>,
     pub provider_names: Vec<String>,
     pub provider_models: HashMap<String, Vec<String>>,
     pub current_session_provider: String,
     pub last_updated: Instant,
     pub hint_status: HintStatus,
+    pub context_tokens: usize,
+    pub context_limit: usize,
 }
 
 impl CompletionCache {
@@ -223,11 +243,14 @@ impl CompletionCache {
         Self {
             prompts: HashMap::new(),
             prompt_info: HashMap::new(),
+            slash_commands: Vec::new(),
             provider_names: Vec::new(),
             provider_models: HashMap::new(),
             current_session_provider: String::new(),
             last_updated: Instant::now(),
             hint_status: HintStatus::Default,
+            context_tokens: 0,
+            context_limit: 0,
         }
     }
 }
@@ -270,6 +293,23 @@ pub async fn classify_planner_response(
     } else {
         Ok(PlannerResponseType::ClarifyingQuestions)
     }
+}
+
+/// Runs a call until it finishes or the interrupt future fires first. The
+/// planner has no reply loop watching for Ctrl-C the way a normal turn does,
+/// so its calls to the model are raced against the signal here.
+async fn until_interrupted<T>(
+    call: impl std::future::Future<Output = T>,
+    interrupt: impl std::future::Future<Output = ()>,
+) -> Option<T> {
+    tokio::select! {
+        result = call => Some(result),
+        _ = interrupt => None,
+    }
+}
+
+async fn wait_for_ctrl_c() {
+    let _ = ctrl_c().await;
 }
 
 fn planner_classification_text(response: &Message) -> Result<String> {
@@ -526,6 +566,10 @@ impl CliSession {
         let result = self.run_interactive(prompt).await;
 
         self.agent
+            .wait_for_pending_session_name(SESSION_NAME_GRACE)
+            .await;
+
+        self.agent
             .emit_hook(goose::hooks::HookEvent::SessionEnd, &self.session_id)
             .await;
 
@@ -554,7 +598,7 @@ impl CliSession {
         history_manager.load(&mut editor);
 
         loop {
-            self.display_context_usage().await?;
+            self.update_context_gauge().await?;
 
             let conversation_strings: Vec<String> = self
                 .messages
@@ -570,6 +614,9 @@ impl CliSession {
                 .collect();
 
             output::run_status_hook("waiting");
+            // one empty line before every prompt, so the input stands apart from
+            // whatever was printed before it, banner included
+            println!();
             let input = input::get_input(&mut editor, Some(&conversation_strings))?;
             if matches!(input, InputResult::Exit) {
                 break;
@@ -584,8 +631,10 @@ impl CliSession {
     fn create_editor(
         &self,
     ) -> Result<rustyline::Editor<GooseCompleter, rustyline::history::DefaultHistory>> {
-        let builder =
-            rustyline::Config::builder().completion_type(rustyline::CompletionType::Circular);
+        let builder = rustyline::Config::builder()
+            .completion_type(rustyline::CompletionType::List)
+            .completion_show_all_if_ambiguous(true)
+            .bell_style(rustyline::config::BellStyle::None);
         let builder = match self.edit_mode {
             Some(mode) => builder.edit_mode(mode),
             None => builder.edit_mode(EditMode::Emacs),
@@ -613,17 +662,25 @@ impl CliSession {
             }
             InputResult::Exit => unreachable!("Exit is handled in the main loop"),
             InputResult::AddExtension(cmd) => {
-                history.save(editor);
-                match self.add_extension(cmd.clone()).await {
-                    Ok(_) => output::render_extension_success(&cmd),
-                    Err(e) => output::render_extension_error(&cmd, &e.to_string()),
+                if cmd.is_empty() {
+                    output::render_extension_usage();
+                } else {
+                    history.save(editor);
+                    match self.add_extension(cmd.clone()).await {
+                        Ok(_) => output::render_extension_success(&cmd),
+                        Err(e) => output::render_extension_error(&cmd, &e.to_string()),
+                    }
                 }
             }
             InputResult::AddBuiltin(names) => {
-                history.save(editor);
-                match self.add_builtin(names.clone()).await {
-                    Ok(_) => output::render_builtin_success(&names),
-                    Err(e) => output::render_builtin_error(&names, &e.to_string()),
+                if names.is_empty() {
+                    output::render_builtin_usage();
+                } else {
+                    history.save(editor);
+                    match self.add_builtin(names.clone()).await {
+                        Ok(_) => output::render_builtin_success(&names),
+                        Err(e) => output::render_builtin_error(&names, &e.to_string()),
+                    }
                 }
             }
             InputResult::ToggleTheme => {
@@ -743,8 +800,8 @@ impl CliSession {
 
                 let _provider = self.agent.provider().await?;
 
-                println!();
                 output::run_status_hook("thinking");
+                output::begin_answer();
                 output::show_thinking();
                 let start_time = Instant::now();
                 self.process_agent_response(true, CancellationToken::default())
@@ -810,7 +867,7 @@ impl CliSession {
             println!(
                 "{}",
                 console::style(
-                    "✓ Full tool output enabled - tool parameters will no longer be truncated"
+                    "✓ Full tool output enabled - every parameter and every line of output is shown"
                 )
                 .green()
             );
@@ -818,7 +875,7 @@ impl CliSession {
             println!(
                 "{}",
                 console::style(
-                    "✓ Full tool output disabled - tool parameters will be truncated to fit terminal width"
+                    "✓ Full tool output disabled - a call takes one line and its output another"
                 )
                 .dim()
             );
@@ -826,6 +883,11 @@ impl CliSession {
     }
 
     async fn handle_goose_mode(&self, mode: &str) -> Result<()> {
+        if mode.is_empty() {
+            output::render_mode_usage(self.agent.goose_mode().await);
+            return Ok(());
+        }
+
         let config = Config::global();
         let mode = match GooseMode::from_str(&mode.to_lowercase()) {
             Ok(mode) => mode,
@@ -1124,41 +1186,20 @@ impl CliSession {
     }
 
     async fn handle_list_skills(&mut self) -> Result<()> {
-        use comfy_table::{presets, Cell, ContentArrangement, Table};
-        use goose::custom_requests::SourceType;
         use goose::skills::list_installed_skills;
         let cwd = std::env::current_dir().unwrap_or_default();
-        let skills = list_installed_skills(Some(&cwd));
+        let mut skills = list_installed_skills(Some(&cwd));
 
         if skills.is_empty() {
             println!("{}", console::style("No skills available.").yellow());
             return Ok(());
         }
 
-        let mut table = Table::new();
-        table.set_content_arrangement(ContentArrangement::Dynamic);
-        table.load_preset(presets::ASCII_FULL);
-        table.set_header(vec!["Skill", "Location", "Description"]);
-
-        let mut sorted_skills = skills;
-        sorted_skills.sort_by(|a, b| a.name.cmp(&b.name));
-
-        for skill in &sorted_skills {
-            let location = if skill.source_type == SourceType::BuiltinSkill {
-                "built-in"
-            } else if skill.global {
-                "global"
-            } else {
-                "project"
-            };
-            table.add_row(vec![
-                Cell::new(&skill.name),
-                Cell::new(location),
-                Cell::new(&skill.description),
-            ]);
-        }
-
-        println!("{table}");
+        skills.sort_by(|a, b| a.name.cmp(&b.name));
+        print!(
+            "{}",
+            output::render_skills(&skills, output::terminal_width())
+        );
         Ok(())
     }
 
@@ -1196,7 +1237,7 @@ impl CliSession {
         let plan_prompt = self.agent.get_plan_prompt(&self.session_id).await?;
         let provider_messages = planner_provider_messages(&plan_messages);
         output::show_thinking();
-        let (plan_response, _usage) = goose::session_context::with_session_id(
+        let planner_call = goose::session_context::with_session_id(
             Some(self.session_id.clone()),
             reasoner.complete(
                 &model_config,
@@ -1204,26 +1245,39 @@ impl CliSession {
                 provider_messages.messages(),
                 &[],
             ),
-        )
-        .await?;
+        );
+        let Some(planned) = until_interrupted(planner_call, wait_for_ctrl_c()).await else {
+            output::hide_thinking();
+            output::render_plan_interrupted();
+            return Ok(());
+        };
+        let (plan_response, _usage) = planned?;
         let classifier_text = planner_classification_text(&plan_response);
         let plan_response = plan_response.user_visible_content();
-        output::render_message(&plan_response, self.debug);
         output::hide_thinking();
+        println!();
+        output::render_message(&plan_response, self.debug);
         let classifier_text = classifier_text?;
         anyhow::ensure!(
             !plan_response.content.is_empty(),
             "Planner returned no user-visible content"
         );
-        let planner_response_type = classify_planner_response(
+        let classifier_call = classify_planner_response(
             &self.session_id,
             classifier_text,
             self.agent.provider().await?,
             self.agent
                 .model_config_for_session(&self.session_id)
                 .await?,
-        )
-        .await?;
+        );
+        // the plan is already on screen, so an interrupt here keeps it in the
+        // conversation the same way declining it would
+        let Some(classified) = until_interrupted(classifier_call, wait_for_ctrl_c()).await else {
+            output::render_plan_interrupted();
+            self.push_message(plan_response);
+            return Ok(());
+        };
+        let planner_response_type = classified?;
 
         match planner_response_type {
             PlannerResponseType::Plan => {
@@ -1246,11 +1300,13 @@ impl CliSession {
                 if should_act {
                     output::render_act_on_plan();
                     self.run_mode = RunMode::Normal;
-                    // set goose mode: auto if that isn't already the case
-                    let config = Config::global();
-                    let curr_goose_mode = config.get_goose_mode().unwrap_or_default();
-                    if curr_goose_mode != GooseMode::Auto {
-                        config.set_goose_mode(GooseMode::Auto).unwrap();
+                    // acting needs tools to run unasked, but only for this
+                    // session; the global config must never see this switch
+                    let prior_mode = self.agent.goose_mode().await;
+                    if prior_mode != GooseMode::Auto {
+                        self.agent
+                            .update_goose_mode(GooseMode::Auto, &self.session_id)
+                            .await?;
                     }
 
                     // clear the messages before acting on the plan
@@ -1260,18 +1316,24 @@ impl CliSession {
                     self.push_message(plan_message);
                     // act on the plan
                     output::show_thinking();
-                    self.process_agent_response(true, CancellationToken::default())
-                        .await?;
+                    let acted = self
+                        .process_agent_response(true, CancellationToken::default())
+                        .await;
                     output::hide_thinking();
 
-                    // Reset run & goose mode
-                    if curr_goose_mode != GooseMode::Auto {
-                        config.set_goose_mode(curr_goose_mode)?;
+                    // restored before the ?, so a failed act cannot leave the
+                    // session in auto
+                    if prior_mode != GooseMode::Auto {
+                        self.agent
+                            .update_goose_mode(prior_mode, &self.session_id)
+                            .await?;
                     }
+                    acted?;
                 } else {
                     // add the plan response (assistant message) & carry the conversation forward
                     // in the next round, the user might wanna slightly modify the plan
                     self.push_message(plan_response);
+                    output::render_plan_kept();
                 }
             }
             PlannerResponseType::ClarifyingQuestions => {
@@ -1289,6 +1351,9 @@ impl CliSession {
         let message = Message::user().with_text(&prompt);
         let result = self
             .process_message(message, CancellationToken::default(), false)
+            .await;
+        self.agent
+            .wait_for_pending_session_name(SESSION_NAME_GRACE)
             .await;
         self.agent
             .emit_hook(goose::hooks::HookEvent::SessionEnd, &self.session_id)
@@ -1497,13 +1562,11 @@ impl CliSession {
                             handle_agent_error(&e, is_stream_json_mode);
                             cancel_token_clone.cancel();
                             drop(stream);
-                            if let Err(e) = self.handle_interrupted_messages(false).await {
-                                eprintln!("Error handling interruption: {}", e);
-                            } else if !is_stream_json_mode {
+                            if !is_stream_json_mode {
                                 output::render_error(
                                     "The error above was an exception we were not able to handle.\n\
-                                    These errors are often related to connection or authentication\n\
-                                    We've removed the conversation up to the most recent user message\n\
+                                    These errors are often related to connection or authentication.\n\
+                                    Your last request stays in the conversation, marked as unfinished\n\
                                     - depending on the error you may be able to continue",
                                 );
                             }
@@ -1514,9 +1577,12 @@ impl CliSession {
                 }
                 _ = cancel_token_clone.cancelled() => {
                     drop(stream);
-                    if let Err(e) = self.handle_interrupted_messages(true).await {
-                        eprintln!("Error handling interruption: {}", e);
+                    // Whatever the model had already written belongs above the
+                    // interruption notice, not under it.
+                    if !is_json_mode && !is_stream_json_mode {
+                        output::flush_markdown_buffer_current_theme(&mut markdown_buffer);
                     }
+                    self.mark_interrupted();
                     break;
                 }
             }
@@ -1602,84 +1668,21 @@ impl CliSession {
         Ok(())
     }
 
-    async fn handle_interrupted_messages(&mut self, interrupt: bool) -> Result<()> {
-        if interrupt {
+    /// Leaves the conversation exactly as the agent stored it: the abandoned turn
+    /// is marked as such on the next reply, so nothing has to be patched here.
+    fn mark_interrupted(&mut self) {
+        {
             let mut cache = self.completion_cache.write().unwrap();
             cache.hint_status = HintStatus::Interrupted;
         }
-
-        let tool_requests = self
-            .messages
-            .last()
-            .filter(|msg| msg.role == rmcp::model::Role::Assistant)
-            .map_or(Vec::new(), |msg| {
-                msg.content
-                    .iter()
-                    .filter_map(|content| {
-                        if let MessageContent::ToolRequest(req) = content {
-                            Some((req.id.clone(), req.tool_call.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            });
-
-        let interrupt_prompt = "Yes — what would you like me to do?";
-
-        if !tool_requests.is_empty() {
-            let mut response_message = Message::user();
-
-            let notification = if interrupt {
-                "Interrupted by the user to make a correction".to_string()
-            } else {
-                "An uncaught error happened during tool use".to_string()
-            };
-            for (req_id, _) in &tool_requests {
-                response_message.content.push(MessageContent::tool_response(
-                    req_id.clone(),
-                    Err(ErrorData {
-                        code: ErrorCode::INTERNAL_ERROR,
-                        message: std::borrow::Cow::from(notification.clone()),
-                        data: None,
-                    }),
-                ));
-            }
-            self.push_message(response_message);
-            self.push_message(Message::assistant().with_text(interrupt_prompt));
-            output::render_message(
-                &Message::assistant().with_text(interrupt_prompt),
-                self.debug,
-            );
-        } else if let Some(last_msg) = self.messages.last() {
-            if last_msg.role == rmcp::model::Role::User {
-                match last_msg.content.first() {
-                    Some(MessageContent::ToolResponse(_)) => {
-                        self.push_message(Message::assistant().with_text(interrupt_prompt));
-                        output::render_message(
-                            &Message::assistant().with_text(interrupt_prompt),
-                            self.debug,
-                        );
-                    }
-                    Some(_) => {
-                        self.messages.pop();
-                        let assistant_msg = Message::assistant().with_text(interrupt_prompt);
-                        self.push_message(assistant_msg.clone());
-                        output::render_message(&assistant_msg, self.debug);
-                    }
-                    None => {
-                        // Empty message content — nothing to do, just continue gracefully
-                    }
-                }
-            }
-        }
-        Ok(())
+        output::render_interrupted();
     }
 
     pub async fn update_completion_cache(&mut self) -> Result<()> {
         let prompts = self.agent.list_extension_prompts(&self.session_id).await;
         let all_providers = goose::providers::providers().await;
-        let session_provider = self.agent.provider().await?.get_name().to_string();
+        let session_provider_handle = self.agent.provider().await?;
+        let session_provider = session_provider_handle.get_name().to_string();
 
         let provider_ids: Vec<String> = all_providers.iter().map(|(m, _)| m.name.clone()).collect();
         let inventory_models: HashMap<String, Vec<String>> = {
@@ -1708,9 +1711,12 @@ impl CliSession {
             })
             .collect();
 
+        let slash_commands = input::agent_slash_commands();
+
         let mut cache = self.completion_cache.write().unwrap();
         cache.prompts.clear();
         cache.prompt_info.clear();
+        cache.slash_commands = slash_commands;
 
         for (extension, prompt_list) in prompts {
             let names: Vec<String> = prompt_list.iter().map(|p| p.name.clone()).collect();
@@ -1730,7 +1736,7 @@ impl CliSession {
         }
 
         cache.provider_names = all_providers.iter().map(|(m, _)| m.name.clone()).collect();
-        cache.current_session_provider = session_provider;
+        cache.current_session_provider = session_provider.clone();
         cache.provider_models.clear();
         for (metadata, _) in &all_providers {
             let mut models: Vec<String> = metadata
@@ -1757,7 +1763,32 @@ impl CliSession {
         }
 
         cache.last_updated = Instant::now();
+        drop(cache);
+
+        self.refresh_provider_models(session_provider_handle, session_provider);
         Ok(())
+    }
+
+    /// A gateway is the only place that knows which models it serves, so ask the
+    /// provider of this session for its list. Detached on purpose: the prompt
+    /// must not wait on the network, and completion keeps answering from the
+    /// cache until the list arrives.
+    fn refresh_provider_models(&self, provider: Arc<dyn Provider>, provider_name: String) {
+        let cache = Arc::clone(&self.completion_cache);
+        tokio::spawn(async move {
+            let models = match provider.fetch_supported_models().await {
+                Ok(models) if !models.is_empty() => models,
+                Ok(_) => return,
+                Err(err) => {
+                    tracing::debug!("could not fetch models of {provider_name}: {err}");
+                    return;
+                }
+            };
+
+            let mut cache = cache.write().unwrap();
+            let known = cache.provider_models.entry(provider_name).or_default();
+            merge_fetched_models(known, models);
+        });
     }
 
     /// Invalidate the completion cache
@@ -1788,6 +1819,10 @@ impl CliSession {
 
         // Render each message
         for message in &messages {
+            match message.role {
+                rmcp::model::Role::User => output::begin_user_message(),
+                rmcp::model::Role::Assistant => output::begin_answer(),
+            }
             output::render_message(message, self.debug);
         }
 
@@ -1808,7 +1843,10 @@ impl CliSession {
     }
 
     /// Display enhanced context usage with session totals
-    pub async fn display_context_usage(&self) -> Result<()> {
+    /// Refresh the numbers behind the context gauge. They are handed to the
+    /// completer rather than printed: on stdout the gauge would leave a stale
+    /// copy of itself above every past answer.
+    pub async fn update_context_gauge(&self) -> Result<()> {
         let provider = self.agent.provider().await?;
         let model_config = self
             .agent
@@ -1819,32 +1857,27 @@ impl CliSession {
             .await
             .unwrap_or_else(|_| model_config.context_limit());
 
+        let metadata = self.get_session().await.ok();
+        let total_tokens = metadata
+            .as_ref()
+            .and_then(|metadata| metadata.usage.total_tokens)
+            .unwrap_or(0) as usize;
+
+        if let Ok(mut cache) = self.completion_cache.write() {
+            cache.context_tokens = total_tokens;
+            cache.context_limit = context_limit;
+        }
+
         let config = Config::global();
         let show_cost = config
             .get_param::<bool>("GOOSE_CLI_SHOW_COST")
             .unwrap_or(false);
 
-        let provider_name = config
-            .get_goose_provider()
-            .unwrap_or_else(|_| "unknown".to_string());
-
-        match self.get_session().await {
-            Ok(metadata) => {
-                let total_tokens = metadata.usage.total_tokens.unwrap_or(0) as usize;
-
-                output::display_context_usage(total_tokens, context_limit);
-
-                if show_cost {
-                    output::display_cost_usage(
-                        &provider_name,
-                        &model_config.model_name,
-                        &metadata.usage,
-                    );
-                }
-            }
-            Err(_) => {
-                output::display_context_usage(0, context_limit);
-            }
+        if let (true, Some(metadata)) = (show_cost, metadata) {
+            let provider_name = config
+                .get_goose_provider()
+                .unwrap_or_else(|_| "unknown".to_string());
+            output::display_cost_usage(&provider_name, &model_config.model_name, &metadata.usage);
         }
 
         Ok(())
@@ -2215,6 +2248,7 @@ fn handle_mcp_notification(
                         if !is_json_mode {
                             output::render_subagent_tool_call(
                                 subagent_id,
+                                obj.get("label").and_then(|v| v.as_str()),
                                 tool_name,
                                 arguments.as_ref(),
                                 debug,
@@ -2470,7 +2504,6 @@ async fn get_reasoner(
     let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
         provider
     } else {
-        println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
         config
             .get_goose_provider()
             .expect("No provider configured. Run 'markov configure' first")
@@ -2480,7 +2513,6 @@ async fn get_reasoner(
     let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
         model
     } else {
-        println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
         config
             .get_goose_model()
             .expect("No model configured. Run 'markov configure' first")
@@ -2541,6 +2573,27 @@ mod tests {
     use std::collections::HashMap;
     use std::time::Duration;
     use test_case::test_case;
+
+    #[test]
+    fn fetched_models_are_appended_after_the_known_ones() {
+        let mut known = vec!["curated-2".to_string(), "curated-1".to_string()];
+        merge_fetched_models(&mut known, vec!["b".to_string(), "a".to_string()]);
+        assert_eq!(known, ["curated-2", "curated-1", "a", "b"]);
+    }
+
+    #[test]
+    fn a_model_already_known_is_not_repeated() {
+        let mut known = vec!["shared".to_string()];
+        merge_fetched_models(&mut known, vec!["shared".to_string(), "new".to_string()]);
+        assert_eq!(known, ["shared", "new"]);
+    }
+
+    #[test]
+    fn a_gateway_repeating_itself_yields_one_entry() {
+        let mut known = Vec::new();
+        merge_fetched_models(&mut known, vec!["one".to_string(), "one".to_string()]);
+        assert_eq!(known, ["one"]);
+    }
 
     #[test]
     fn planner_classification_excludes_user_only_content() {
@@ -2852,5 +2905,24 @@ mod tests {
             CliSession::parse_streamable_http_extension(url, timeout),
             expected
         );
+    }
+
+    #[tokio::test]
+    async fn a_call_that_finishes_is_returned_whole() {
+        let result = until_interrupted(std::future::ready(7), std::future::pending()).await;
+        assert_eq!(result, Some(7));
+    }
+
+    #[tokio::test]
+    async fn an_interrupt_beats_a_call_that_hangs() {
+        let result = until_interrupted(std::future::pending::<i32>(), std::future::ready(())).await;
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn a_call_that_fails_reports_its_error_rather_than_an_interrupt() {
+        let call = std::future::ready(Err::<(), _>(anyhow::anyhow!("boom")));
+        let result = until_interrupted(call, std::future::pending()).await;
+        assert!(result.is_some_and(|inner| inner.is_err()));
     }
 }

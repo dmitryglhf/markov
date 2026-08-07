@@ -1,6 +1,9 @@
 # Justfile
 
-FEATURES := "rustls-tls,system-keyring,code-mode"
+# no system-keyring: an ad-hoc signed binary gets a new identity on every build,
+# so the OS keychain re-asks for permission and the prompt reads as a hang.
+# Secrets go to config_dir/secrets.yaml (0600) instead.
+FEATURES := "rustls-tls,code-mode"
 
 # list all tasks
 default:
@@ -166,7 +169,7 @@ check-acp-schema: generate-acp-types
 # Generate ACP JSON schema from Rust types
 generate-acp-schema:
     @echo "Generating ACP schema..."
-    cd crates/goose && cargo run --features code-mode,local-inference,aws-providers,telemetry,otel,rustls-tls,system-keyring --bin generate-acp-schema
+    cd crates/goose && cargo run --features code-mode,local-inference,aws-providers,telemetry,otel,rustls-tls --bin generate-acp-schema
     @echo "ACP schema generated: crates/goose/acp-schema.json, crates/goose/acp-meta.json"
 
 # Generate ACP TypeScript types from JSON schema (requires generate-acp-schema first)
@@ -227,6 +230,56 @@ run-dev:
 install-deps:
     cd ui/desktop && pnpm install
     cd documentation && yarn
+
+# Wipe local markov state (config, secrets, sessions, logs) to test setup from scratch. Pass "force" to skip the prompt
+[unix]
+reset-config CONFIRM="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    config="${XDG_CONFIG_HOME:-$HOME/.config}/markov"
+    data="${XDG_DATA_HOME:-$HOME/.local/share}/markov"
+    state="${XDG_STATE_HOME:-$HOME/.local/state}/markov"
+    desktop="$HOME/Library/Application Support/Markov"
+
+    targets=()
+    for path in "$config" "$data" "$state" "$desktop"; do
+        [ -e "$path" ] && targets+=("$path")
+    done
+
+    if [ ${#targets[@]} -eq 0 ]; then
+        echo "No markov directories on disk"
+    else
+        echo "About to remove:"
+        printf '  %s\n' "${targets[@]}"
+    fi
+    # the fork kept the upstream keyring service name, secrets live under "goose"
+    echo "Also clearing keyring secrets (service goose, account secrets)"
+
+    if pgrep -x markov >/dev/null 2>&1; then
+        echo "Warning: markov is running, quit it first or it will rewrite the state"
+    fi
+
+    if [ "{{CONFIRM}}" != "force" ]; then
+        read -r -p "Proceed? [y/N] " reply
+        case "$reply" in
+            y|Y) ;;
+            *) echo "Cancelled"; exit 0 ;;
+        esac
+    fi
+
+    for path in "${targets[@]:-}"; do
+        [ -n "$path" ] && rm -rf "$path"
+    done
+
+    if command -v security >/dev/null 2>&1; then
+        security delete-generic-password -s goose -a secrets >/dev/null 2>&1 || true
+    elif command -v secret-tool >/dev/null 2>&1; then
+        secret-tool clear service goose username secrets >/dev/null 2>&1 || true
+    fi
+
+    echo "Done, next markov run starts the first-time setup"
+    echo "Tip: GOOSE_PATH_ROOT=<dir> markov keeps a throwaway setup out of your real one"
 
 ensure-release-branch:
     #!/usr/bin/env bash

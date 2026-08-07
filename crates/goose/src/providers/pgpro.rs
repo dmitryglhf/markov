@@ -109,6 +109,22 @@ impl PgproProvider {
     async fn fetch_models_from_api(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let response = self.api_client.request("model/info").response_get().await?;
 
+        // the gateway grants /model/info to privileged keys only; an ordinary
+        // virtual key gets 403 and has to settle for the plain model list
+        if !response.status().is_success() {
+            return self.fetch_models_from_list().await;
+        }
+
+        let response_json: Value = response.json().await.map_err(|e| {
+            ProviderError::RequestFailed(format!("Failed to parse models response: {}", e))
+        })?;
+
+        parse_model_info(&response_json)
+    }
+
+    async fn fetch_models_from_list(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        let response = self.api_client.request("v1/models").response_get().await?;
+
         if !response.status().is_success() {
             return Err(ProviderError::RequestFailed(format!(
                 "Models endpoint returned status: {}",
@@ -120,29 +136,7 @@ impl PgproProvider {
             ProviderError::RequestFailed(format!("Failed to parse models response: {}", e))
         })?;
 
-        let models_data = response_json["data"].as_array().ok_or_else(|| {
-            ProviderError::RequestFailed("Missing data field in models response".to_string())
-        })?;
-
-        let mut models = Vec::new();
-        for model_data in models_data {
-            if let Some(model_name) = model_data["model_name"].as_str() {
-                if model_name.contains("/*") {
-                    continue;
-                }
-
-                let model_info = &model_data["model_info"];
-                let context_length =
-                    model_info["max_input_tokens"].as_u64().unwrap_or(128000) as usize;
-                let supports_cache_control = model_info["supports_prompt_caching"].as_bool();
-
-                let mut model_info_obj = ModelInfo::new(model_name, context_length);
-                model_info_obj.supports_cache_control = supports_cache_control;
-                models.push(model_info_obj);
-            }
-        }
-
-        Ok(models)
+        parse_model_list(&response_json)
     }
 
     async fn post(
@@ -181,13 +175,7 @@ impl goose_providers::base::ProviderDescriptor for PgproProvider {
             PGPRO_DOC_URL,
             vec![
                 ConfigKey::new("PGPRO_API_KEY", true, true, None, true),
-                ConfigKey::new(
-                    "PGPRO_HOST",
-                    true,
-                    false,
-                    Some(PGPRO_DEFAULT_HOST),
-                    true,
-                ),
+                ConfigKey::new("PGPRO_HOST", true, false, Some(PGPRO_DEFAULT_HOST), true),
                 ConfigKey::new(
                     "PGPRO_BASE_PATH",
                     true,
@@ -360,6 +348,46 @@ pub fn update_request_for_cache_control(original_payload: &Value) -> Value {
 }
 
 /// PGPRO_CONTEXT_LIMITS maps model name to context window, as a mapping or a JSON string.
+fn parse_model_info(response: &Value) -> Result<Vec<ModelInfo>, ProviderError> {
+    let models_data = response["data"].as_array().ok_or_else(|| {
+        ProviderError::RequestFailed("Missing data field in models response".to_string())
+    })?;
+
+    let mut models = Vec::new();
+    for model_data in models_data {
+        if let Some(model_name) = model_data["model_name"].as_str() {
+            if model_name.contains("/*") {
+                continue;
+            }
+
+            let model_info = &model_data["model_info"];
+            let context_length = model_info["max_input_tokens"].as_u64().unwrap_or(128000) as usize;
+            let supports_cache_control = model_info["supports_prompt_caching"].as_bool();
+
+            let mut model_info_obj = ModelInfo::new(model_name, context_length);
+            model_info_obj.supports_cache_control = supports_cache_control;
+            models.push(model_info_obj);
+        }
+    }
+
+    Ok(models)
+}
+
+/// The plain /v1/models list carries names and nothing else, so the context
+/// window comes from PGPRO_CONTEXT_LIMITS and the measured defaults.
+fn parse_model_list(response: &Value) -> Result<Vec<ModelInfo>, ProviderError> {
+    let models_data = response["data"].as_array().ok_or_else(|| {
+        ProviderError::RequestFailed("Missing data field in models response".to_string())
+    })?;
+
+    Ok(models_data
+        .iter()
+        .filter_map(|model| model["id"].as_str())
+        .filter(|name| !name.contains("/*"))
+        .map(|name| ModelInfo::new(name, configured_context_limit(name).unwrap_or(128000)))
+        .collect())
+}
+
 fn configured_context_limit(model_name: &str) -> Option<usize> {
     let config = crate::config::Config::global();
     let from_config = config
@@ -387,4 +415,42 @@ fn parse_custom_headers(headers_str: String) -> HashMap<String, String> {
         }
     }
     headers
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_restricted_key_still_gets_the_model_names() {
+        let response = serde_json::json!({
+            "data": [
+                {"id": "zai-org/GLM-5-FP8", "object": "model"},
+                {"id": "team/*", "object": "model"},
+                {"id": "unknown-model", "object": "model"},
+            ]
+        });
+        let models = parse_model_list(&response).unwrap();
+        let names: Vec<_> = models.iter().map(|m| m.name.as_str()).collect();
+        assert_eq!(names, ["zai-org/GLM-5-FP8", "unknown-model"]);
+    }
+
+    #[test]
+    fn a_known_model_from_the_list_keeps_its_measured_context_window() {
+        let response = serde_json::json!({"data": [{"id": "zai-org/GLM-5-FP8"}]});
+        let models = parse_model_list(&response).unwrap();
+        assert_eq!(models[0].context_limit, 202_000);
+    }
+
+    #[test]
+    fn a_model_the_gateway_never_measured_gets_the_default_window() {
+        let response = serde_json::json!({"data": [{"id": "unknown-model"}]});
+        let models = parse_model_list(&response).unwrap();
+        assert_eq!(models[0].context_limit, 128_000);
+    }
+
+    #[test]
+    fn a_list_without_data_is_an_error() {
+        assert!(parse_model_list(&serde_json::json!({"object": "list"})).is_err());
+    }
 }

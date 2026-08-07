@@ -224,7 +224,10 @@ pub fn configure_telemetry_consent_dialog() -> anyhow::Result<bool> {
 
 async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
     println!();
-    println!("{}", style("Welcome to Markov! Let's get you set up.").dim());
+    println!(
+        "{}",
+        style("Welcome to Markov! Let's get you set up.").dim()
+    );
     println!(
         "{}",
         style("  you can rerun this command later to update your configuration").dim()
@@ -239,23 +242,24 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
 
     let setup_method = cliclack::select("How would you like to set up your provider?")
         .item(
+            "pgpro",
+            "Postgres Professional (Recommended)",
+            "Use the company model gateway with your API key",
+        )
+        .item(
             "openrouter",
-            "OpenRouter Login (Recommended)",
+            "OpenRouter Login",
             "Sign in with OpenRouter to automatically configure models",
         )
         .item(
-            "tetrate",
-            "Tetrate Agent Router Service Login",
-            "Sign in with Tetrate Agent Router Service to automatically configure models",
-        )
-        .item(
             "manual",
-            "Manual Configuration",
-            "Choose a provider and enter credentials manually",
+            "Other Providers",
+            "Choose from all supported providers and enter credentials manually",
         )
         .interact()?;
 
     match setup_method {
+        "pgpro" => handle_manual_provider_setup(config, Some("pgpro")).await,
         "openrouter" => {
             if let Err(e) = handle_openrouter_auth().await {
                 let _ = config.clear();
@@ -266,24 +270,19 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
                 );
             }
         }
-        "tetrate" => {
-            if let Err(e) = handle_tetrate_auth().await {
-                let _ = config.clear();
-                println!(
-                    "\n  {} Tetrate Agent Router Service authentication failed: {} \n  Please try again or use manual configuration",
-                    style("Error").red().italic(),
-                    e,
-                );
-            }
-        }
-        "manual" => handle_manual_provider_setup(config).await,
+        "manual" => handle_manual_provider_setup(config, None).await,
         _ => unreachable!(),
     }
     Ok(())
 }
 
-async fn handle_manual_provider_setup(config: &Config) {
-    match configure_provider_dialog().await {
+async fn handle_manual_provider_setup(config: &Config, provider_name: Option<&str>) {
+    let outcome = match provider_name {
+        Some(name) => configure_selected_provider(name).await,
+        None => configure_provider_dialog().await,
+    };
+
+    match outcome {
         Ok(true) => {
             println!(
                 "\n  {}: Run '{}' again to adjust your config or add extensions",
@@ -880,18 +879,25 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
             .interact()?
     };
 
-    // Get the selected provider's metadata
+    configure_selected_provider(&provider_name).await
+}
+
+/// Configures credentials and a model for a provider that is already chosen.
+pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<bool> {
+    let config = Config::global();
+
+    let available_providers = providers().await;
     let (provider_meta, _) = available_providers
         .iter()
-        .find(|(p, _)| p.name == provider_name.as_str())
-        .expect("Selected provider must exist in metadata");
+        .find(|(p, _)| p.name == provider_name)
+        .ok_or_else(|| anyhow::anyhow!("Unknown provider: {provider_name}"))?;
 
     for key in provider_meta
         .config_keys
         .iter()
         .filter(|k| k.primary || k.oauth_flow)
     {
-        if !configure_single_key(config, &provider_name, &provider_meta.display_name, key).await? {
+        if !configure_single_key(config, provider_name, &provider_meta.display_name, key).await? {
             return Ok(false);
         }
     }
@@ -907,7 +913,7 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
             .interact()?
     {
         for key in non_primary_keys {
-            if !configure_single_key(config, &provider_name, &provider_meta.display_name, key)
+            if !configure_single_key(config, provider_name, &provider_meta.display_name, key)
                 .await?
             {
                 return Ok(false);
@@ -917,14 +923,17 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
 
     let spin = spinner();
     spin.start("Attempting to fetch supported models...");
-    let temp_provider = create(&provider_name, Vec::new()).await?;
+    let temp_provider = create(provider_name, Vec::new()).await?;
     let models_res = retry_operation(&RetryConfig::default(), || async {
         temp_provider
             .fetch_recommended_models(goose::model_config::global_toolshim())
             .await
     })
     .await;
-    spin.stop(style("Model fetch complete").green());
+    match &models_res {
+        Ok(_) => spin.stop(style("Model fetch complete").green()),
+        Err(_) => spin.stop(style("Model fetch failed").red()),
+    }
 
     // Select a model: on fetch error show styled error and abort; if models available, show list; otherwise free-text input
     let model: String = match models_res {
@@ -973,11 +982,10 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
         .unwrap_or(false);
     let toolshim_model = std::env::var("GOOSE_TOOLSHIM_OLLAMA_MODEL").ok();
 
-    match test_provider_configuration(&provider_name, &model, toolshim_enabled, toolshim_model)
-        .await
+    match test_provider_configuration(provider_name, &model, toolshim_enabled, toolshim_model).await
     {
         Ok(()) => {
-            goose::config::set_active_provider(config, &provider_name, &model)?;
+            goose::config::set_active_provider(config, provider_name, &model)?;
             print_config_file_saved()?;
             Ok(true)
         }
@@ -1647,8 +1655,9 @@ pub fn configure_keyring_dialog() -> anyhow::Result<()> {
             // Set to empty string to enable keyring (absence or empty = enabled)
             config.set_param("GOOSE_DISABLE_KEYRING", Value::String("".to_string()))?;
             cliclack::outro("Secret storage set to system keyring (secure)")?;
-            let _ =
-                cliclack::log::info("You may need to restart markov for this change to take effect");
+            let _ = cliclack::log::info(
+                "You may need to restart markov for this change to take effect",
+            );
         }
         "file" => {
             // Set the disable flag to use file storage
@@ -1657,8 +1666,9 @@ pub fn configure_keyring_dialog() -> anyhow::Result<()> {
                 "Secret storage set to file ({}). Keep this file secure!",
                 secrets_path.display(),
             ))?;
-            let _ =
-                cliclack::log::info("You may need to restart markov for this change to take effect");
+            let _ = cliclack::log::info(
+                "You may need to restart markov for this change to take effect",
+            );
         }
         _ => unreachable!(),
     };

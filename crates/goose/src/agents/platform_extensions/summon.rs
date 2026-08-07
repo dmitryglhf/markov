@@ -1279,6 +1279,7 @@ impl SummonClient {
         }
 
         let working_dir = session.working_dir.clone();
+        let task_label = safe_truncate(&Self::get_task_description(&params), TASK_LABEL_BUDGET);
         let recipe = self
             .build_delegate_recipe(&params, session_id, &working_dir)
             .await?;
@@ -1323,6 +1324,7 @@ impl SummonClient {
             cancellation_token: Some(cancellation_token),
             on_message: None,
             notification_tx: Some(notif_tx),
+            label: Some(task_label),
         })
         .await;
 
@@ -1886,6 +1888,7 @@ impl SummonClient {
             Arc::clone(&notification_buffer),
         );
 
+        let task_description = description.clone();
         let handle = tokio::spawn(async move {
             run_subagent_task(SubagentRunParams {
                 config: agent_config,
@@ -1896,6 +1899,7 @@ impl SummonClient {
                 cancellation_token: Some(task_token_clone),
                 on_message: Some(on_message),
                 notification_tx: Some(notif_tx),
+                label: Some(task_description),
             })
             .await
         });
@@ -2885,7 +2889,7 @@ You review code."#;
                     .clone(),
             );
             let content = MessageContent::tool_request("req1", Ok(tool_call));
-            let notif = create_tool_notification(&content, "20260204_1").unwrap();
+            let notif = create_tool_notification(&content, "20260204_1", None).unwrap();
 
             let buffer = Arc::new(Mutex::new(vec![notif]));
 

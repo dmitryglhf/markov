@@ -1,14 +1,17 @@
-use goose::agents::execute_commands::list_commands;
+use console::Term;
 use goose::config::{Config, GooseMode};
+use goose::slash_commands::types::SlashCommandEntry;
+use goose::utils::safe_truncate;
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::highlight::{CmdKind, Highlighter};
-use rustyline::hint::Hinter;
+use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::Validator;
 use rustyline::{Context, Helper, Result};
 use std::borrow::Cow;
 use std::sync::Arc;
 use strum::VariantNames;
 
+use super::input::{ReplCommand, REPL_COMMANDS};
 use super::{CompletionCache, HintStatus};
 
 /// Completer for goose CLI commands
@@ -233,42 +236,55 @@ impl GooseCompleter {
 
     /// Complete slash commands
     fn complete_slash_commands(&self, line: &str) -> Result<(usize, Vec<Pair>)> {
-        let mut commands = vec![
-            "/exit".to_string(),
-            "/quit".to_string(),
-            "/help".to_string(),
-            "/?".to_string(),
-            "/t".to_string(),
-            "/extension".to_string(),
-            "/builtin".to_string(),
-            "/mode".to_string(),
-            "/model".to_string(),
-            "/recipe".to_string(),
-        ];
-        commands.extend(
-            list_commands()
-                .iter()
-                .map(|command| format!("/{}", command.name)),
-        );
-        commands.sort();
-        commands.dedup();
+        let agent_commands = self
+            .completion_cache
+            .read()
+            .map(|cache| cache.slash_commands.clone())
+            .unwrap_or_default();
 
-        // Find commands that match the prefix
-        let matching_commands: Vec<Pair> = commands
-            .iter()
-            .filter(|cmd| cmd.starts_with(line))
-            .map(|cmd| Pair {
-                display: cmd.to_string(),
-                replacement: format!("{} ", cmd), // Add a space after the command
-            })
-            .collect();
-
+        let matching_commands = slash_command_candidates(REPL_COMMANDS, &agent_commands, line);
         if !matching_commands.is_empty() {
             return Ok((0, matching_commands));
         }
 
         // No command completions available
         Ok((line.len(), vec![]))
+    }
+
+    /// The suggestion shown after the cursor. While a command name is being
+    /// typed the registry wins, so that a mistyped line kept in history cannot
+    /// shadow the real command; once the name is complete the registry has
+    /// nothing left to offer and history takes over with the arguments.
+    fn ghost_hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<InputHint> {
+        if pos < line.len() || line.contains('\n') {
+            return None;
+        }
+
+        let completion = self
+            .command_hint(line)
+            .or_else(|| HistoryHinter::new().hint(line, pos, ctx))?;
+
+        InputHint::ghost(line, completion)
+    }
+
+    /// The tail of the first matching slash command, taken in the order the Tab
+    /// list uses so that the two never disagree.
+    fn command_hint(&self, line: &str) -> Option<String> {
+        if !line.starts_with('/') {
+            return None;
+        }
+
+        let agent_commands = self
+            .completion_cache
+            .read()
+            .map(|cache| cache.slash_commands.clone())
+            .unwrap_or_default();
+
+        let (name, _) = matching_slash_commands(REPL_COMMANDS, &agent_commands, line)
+            .into_iter()
+            .next()?;
+        let tail = name.strip_prefix(line)?.to_string();
+        (!tail.is_empty()).then_some(tail)
     }
 
     /// Complete argument keys for a specific prompt
@@ -378,32 +394,86 @@ impl GooseCompleter {
 
     /// Complete file paths
     fn complete_file_path(&self, line: &str, ctx: &Context) -> Result<(usize, Vec<Pair>)> {
-        let parts: Vec<&str> = line.split_whitespace().collect();
+        let Some(path) = path_to_complete(last_word(line)) else {
+            return Ok((line.len(), vec![]));
+        };
 
-        if let Some(last_part) = parts.last() {
-            // Skip filename completion for words starting with special characters
-            if last_part.starts_with('/') && last_part.len() == 1 {
-                // Just a slash - no completion
-                return Ok((line.len(), vec![]));
-            }
+        let pos = line.len() - path.len();
+        let (start, candidates) = self.filename_completer.complete(path, path.len(), ctx)?;
 
-            if last_part.starts_with('-') || last_part.contains('=') {
-                // Skip flag or key-value pairs
-                return Ok((line.len(), vec![]));
-            }
-
-            // Complete the partial path
-            let pos = line.len() - last_part.len();
-            let (start, candidates) =
-                self.filename_completer
-                    .complete(last_part, last_part.len(), ctx)?;
-
-            // Return the completion results, with adjusted position
-            return Ok((pos + start, candidates));
-        }
-
-        Ok((line.len(), vec![]))
+        // Return the completion results, with adjusted position
+        Ok((pos + start, candidates))
     }
+}
+
+/// The last whitespace-separated word, empty when the line ends in whitespace.
+fn last_word(line: &str) -> &str {
+    line.rsplit(char::is_whitespace).next().unwrap_or(line)
+}
+
+/// The part of the last word to complete as a file path, if any. A leading `@`
+/// marks a path explicitly and stays in the line; without it a word is only
+/// completed when it already looks like a path, so that Tab in the middle of a
+/// sentence does not list the working directory.
+fn path_to_complete(word: &str) -> Option<&str> {
+    if let Some(path) = word.strip_prefix('@') {
+        return Some(path);
+    }
+
+    if word == "/" || word.starts_with('-') || word.contains('=') {
+        return None;
+    }
+
+    let looks_like_path = word.contains('/') || word.starts_with('~');
+    looks_like_path.then_some(word)
+}
+
+/// Slash commands starting with what was typed, from the terminal-only list and
+/// from the agent registry, sorted by name. Shared by Tab and the ghost hint.
+fn matching_slash_commands<'a>(
+    repl_commands: &'a [ReplCommand],
+    agent_commands: &'a [SlashCommandEntry],
+    line: &str,
+) -> Vec<(String, &'a str)> {
+    let mut commands: Vec<(String, &str)> = repl_commands
+        .iter()
+        .map(|command| (command.name.to_string(), command.description))
+        .collect();
+    commands.extend(
+        agent_commands
+            .iter()
+            .map(|command| (format!("/{}", command.name), command.description.as_str())),
+    );
+
+    commands.sort_by(|left, right| left.0.cmp(&right.0));
+    commands.dedup_by(|left, right| left.0 == right.0);
+    commands.retain(|(name, _)| name.starts_with(line));
+    commands
+}
+
+/// Build the candidate list for a partially typed slash command. The name goes
+/// into the replacement and the description only into the display, because
+/// rustyline computes the common prefix from the replacement.
+fn slash_command_candidates(
+    repl_commands: &[ReplCommand],
+    agent_commands: &[SlashCommandEntry],
+    line: &str,
+) -> Vec<Pair> {
+    let commands = matching_slash_commands(repl_commands, agent_commands, line);
+
+    let name_width = commands
+        .iter()
+        .map(|(name, _)| name.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    commands
+        .iter()
+        .map(|(name, description)| Pair {
+            display: format!("{:<name_width$}  {}", name, description),
+            replacement: format!("{} ", name),
+        })
+        .collect()
 }
 
 impl Completer for GooseCompleter {
@@ -508,36 +578,109 @@ impl Completer for GooseCompleter {
 // Implement the Helper trait which is required by rustyline
 impl Helper for GooseCompleter {}
 
-// Implement required traits with default implementations
-impl Hinter for GooseCompleter {
-    type Hint = String;
+/// Width of the REPL prompt, needed to know how much room a hint has left.
+const PROMPT_WIDTH: usize = 2;
 
-    fn hint(&self, line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<Self::Hint> {
-        let cache = self.completion_cache.read().unwrap();
+/// Below this many free columns a hint is more noise than help.
+const MIN_HINT_WIDTH: usize = 8;
 
-        if !line.is_empty() && cache.hint_status != HintStatus::Default {
-            drop(cache);
-            let mut cache_write = self.completion_cache.write().unwrap();
-            cache_write.hint_status = HintStatus::Default;
-            return None;
+/// Narrower than this the gauge and the footer would not share a line. The
+/// gauge carries colour, so its width cannot be measured after the fact.
+const GAUGE_MIN_TERM_WIDTH: usize = 80;
+
+/// Puts the context gauge in front of the footer. It lives on the input line
+/// because rustyline drops the hint when the line is submitted, which is what
+/// keeps a spent gauge out of the scrollback.
+fn with_context_gauge(footer: String, tokens: usize, limit: usize) -> String {
+    let too_narrow = Term::stdout()
+        .size_checked()
+        .is_some_and(|(_h, w)| (w as usize) < GAUGE_MIN_TERM_WIDTH);
+
+    if limit == 0 || too_narrow {
+        return footer;
+    }
+
+    format!(
+        "{} · {}",
+        super::output::format_context_usage(tokens, limit),
+        footer
+    )
+}
+
+/// Text shown after the cursor. `display` is what is drawn and may be cut to the
+/// width of the terminal, `completion` is what the right arrow inserts, so a
+/// footer that is not meant to be typed leaves it empty.
+pub struct InputHint {
+    display: String,
+    completion: Option<String>,
+}
+
+impl InputHint {
+    fn footer(display: String) -> Self {
+        Self {
+            display,
+            completion: None,
         }
+    }
+
+    fn ghost(line: &str, completion: String) -> Option<Self> {
+        let room = Term::stdout()
+            .size_checked()
+            .map(|(_h, w)| (w as usize).saturating_sub(PROMPT_WIDTH + line.chars().count()));
+
+        let display = match room {
+            Some(room) if room < MIN_HINT_WIDTH => return None,
+            Some(room) => safe_truncate(&completion, room),
+            None => completion.clone(),
+        };
+
+        Some(Self {
+            display,
+            completion: Some(completion),
+        })
+    }
+}
+
+impl rustyline::hint::Hint for InputHint {
+    fn display(&self) -> &str {
+        &self.display
+    }
+
+    fn completion(&self) -> Option<&str> {
+        self.completion.as_deref()
+    }
+}
+
+impl Hinter for GooseCompleter {
+    type Hint = InputHint;
+
+    fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<Self::Hint> {
+        let (status, tokens, limit) = {
+            let cache = self.completion_cache.read().unwrap();
+            (cache.hint_status, cache.context_tokens, cache.context_limit)
+        };
 
         if !line.is_empty() {
-            return None;
+            if status != HintStatus::Default {
+                self.completion_cache.write().unwrap().hint_status = HintStatus::Default;
+            }
+            return self.ghost_hint(line, pos, ctx);
         }
 
-        match cache.hint_status {
+        let footer = match status {
             HintStatus::Interrupted => {
-                Some("Interrupted, what should markov work on instead?".to_string())
+                "Interrupted, what should markov work on instead?".to_string()
             }
             HintStatus::MaybeExit => {
-                Some("Press Ctrl+C again to exit, or type new instructions to continue".to_string())
+                "Press Ctrl+C again to exit, or type new instructions to continue".to_string()
             }
             HintStatus::Default => {
                 let newline_key = super::input::get_newline_key().to_ascii_uppercase();
-                Some(format!("Enter to send · Ctrl+{newline_key} newline"))
+                format!("Enter to send · Ctrl+{newline_key} newline")
             }
-        }
+        };
+
+        Some(InputHint::footer(with_context_gauge(footer, tokens, limit)))
     }
 }
 
@@ -547,7 +690,7 @@ impl Highlighter for GooseCompleter {
         prompt: &'p str,
         _default: bool,
     ) -> Cow<'b, str> {
-        Cow::Borrowed(prompt)
+        Cow::Owned(console::Style::new().green().apply_to(prompt).to_string())
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
@@ -580,7 +723,208 @@ mod tests {
 
     use super::*;
     use crate::session::output;
+    use rustyline::hint::Hint as _;
+    use rustyline::history::{DefaultHistory, History as _};
     use std::sync::{Arc, RwLock};
+
+    #[test]
+    fn an_at_sign_marks_a_path_and_stays_in_the_line() {
+        assert_eq!(path_to_complete("@src/ma"), Some("src/ma"));
+        assert_eq!(path_to_complete("@"), Some(""));
+    }
+
+    #[test]
+    fn plain_words_are_not_completed_as_paths() {
+        assert_eq!(path_to_complete("hello"), None);
+        assert_eq!(path_to_complete(""), None);
+        assert_eq!(path_to_complete("/"), None);
+        assert_eq!(path_to_complete("--flag"), None);
+        assert_eq!(path_to_complete("key=value"), None);
+    }
+
+    #[test]
+    fn words_that_already_look_like_paths_are_still_completed() {
+        assert_eq!(path_to_complete("src/ma"), Some("src/ma"));
+        assert_eq!(path_to_complete("./ma"), Some("./ma"));
+        assert_eq!(path_to_complete("../ma"), Some("../ma"));
+        assert_eq!(path_to_complete("/etc/pas"), Some("/etc/pas"));
+        assert_eq!(path_to_complete("~"), Some("~"));
+    }
+
+    #[test]
+    fn the_last_word_is_found_after_multibyte_text() {
+        assert_eq!(last_word("посмотри @src"), "@src");
+        assert_eq!(last_word("read src/main.rs "), "");
+        assert_eq!(last_word("src"), "src");
+    }
+
+    fn agent_command(name: &str, description: &str) -> SlashCommandEntry {
+        SlashCommandEntry {
+            name: name.to_string(),
+            description: description.to_string(),
+            source: goose::slash_commands::types::SlashCommandSource::Builtin,
+            source_path: None,
+            input_hint: None,
+        }
+    }
+
+    fn replacements(candidates: &[Pair]) -> Vec<&str> {
+        candidates.iter().map(|c| c.replacement.as_str()).collect()
+    }
+
+    #[test]
+    fn repl_only_commands_are_offered() {
+        let candidates = slash_command_candidates(REPL_COMMANDS, &[], "/e");
+        let replacements = replacements(&candidates);
+
+        assert!(replacements.contains(&"/edit "));
+        assert!(replacements.contains(&"/endplan "));
+        assert!(replacements.contains(&"/extension "));
+    }
+
+    #[test]
+    fn agent_commands_are_offered_with_a_leading_slash() {
+        let agent = vec![agent_command("deploy", "Run the deploy recipe")];
+        let candidates = slash_command_candidates(&[], &agent, "/dep");
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].replacement, "/deploy ");
+        assert!(candidates[0].display.contains("Run the deploy recipe"));
+    }
+
+    #[test]
+    fn descriptions_stay_out_of_the_replacement() {
+        let agent = vec![agent_command("status", "Show session status")];
+        let candidates = slash_command_candidates(REPL_COMMANDS, &agent, "/");
+
+        assert!(!candidates.is_empty());
+        for candidate in &candidates {
+            assert!(candidate.replacement.ends_with(' '));
+            assert_eq!(candidate.replacement.split_whitespace().count(), 1);
+        }
+    }
+
+    #[test]
+    fn a_command_known_to_both_sides_is_offered_once() {
+        let agent = vec![agent_command("help", "Agent help")];
+        let candidates = slash_command_candidates(REPL_COMMANDS, &agent, "/help");
+
+        assert_eq!(candidates.len(), 1);
+        assert!(candidates[0].display.contains("Display the help message"));
+    }
+
+    #[test]
+    fn candidates_are_sorted_by_name() {
+        let agent = vec![agent_command("compact", "Compact the conversation")];
+        let candidates = slash_command_candidates(REPL_COMMANDS, &agent, "/");
+        let replacements = replacements(&candidates);
+
+        let mut sorted = replacements.clone();
+        sorted.sort();
+        assert_eq!(replacements, sorted);
+    }
+
+    #[test]
+    fn the_first_matching_command_is_hinted() {
+        let completer = GooseCompleter::new(create_test_cache());
+
+        assert_eq!(completer.command_hint("/e"), Some("dit".to_string()));
+        assert_eq!(completer.command_hint("/com"), Some("pact".to_string()));
+    }
+
+    #[test]
+    fn a_fully_typed_command_is_not_hinted() {
+        let completer = GooseCompleter::new(create_test_cache());
+
+        assert_eq!(completer.command_hint("/exit"), None);
+        assert_eq!(completer.command_hint("write a test"), None);
+    }
+
+    #[test]
+    fn the_hint_agrees_with_the_first_row_of_the_tab_list() {
+        let completer = GooseCompleter::new(create_test_cache());
+        let agent = vec![agent_command("compact", "Compact the conversation")];
+        let candidates = slash_command_candidates(REPL_COMMANDS, &agent, "/e");
+        let hint = completer.command_hint("/e").unwrap();
+
+        assert_eq!(candidates[0].replacement.trim_end(), format!("/e{hint}"));
+    }
+
+    #[test]
+    fn a_command_being_typed_is_not_shadowed_by_history() {
+        let completer = GooseCompleter::new(create_test_cache());
+        let mut history = DefaultHistory::new();
+        history.add("/exirt").unwrap();
+        let ctx = Context::new(&history);
+
+        let hint = completer.ghost_hint("/exi", 4, &ctx).unwrap();
+        assert_eq!(hint.completion(), Some("t"));
+    }
+
+    #[test]
+    fn history_carries_the_arguments_of_a_complete_command() {
+        let completer = GooseCompleter::new(create_test_cache());
+        let mut history = DefaultHistory::new();
+        history.add("/mode approve").unwrap();
+        let ctx = Context::new(&history);
+
+        let hint = completer.ghost_hint("/mode", 5, &ctx).unwrap();
+        assert_eq!(hint.completion(), Some(" approve"));
+    }
+
+    #[test]
+    fn plain_text_is_hinted_from_history() {
+        let completer = GooseCompleter::new(create_test_cache());
+        let mut history = DefaultHistory::new();
+        history.add("read every rust file").unwrap();
+        let ctx = Context::new(&history);
+
+        let hint = completer.ghost_hint("read every", 10, &ctx).unwrap();
+        assert_eq!(hint.completion(), Some(" rust file"));
+    }
+
+    #[test]
+    fn nothing_is_hinted_away_from_the_end_of_a_single_line() {
+        let completer = GooseCompleter::new(create_test_cache());
+        let history = DefaultHistory::new();
+        let ctx = Context::new(&history);
+
+        assert!(completer.ghost_hint("/exi", 2, &ctx).is_none());
+        assert!(completer.ghost_hint("/edit\nmore", 10, &ctx).is_none());
+    }
+
+    #[test]
+    fn the_footer_hint_is_not_inserted_by_the_arrow_key() {
+        let completer = GooseCompleter::new(create_test_cache());
+        let history = DefaultHistory::new();
+        let ctx = Context::new(&history);
+
+        let footer = completer.hint("", 0, &ctx).unwrap();
+        assert!(!footer.display().is_empty());
+        assert_eq!(footer.completion(), None);
+    }
+
+    #[test]
+    fn the_gauge_joins_the_footer_when_a_limit_is_known() {
+        let footer = with_context_gauge("Enter to send".to_string(), 7_000, 210_000);
+        if Term::stdout()
+            .size_checked()
+            .is_some_and(|(_h, w)| (w as usize) < GAUGE_MIN_TERM_WIDTH)
+        {
+            assert_eq!(footer, "Enter to send");
+        } else {
+            assert!(footer.contains("7k/210k"), "{footer}");
+            assert!(footer.ends_with("Enter to send"), "{footer}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_limit_leaves_the_footer_alone() {
+        assert_eq!(
+            with_context_gauge("Enter to send".to_string(), 0, 0),
+            "Enter to send"
+        );
+    }
 
     // Helper function to create a test completion cache
     fn create_test_cache() -> Arc<RwLock<CompletionCache>> {
@@ -642,6 +986,7 @@ mod tests {
             "zai".to_string(),
         ];
         cache.current_session_provider = "anthropic".to_string();
+        cache.slash_commands = vec![agent_command("compact", "Compact the conversation")];
         cache.provider_models.insert(
             "anthropic".to_string(),
             vec!["claude-sonnet-4".to_string(), "claude-haiku-4".to_string()],
@@ -666,7 +1011,7 @@ mod tests {
         let (pos, candidates) = completer.complete_slash_commands("/exit").unwrap();
         assert_eq!(pos, 0);
         assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].display, "/exit");
+        assert!(candidates[0].display.starts_with("/exit"));
         assert_eq!(candidates[0].replacement, "/exit ");
 
         // Test partial match
@@ -679,15 +1024,12 @@ mod tests {
         let (pos, candidates) = completer.complete_slash_commands("/").unwrap();
         assert_eq!(pos, 0);
         assert!(candidates.len() > 1);
-        for command in list_commands() {
-            assert!(
-                candidates
-                    .iter()
-                    .any(|candidate| candidate.display == format!("/{}", command.name)),
-                "slash completion should list /{}",
-                command.name
-            );
-        }
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| candidate.replacement == "/compact "),
+            "slash completion should list the commands cached from the agent"
+        );
 
         // Test no match
         let (_pos, candidates) = completer.complete_slash_commands("/nonexistent").unwrap();

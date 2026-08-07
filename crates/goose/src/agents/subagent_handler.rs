@@ -42,6 +42,10 @@ pub struct SubagentRunParams {
     pub cancellation_token: Option<CancellationToken>,
     pub on_message: Option<OnMessageCallback>,
     pub notification_tx: Option<tokio::sync::mpsc::UnboundedSender<ServerNotification>>,
+    /// What the task was asked to do, for whoever shows its tool calls. Without
+    /// it a subagent can only be named by its session id, which says nothing
+    /// about which of several running tasks it is.
+    pub label: Option<String>,
 }
 
 pub async fn run_subagent_task(params: SubagentRunParams) -> Result<String, anyhow::Error> {
@@ -128,6 +132,7 @@ fn get_agent_messages(params: SubagentRunParams) -> AgentMessagesFuture {
             cancellation_token,
             on_message,
             notification_tx,
+            label,
             ..
         } = params;
 
@@ -199,7 +204,9 @@ fn get_agent_messages(params: SubagentRunParams) -> AgentMessagesFuture {
                     }
                     if let Some(ref tx) = notification_tx {
                         for content in &msg.content {
-                            if let Some(notif) = create_tool_notification(content, &session_id) {
+                            if let Some(notif) =
+                                create_tool_notification(content, &session_id, label.as_deref())
+                            {
                                 if tx.send(notif).is_err() {
                                     debug!(
                                         "Notification receiver dropped for subagent {}",
@@ -278,6 +285,7 @@ async fn get_final_output(agent: &Agent, has_response_schema: bool) -> Option<St
 pub fn create_tool_notification(
     content: &MessageContent,
     subagent_id: &str,
+    label: Option<&str>,
 ) -> Option<ServerNotification> {
     if let MessageContent::ToolRequest(req) = content {
         let tool_call = req.tool_call.as_ref().ok()?;
@@ -289,6 +297,7 @@ pub fn create_tool_notification(
                     serde_json::json!({
                         "type": SUBAGENT_TOOL_REQUEST_TYPE,
                         "subagent_id": subagent_id,
+                        "label": label,
                         "tool_call": {
                             "name": tool_call.name,
                             "arguments": tool_call.arguments
@@ -316,8 +325,8 @@ mod tests {
         let tool_call = CallToolRequestParams::new("developer__shell".to_string())
             .with_arguments(json!({"command": "ls"}).as_object().unwrap().clone());
         let content = MessageContent::tool_request("req1", Ok(tool_call));
-        let notification =
-            create_tool_notification(&content, "session_1").expect("expected notification");
+        let notification = create_tool_notification(&content, "session_1", Some("read the docs"))
+            .expect("expected notification");
 
         let ServerNotification::LoggingMessageNotification(log_notif) = notification else {
             panic!("expected logging notification");
@@ -335,6 +344,10 @@ mod tests {
             data.get("subagent_id").and_then(|v| v.as_str()),
             Some("session_1")
         );
+        assert_eq!(
+            data.get("label").and_then(|v| v.as_str()),
+            Some("read the docs")
+        );
         let tool_call = data
             .get("tool_call")
             .and_then(|v| v.as_object())
@@ -348,6 +361,6 @@ mod tests {
     #[test]
     fn create_tool_notification_ignores_non_tool_request() {
         let content = MessageContent::text("hello");
-        assert!(create_tool_notification(&content, "session_1").is_none());
+        assert!(create_tool_notification(&content, "session_1", None).is_none());
     }
 }

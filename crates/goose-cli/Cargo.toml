@@ -87,7 +87,6 @@ default = [
     "nostr",
     "otel",
     "rustls-tls",
-    "system-keyring",
     "update",
 ]
 code-mode = ["goose/code-mode"]

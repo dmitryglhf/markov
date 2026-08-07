@@ -5,6 +5,8 @@ use super::paste::{
 use super::{CompletionCache, HintStatus};
 use anyhow::Result;
 use goose::config::{Config, GooseMode};
+use goose::slash_commands::slash_command;
+use goose::slash_commands::types::SlashCommandEntry;
 use rustyline::Editor;
 use shlex;
 use std::collections::HashMap;
@@ -220,8 +222,95 @@ pub fn get_input(
     // Handle slash commands
     match handle_slash_command(&input) {
         Some(result) => Ok(result),
-        None => Ok(InputResult::Message(input.trim().to_string())),
+        None => {
+            let known = known_command_names();
+            match unknown_command_name(input.trim(), &known) {
+                Some(name) => {
+                    println!("{}", unknown_command_report(name, &known));
+                    Ok(InputResult::Retry)
+                }
+                None => Ok(InputResult::Message(input.trim().to_string())),
+            }
+        }
     }
+}
+
+/// The name of a command nobody answers to. What the REPL did not take may
+/// still belong to the agent, which owns its builtins, recipes and skills, so
+/// only a name missing from both sides is a misspelling.
+fn unknown_command_name<'a>(input: &'a str, known: &[String]) -> Option<&'a str> {
+    let name = command_attempt(input)?;
+    known
+        .iter()
+        .all(|command| !command.eq_ignore_ascii_case(name))
+        .then_some(name)
+}
+
+/// The name a line is trying to call, if the line even looks like an attempt at
+/// one. A line beginning with a slash is just as often a path being talked
+/// about, so only a single bare word counts, and a line starting with a space
+/// never reaches here at all.
+fn command_attempt(input: &str) -> Option<&str> {
+    let name = input.split_whitespace().next()?.strip_prefix('/')?;
+    let shaped = name.starts_with(|c: char| c.is_ascii_alphabetic())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
+    shaped.then_some(name)
+}
+
+/// Names the REPL answers to, plus the ones the agent answers to: builtins,
+/// recipes and skills. Read on the spot rather than from the completion cache,
+/// which fills in asynchronously and would deny a real command right after
+/// startup.
+fn known_command_names() -> Vec<String> {
+    REPL_COMMANDS
+        .iter()
+        .filter_map(|command| command.name.strip_prefix('/').map(String::from))
+        .chain(agent_slash_commands().into_iter().map(|entry| entry.name))
+        .collect()
+}
+
+fn unknown_command_report(name: &str, known: &[String]) -> String {
+    let suggestions = nearest_command_names(name, known);
+    let did_you_mean = match suggestions.len() {
+        0 => String::new(),
+        _ => format!(" — did you mean {}?", suggestions.join(" or ")),
+    };
+
+    format!(
+        "{}\n{}",
+        console::style(format!("Unknown command /{name}{did_you_mean}")).yellow(),
+        console::style(
+            "/help lists commands; start the line with a space to send it as a message."
+        )
+        .dim()
+    )
+}
+
+/// Commands close enough to be worth offering: those the typed name begins,
+/// then the ones that merely look alike.
+fn nearest_command_names(name: &str, known: &[String]) -> Vec<String> {
+    let typed = name.to_lowercase();
+    let mut scored: Vec<(f64, &String)> = known
+        .iter()
+        .filter_map(|candidate| {
+            let lowered = candidate.to_lowercase();
+            let score = if lowered.starts_with(&typed) {
+                2.0
+            } else {
+                strsim::jaro_winkler(&lowered, &typed)
+            };
+            (score > 0.8).then_some((score, candidate))
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| a.1.cmp(b.1)));
+    scored
+        .into_iter()
+        .take(3)
+        .map(|(_, name)| format!("/{name}"))
+        .collect()
 }
 
 fn handle_slash_command(input: &str) -> Option<InputResult> {
@@ -292,12 +381,15 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
                 None
             }
         }
+        "/extension" => Some(InputResult::AddExtension(String::new())),
         s if s.starts_with(CMD_EXTENSION) => Some(InputResult::AddExtension(
             s.get(CMD_EXTENSION.len()..).unwrap_or("").to_string(),
         )),
+        "/builtin" => Some(InputResult::AddBuiltin(String::new())),
         s if s.starts_with(CMD_BUILTIN) => Some(InputResult::AddBuiltin(
             s.get(CMD_BUILTIN.len()..).unwrap_or("").to_string(),
         )),
+        "/mode" => Some(InputResult::GooseMode(String::new())),
         s if s.starts_with(CMD_MODE) => Some(InputResult::GooseMode(
             s.get(CMD_MODE.len()..).unwrap_or("").to_string(),
         )),
@@ -454,6 +546,77 @@ fn parse_plan_command(input: String) -> Option<InputResult> {
     Some(InputResult::Plan(options))
 }
 
+/// Slash commands the REPL handles itself. Everything else reaches the agent,
+/// which owns its own list of builtins, recipes and skills.
+pub(super) struct ReplCommand {
+    pub name: &'static str,
+    pub description: &'static str,
+}
+
+pub(super) const REPL_COMMANDS: &[ReplCommand] = &[
+    ReplCommand {
+        name: "/?",
+        description: "Display the help message",
+    },
+    ReplCommand {
+        name: "/builtin",
+        description: "Add builtin extensions by name",
+    },
+    ReplCommand {
+        name: "/edit",
+        description: "Compose a message in your editor",
+    },
+    ReplCommand {
+        name: "/endplan",
+        description: "Leave plan mode",
+    },
+    ReplCommand {
+        name: "/exit",
+        description: "Exit the session",
+    },
+    ReplCommand {
+        name: "/extension",
+        description: "Add a stdio extension",
+    },
+    ReplCommand {
+        name: "/help",
+        description: "Display the help message",
+    },
+    ReplCommand {
+        name: "/mode",
+        description: "Set the mode to use",
+    },
+    ReplCommand {
+        name: "/model",
+        description: "Show the current model, or switch model or provider",
+    },
+    ReplCommand {
+        name: "/plan",
+        description: "Enter plan mode, optionally with a message",
+    },
+    ReplCommand {
+        name: "/quit",
+        description: "Exit the session",
+    },
+    ReplCommand {
+        name: "/r",
+        description: "Toggle full tool output",
+    },
+    ReplCommand {
+        name: "/recipe",
+        description: "Save this conversation as a recipe",
+    },
+    ReplCommand {
+        name: "/t",
+        description: "Toggle or set the theme (light, dark, ansi)",
+    },
+];
+
+pub(super) fn agent_slash_commands() -> Vec<SlashCommandEntry> {
+    let working_dir = std::env::current_dir().ok();
+    slash_command::list_acp_commands(working_dir.as_deref())
+}
+
 fn help_text() -> String {
     let modes = GooseMode::VARIANTS.join(", ");
     let newline_key = get_newline_key().to_ascii_uppercase();
@@ -505,9 +668,9 @@ fn additional_builtin_help() -> String {
     const DOCUMENTED_BUILTINS: &[&str] =
         &["prompts", "prompt", "compact", "clear", "skills", "status"];
 
-    goose::agents::execute_commands::list_commands()
+    agent_slash_commands()
         .iter()
-        .filter(|command| !DOCUMENTED_BUILTINS.contains(&command.name))
+        .filter(|command| !DOCUMENTED_BUILTINS.contains(&command.name.as_str()))
         .map(|command| format!("/{} - {}", command.name, command.description))
         .collect::<Vec<_>>()
         .join("\n")
@@ -665,6 +828,82 @@ mod tests {
 
         // Test unknown commands
         assert!(handle_slash_command("/unknown").is_none());
+    }
+
+    #[test]
+    fn bare_commands_do_not_fall_through_to_the_model() {
+        for input in [
+            "/mode",
+            "/mode ",
+            "/builtin",
+            "/builtin ",
+            "/extension",
+            "/extension ",
+        ] {
+            assert!(
+                handle_slash_command(input).is_some(),
+                "{input} should be handled, not sent to the model"
+            );
+        }
+    }
+
+    #[test]
+    fn a_misspelled_command_is_not_sent_to_the_model() {
+        let known = known_command_names();
+
+        for input in ["/mo", "/exirt", "/promptxyz"] {
+            assert!(
+                handle_slash_command(input).is_none(),
+                "{input} is not a command the repl takes"
+            );
+            assert!(
+                unknown_command_name(input, &known).is_some(),
+                "{input} should be caught before it reaches the model"
+            );
+        }
+    }
+
+    #[test]
+    fn a_line_that_only_begins_with_a_slash_still_reaches_the_model() {
+        let known = known_command_names();
+
+        for input in [
+            "/etc/nixos/configuration.nix посмотри",
+            "/usr/bin/env",
+            "/",
+            "/2fa",
+        ] {
+            assert!(
+                unknown_command_name(input, &known).is_none(),
+                "{input} is not an attempt at a command"
+            );
+        }
+    }
+
+    #[test]
+    fn commands_the_agent_owns_reach_it() {
+        let known = known_command_names();
+
+        for command in goose::agents::execute_commands::list_commands() {
+            let input = format!("/{}", command.name);
+            assert!(
+                unknown_command_name(&input, &known).is_none(),
+                "/{} is handled by the agent and must not be rejected",
+                command.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_misspelling_is_reported_with_the_commands_it_resembles() {
+        let known = known_command_names();
+
+        let report = unknown_command_report("mo", &known);
+        assert!(report.contains("Unknown command /mo"));
+        assert!(report.contains("/mode"));
+        assert!(report.contains("/model"));
+
+        assert_eq!(nearest_command_names("qqqq", &known), Vec::<String>::new());
     }
 
     #[test]
