@@ -30,6 +30,7 @@ pub fn setup_logging(name: Option<&str>) -> &'static Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use goose::config::paths::Paths;
     use goose::tracing::langfuse_layer;
     use std::env;
     use tempfile::TempDir;
@@ -51,8 +52,9 @@ mod tests {
         assert!(log_dir.exists());
         assert!(log_dir.is_dir());
 
+        assert!(log_dir.starts_with(Paths::state_dir()));
+
         let path_components: Vec<_> = log_dir.components().collect();
-        assert!(path_components.iter().any(|c| c.as_os_str() == "goose"));
         assert!(path_components.iter().any(|c| c.as_os_str() == "logs"));
         assert!(path_components.iter().any(|c| c.as_os_str() == "cli"));
     }

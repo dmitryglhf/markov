@@ -1,6 +1,7 @@
 use crate::session::user_projected_message_to_markdown;
 use anyhow::{Context, Result};
 
+use chrono::{DateTime, Utc};
 use cliclack::{confirm, multiselect, select};
 use etcetera::home_dir;
 #[cfg(feature = "nostr")]
@@ -18,6 +19,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 const TRUNCATED_DESC_LENGTH: usize = 60;
+const SESSION_PICKER_LIMIT: usize = 20;
+const SESSION_PICKER_ROWS: usize = 10;
 
 fn display_path_with_tilde(path: &Path) -> String {
     #[cfg(not(target_os = "windows"))]
@@ -57,37 +60,40 @@ fn prompt_interactive_session_removal(sessions: &[Session]) -> Result<Vec<Sessio
         return Ok(vec![]);
     }
 
+    // Everything is offered here, unlike the picker: a session you cannot see is
+    // a session you cannot delete.
+    let choices = session_picker_entries(sessions, sessions.len(), Utc::now());
+
     let mut selector = multiselect(
         "Select sessions to delete (use spacebar, Enter to confirm, Ctrl+C to cancel):",
-    );
-
-    let display_map: std::collections::HashMap<String, Session> = sessions
-        .iter()
-        .map(|s| {
-            let desc = if s.name.is_empty() {
-                "(no name)"
-            } else {
-                &s.name
-            };
-            let truncated_desc = safe_truncate(desc, TRUNCATED_DESC_LENGTH);
-            let display_text =
-                format!("{} - {} ({})", session_activity_at(s), truncated_desc, s.id);
-            (display_text, s.clone())
-        })
-        .collect();
-
-    for display_text in display_map.keys() {
-        selector = selector.item(display_text.clone(), display_text.clone(), "");
+    )
+    .max_rows(SESSION_PICKER_ROWS);
+    for choice in &choices {
+        selector = selector.item(choice.id.clone(), &choice.label, &choice.working_dir);
     }
 
-    let selected_display_texts: Vec<String> = selector.interact()?;
+    let selected: Vec<String> = match selector.interact() {
+        Ok(selected) => selected,
+        Err(e) if e.kind() == io::ErrorKind::Interrupted => return Ok(vec![]),
+        Err(e) => return Err(e.into()),
+    };
 
-    let selected_sessions: Vec<Session> = selected_display_texts
-        .into_iter()
-        .filter_map(|text| display_map.get(&text).cloned())
-        .collect();
+    Ok(select_sessions_by_id(sessions, &choices, &selected))
+}
 
-    Ok(selected_sessions)
+/// Keeps the order the sessions were shown in, so the confirmation list reads
+/// like the menu that produced it.
+fn select_sessions_by_id(
+    sessions: &[Session],
+    choices: &[SessionChoice],
+    selected: &[String],
+) -> Vec<Session> {
+    choices
+        .iter()
+        .filter(|choice| selected.contains(&choice.id))
+        .filter_map(|choice| sessions.iter().find(|s| s.id == choice.id))
+        .cloned()
+        .collect()
 }
 
 pub async fn handle_session_remove(
@@ -433,67 +439,201 @@ fn export_session_to_markdown(
     markdown_output
 }
 
-/// Prompt the user to interactively select a session
+struct SessionChoice {
+    id: String,
+    label: String,
+    working_dir: String,
+}
+
+/// A human-scale stamp, because an exact timestamp is noise when you are looking
+/// for the session you were in an hour ago.
+fn time_ago(when: DateTime<Utc>, now: DateTime<Utc>) -> String {
+    let minutes = (now - when).num_minutes();
+    match minutes {
+        m if m < 1 => "just now".to_string(),
+        m if m < 60 => format!("{m}m ago"),
+        m if m < 60 * 24 => format!("{}h ago", m / 60),
+        m if m < 60 * 24 * 7 => format!("{}d ago", m / (60 * 24)),
+        _ => when.format("%Y-%m-%d").to_string(),
+    }
+}
+
+fn session_picker_entries(
+    sessions: &[Session],
+    limit: usize,
+    now: DateTime<Utc>,
+) -> Vec<SessionChoice> {
+    let mut ordered: Vec<&Session> = sessions.iter().collect();
+    ordered.sort_by_key(|s| std::cmp::Reverse(session_activity_at(s)));
+    ordered.truncate(limit);
+
+    ordered
+        .into_iter()
+        .map(|s| {
+            let name = match s.name.trim() {
+                "" => "(no name)",
+                name => name,
+            };
+            SessionChoice {
+                id: s.id.clone(),
+                label: format!(
+                    "{} · {}",
+                    time_ago(session_activity_at(s), now),
+                    safe_truncate(name, TRUNCATED_DESC_LENGTH)
+                ),
+                working_dir: display_path_with_tilde(&s.working_dir),
+            }
+        })
+        .collect()
+}
+
+/// Prompt the user to interactively select a session, newest first.
 ///
-/// Shows a list of available sessions and lets the user select one
+/// `Ok(None)` means the user backed out. Passing session types narrows the list
+/// to the ones worth offering for the task at hand.
 pub async fn prompt_interactive_session_selection(
     session_manager: &SessionManager,
-) -> Result<String> {
-    let sessions = session_manager.list_sessions().await?;
+    prompt: &str,
+    types: Option<&[SessionType]>,
+) -> Result<Option<String>> {
+    let sessions = match types {
+        Some(types) => session_manager.list_sessions_by_types(types).await?,
+        None => session_manager.list_sessions().await?,
+    };
 
-    if sessions.is_empty() {
+    let choices = session_picker_entries(&sessions, SESSION_PICKER_LIMIT, Utc::now());
+    if choices.is_empty() {
         return Err(anyhow::anyhow!("No sessions found"));
     }
 
-    // Build the selection prompt
-    let mut selector = select("Select a session to export:");
-
-    // Map to display text
-    let display_map: std::collections::HashMap<String, Session> = sessions
-        .iter()
-        .map(|s| {
-            let desc = if s.name.is_empty() {
-                "(no name)"
-            } else {
-                &s.name
-            };
-            let truncated_desc = safe_truncate(desc, TRUNCATED_DESC_LENGTH);
-
-            let display_text = format!("{} - {} ({})", s.updated_at, truncated_desc, s.id);
-            (display_text, s.clone())
-        })
-        .collect();
-
-    // Add each session as an option
-    for display_text in display_map.keys() {
-        selector = selector.item(display_text.clone(), display_text.clone(), "");
+    let mut selector = select(prompt).max_rows(SESSION_PICKER_ROWS);
+    for choice in &choices {
+        selector = selector.item(Some(choice.id.clone()), &choice.label, &choice.working_dir);
     }
+    selector = selector.item(None, "Cancel", "");
 
-    // Add a cancel option
-    let cancel_value = String::from("cancel");
-    selector = selector.item(cancel_value, "Cancel", "Cancel export");
-
-    // Get user selection
-    let selected_display_text: String = selector.interact()?;
-
-    if selected_display_text == "cancel" {
-        return Err(anyhow::anyhow!("Export canceled"));
-    }
-
-    // Retrieve the selected session
-    if let Some(session) = display_map.get(&selected_display_text) {
-        Ok(session.id.clone())
-    } else {
-        Err(anyhow::anyhow!("Invalid selection"))
+    match selector.interact() {
+        Ok(selected) => Ok(selected),
+        Err(e) if e.kind() == io::ErrorKind::Interrupted => Ok(None),
+        Err(e) => Err(e.into()),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
     use goose::conversation::message::Message;
     use goose::conversation::Conversation;
     use rmcp::model::{Annotations, ContentBlock, Role, TextContent};
+
+    fn at(minutes: i64) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 8, 6, 12, 0, 0).unwrap() - chrono::Duration::minutes(minutes)
+    }
+
+    fn session(id: &str, name: &str, minutes_ago: i64) -> Session {
+        Session {
+            id: id.to_string(),
+            name: name.to_string(),
+            working_dir: PathBuf::from("/work"),
+            last_message_at: Some(at(minutes_ago)),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_picker_puts_the_freshest_session_first_every_time() {
+        let sessions = vec![
+            session("old", "Old One", 500),
+            session("fresh", "Fresh One", 2),
+            session("middle", "Middle One", 90),
+        ];
+
+        let ids: Vec<String> = session_picker_entries(&sessions, 10, at(0))
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+
+        assert_eq!(ids, vec!["fresh", "middle", "old"]);
+        let again: Vec<String> = session_picker_entries(&sessions, 10, at(0))
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        assert_eq!(ids, again);
+    }
+
+    #[test]
+    fn the_picker_keeps_only_the_most_recent_sessions_within_the_limit() {
+        let sessions: Vec<Session> = (0..30)
+            .map(|i| session(&format!("s{i}"), "Session", i as i64))
+            .collect();
+
+        let choices = session_picker_entries(&sessions, 20, at(0));
+
+        assert_eq!(choices.len(), 20);
+        assert_eq!(choices[0].id, "s0");
+        assert_eq!(choices[19].id, "s19");
+    }
+
+    #[test]
+    fn a_session_without_a_name_still_reads_as_something() {
+        let choices = session_picker_entries(&[session("s1", "   ", 5)], 10, at(0));
+
+        assert_eq!(choices[0].label, "5m ago · (no name)");
+        assert_eq!(choices[0].working_dir, "/work");
+    }
+
+    #[test]
+    fn a_long_name_is_cut_to_the_list_width() {
+        let long_name = "n".repeat(TRUNCATED_DESC_LENGTH + 20);
+        let choices = session_picker_entries(&[session("s1", &long_name, 5)], 10, at(0));
+
+        let shown = choices[0].label.strip_prefix("5m ago · ").expect("stamp");
+        assert!(shown.chars().count() <= TRUNCATED_DESC_LENGTH);
+    }
+
+    #[test]
+    fn the_deletion_menu_offers_every_session_newest_first() {
+        let sessions: Vec<Session> = (0..30)
+            .map(|i| session(&format!("s{i}"), "Session", 30 - i as i64))
+            .collect();
+
+        let choices = session_picker_entries(&sessions, sessions.len(), at(0));
+
+        assert_eq!(choices.len(), 30);
+        assert_eq!(choices[0].id, "s29");
+    }
+
+    #[test]
+    fn ticked_sessions_come_back_in_the_order_they_were_shown() {
+        let sessions = vec![
+            session("old", "Old One", 500),
+            session("fresh", "Fresh One", 2),
+            session("middle", "Middle One", 90),
+        ];
+        let choices = session_picker_entries(&sessions, 10, at(0));
+
+        let picked = select_sessions_by_id(
+            &sessions,
+            &choices,
+            &["old".to_string(), "fresh".to_string(), "gone".to_string()],
+        );
+
+        let ids: Vec<&str> = picked.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, vec!["fresh", "old"]);
+    }
+
+    #[test]
+    fn time_ago_speaks_in_the_largest_unit_that_fits() {
+        let now = at(0);
+        assert_eq!(time_ago(at(0), now), "just now");
+        assert_eq!(time_ago(at(59), now), "59m ago");
+        assert_eq!(time_ago(at(60), now), "1h ago");
+        assert_eq!(time_ago(at(60 * 24 - 1), now), "23h ago");
+        assert_eq!(time_ago(at(60 * 24), now), "1d ago");
+        assert_eq!(time_ago(at(60 * 24 * 7 - 1), now), "6d ago");
+        assert_eq!(time_ago(at(60 * 24 * 7), now), "2026-07-30");
+    }
 
     #[test]
     fn markdown_export_preserves_user_audience_tool_output() {

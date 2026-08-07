@@ -61,7 +61,9 @@ use rmcp::model::{
     GetPromptResult, Prompt, ServerNotification, Tool,
 };
 use serde_json::Value;
+use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument, warn};
 
@@ -261,6 +263,7 @@ pub struct Agent {
     goal: Mutex<Option<String>>,
     grind: Mutex<Option<String>>,
     pending_steers: Mutex<HashMap<String, VecDeque<Message>>>,
+    pending_session_name: Mutex<Option<JoinHandle<()>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -280,6 +283,42 @@ fn ensure_message_event_id(event: AgentEvent) -> AgentEvent {
         AgentEvent::Message(message) => AgentEvent::Message(message.with_generated_id_if_missing()),
         other => other,
     }
+}
+
+/// The model must not pick up a request the user walked away from, and two user
+/// messages in a row would otherwise be merged into a single prompt.
+fn abandoned_turn_marker() -> Message {
+    Message::assistant()
+        .with_text(
+            "[The previous request was interrupted before it completed. \
+             Do not resume it unless asked.]",
+        )
+        .with_visibility(false, true)
+}
+
+/// A turn that ran to its end always leaves an assistant message with every tool
+/// request answered. Anything else — a question, a tool result nobody acted on, a
+/// tool call left hanging — means the turn stopped halfway.
+fn previous_turn_was_abandoned(conversation: &Conversation) -> bool {
+    let messages = conversation.messages();
+    let Some(last) = messages.iter().rev().find(|message| {
+        message.is_agent_visible() && !message.agent_visible_content().content.is_empty()
+    }) else {
+        return false;
+    };
+
+    if last.role != rmcp::model::Role::Assistant {
+        return true;
+    }
+
+    last.content.iter().any(|content| match content {
+        MessageContent::ToolRequest(request) => !messages.iter().any(|message| {
+            message.content.iter().any(|content| {
+                matches!(content, MessageContent::ToolResponse(response) if response.id == request.id)
+            })
+        }),
+        _ => false,
+    })
 }
 
 fn push_message_with_id(messages: &mut Conversation, message: Message) -> Message {
@@ -389,6 +428,10 @@ where
     })
 }
 
+async fn join_within(handle: JoinHandle<()>, limit: Duration) -> bool {
+    matches!(tokio::time::timeout(limit, handle).await, Ok(Ok(())))
+}
+
 impl Agent {
     pub fn new() -> Self {
         let config = Config::global();
@@ -464,6 +507,17 @@ impl Agent {
             goal: Mutex::new(None),
             grind: Mutex::new(None),
             pending_steers: Mutex::new(HashMap::new()),
+            pending_session_name: Mutex::new(None),
+        }
+    }
+
+    /// Waits out a session-naming request that is still in flight, so a short
+    /// session does not exit with the placeholder name on it.
+    pub async fn wait_for_pending_session_name(&self, limit: Duration) -> bool {
+        let handle = self.pending_session_name.lock().await.take();
+        match handle {
+            Some(handle) => join_within(handle, limit).await,
+            None => true,
         }
     }
 
@@ -1681,6 +1735,14 @@ impl Agent {
             return Ok(Box::pin(futures::stream::empty()));
         }
 
+        if let Some(conversation) = session.conversation.as_ref() {
+            if previous_turn_was_abandoned(conversation) {
+                session_manager
+                    .add_message(&session_config.id, &abandoned_turn_marker())
+                    .await?;
+            }
+        }
+
         if is_first_agent_turn {
             self.emit_hook(crate::hooks::HookEvent::SessionStart, &session_config.id)
                 .await;
@@ -1953,7 +2015,7 @@ impl Agent {
             let provider = provider.clone();
             let manager_for_spawn = session_manager.clone();
             let session_name_update_tx = self.config.session_name_update_tx.clone();
-            tokio::spawn(async move {
+            let naming = tokio::spawn(async move {
                 match manager_for_spawn
                     .maybe_update_name(&session_id, provider)
                     .await
@@ -1969,6 +2031,9 @@ impl Agent {
                     Err(e) => warn!("Failed to generate session description: {}", e),
                 }
             });
+            // A dropped handle keeps its task running, so an older naming request
+            // still gets its chance to land.
+            *self.pending_session_name.lock().await = Some(naming);
         }
 
         // Count tool calls present before this reply — everything added during
@@ -3628,6 +3693,101 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn join_within_waits_for_a_task_that_finishes() {
+        let handle = tokio::spawn(async {});
+        assert!(join_within(handle, Duration::from_secs(5)).await);
+    }
+
+    #[tokio::test]
+    async fn join_within_gives_up_on_a_task_that_outlasts_the_limit() {
+        let handle = tokio::spawn(async {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        });
+        assert!(!join_within(handle, Duration::from_millis(20)).await);
+    }
+
+    fn conversation_of(messages: Vec<Message>) -> Conversation {
+        Conversation::new_unvalidated(messages)
+    }
+
+    #[test]
+    fn an_empty_conversation_has_no_abandoned_turn() {
+        assert!(!previous_turn_was_abandoned(&conversation_of(vec![])));
+    }
+
+    #[test]
+    fn a_question_left_without_an_answer_is_an_abandoned_turn() {
+        let conversation = conversation_of(vec![Message::user().with_text("write me an essay")]);
+        assert!(previous_turn_was_abandoned(&conversation));
+    }
+
+    #[test]
+    fn an_answered_question_is_not_an_abandoned_turn() {
+        let conversation = conversation_of(vec![
+            Message::user().with_text("write me an essay"),
+            Message::assistant().with_text("here it is"),
+        ]);
+        assert!(!previous_turn_was_abandoned(&conversation));
+    }
+
+    #[test]
+    fn a_tool_request_nobody_answered_is_an_abandoned_turn() {
+        let conversation = conversation_of(vec![
+            Message::user().with_text("read the file"),
+            Message::assistant()
+                .with_tool_request("call-1", Ok(CallToolRequestParams::new("developer"))),
+        ]);
+        assert!(previous_turn_was_abandoned(&conversation));
+    }
+
+    #[test]
+    fn a_tool_result_nobody_acted_on_is_an_abandoned_turn() {
+        let conversation = conversation_of(vec![
+            Message::user().with_text("read the file"),
+            Message::assistant()
+                .with_tool_request("call-1", Ok(CallToolRequestParams::new("developer"))),
+            Message::user().with_tool_response("call-1", Ok(CallToolResult::success(vec![]))),
+        ]);
+        assert!(previous_turn_was_abandoned(&conversation));
+    }
+
+    #[test]
+    fn a_tool_call_the_assistant_summed_up_is_not_an_abandoned_turn() {
+        let conversation = conversation_of(vec![
+            Message::user().with_text("read the file"),
+            Message::assistant()
+                .with_tool_request("call-1", Ok(CallToolRequestParams::new("developer"))),
+            Message::user().with_tool_response("call-1", Ok(CallToolResult::success(vec![]))),
+            Message::assistant().with_text("the file says hello"),
+        ]);
+        assert!(!previous_turn_was_abandoned(&conversation));
+    }
+
+    #[test]
+    fn messages_the_agent_never_sees_do_not_decide_the_verdict() {
+        let conversation = conversation_of(vec![
+            Message::user().with_text("write me an essay"),
+            Message::assistant()
+                .with_text("side note for the user")
+                .with_visibility(true, false),
+        ]);
+        assert!(previous_turn_was_abandoned(&conversation));
+    }
+
+    #[test]
+    fn the_marker_is_hidden_from_the_user_and_ends_the_abandoned_turn() {
+        let marker = abandoned_turn_marker();
+        assert!(!marker.is_user_visible());
+        assert!(marker.is_agent_visible());
+
+        let conversation = conversation_of(vec![Message::user().with_text("write me an essay")]);
+        let mut with_marker = conversation.clone();
+        with_marker.push(marker);
+        assert!(previous_turn_was_abandoned(&conversation));
+        assert!(!previous_turn_was_abandoned(&with_marker));
+    }
 
     #[test]
     fn ensure_message_event_id_assigns_missing_ids_and_preserves_existing_ids() {

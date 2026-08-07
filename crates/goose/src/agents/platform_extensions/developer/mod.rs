@@ -164,7 +164,7 @@ impl DeveloperClient {
             )),
             Tool::new(
                 "read_image".to_string(),
-                "Read an image from a local file path or http(s) URL and return it as image content for the model to inspect. Supports png, jpeg, gif, and webp.".to_string(),
+                "Read an image from a local file path or http(s) URL and return it as image content for the model to inspect. Supports png, jpeg, gif, and webp. Not for text files - read source code and documents with shell (cat, sed).".to_string(),
                 Self::schema::<ImageReadParams>(),
             )
             .annotate(ToolAnnotations::from_raw(

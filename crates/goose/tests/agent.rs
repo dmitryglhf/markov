@@ -1462,6 +1462,172 @@ mod tests {
     }
 
     #[cfg(test)]
+    mod interrupted_turn_tests {
+        use super::*;
+        use async_trait::async_trait;
+        use goose::agents::{AgentConfig, SessionConfig};
+        use goose::config::permission::PermissionManager;
+        use goose::config::GooseMode;
+        use goose::conversation::message::Message;
+        use goose::providers::base::{
+            stream_from_single_message, MessageStream, Provider, ProviderDef, ProviderMetadata,
+        };
+        use goose::session::session_manager::SessionType;
+        use goose::session::SessionManager;
+        use goose_providers::conversation::token_usage::{ProviderUsage, Usage};
+        use goose_providers::errors::ProviderError;
+        use goose_providers::model::ModelConfig;
+        use rmcp::model::{Role, Tool};
+        use std::path::PathBuf;
+        use tokio_util::sync::CancellationToken;
+
+        struct TalkingProvider;
+
+        impl goose::providers::base::ProviderDescriptor for TalkingProvider {
+            fn metadata() -> ProviderMetadata {
+                ProviderMetadata {
+                    name: "talking-mock".to_string(),
+                    display_name: "Talking Mock".to_string(),
+                    description: "Mock provider that answers with text".to_string(),
+                    default_model: "mock-model".to_string(),
+                    known_models: vec![],
+                    model_doc_link: "".to_string(),
+                    config_keys: vec![],
+                    setup_steps: vec![],
+                    model_selection_hint: None,
+                    fast_model: None,
+                }
+            }
+        }
+
+        impl ProviderDef for TalkingProvider {
+            type Provider = Self;
+
+            fn from_env(
+                _extensions: Vec<goose::config::ExtensionConfig>,
+                _tls_config: Option<goose::providers::api_client::TlsConfig>,
+            ) -> futures::future::BoxFuture<'static, anyhow::Result<Self>> {
+                unimplemented!()
+            }
+        }
+
+        #[async_trait]
+        impl Provider for TalkingProvider {
+            async fn stream(
+                &self,
+                _model_config: &ModelConfig,
+                _system_prompt: &str,
+                _messages: &[Message],
+                _tools: &[Tool],
+            ) -> Result<MessageStream, ProviderError> {
+                Ok(stream_from_single_message(
+                    Message::assistant().with_text("answering the second question"),
+                    ProviderUsage::new(
+                        "mock-model".to_string(),
+                        Usage::new(Some(10), Some(5), Some(15)),
+                    ),
+                ))
+            }
+
+            fn get_name(&self) -> &str {
+                "talking-mock"
+            }
+        }
+
+        #[tokio::test]
+        async fn an_interrupted_question_is_marked_before_the_next_one() -> Result<()> {
+            let temp_dir = tempfile::tempdir()?;
+            let session_manager = Arc::new(SessionManager::new(temp_dir.path().to_path_buf()));
+            let config = AgentConfig::new(
+                session_manager.clone(),
+                PermissionManager::instance(),
+                None,
+                GooseMode::Auto,
+                true,
+                GoosePlatform::GooseCli,
+            );
+            let agent = Agent::with_config(config);
+
+            let session = session_manager
+                .create_session(
+                    PathBuf::default(),
+                    "interrupted-test".to_string(),
+                    SessionType::Hidden,
+                    GooseMode::default(),
+                )
+                .await?;
+            let session_id = session.id.clone();
+            agent
+                .update_provider(
+                    Arc::new(TalkingProvider),
+                    ModelConfig::new("mock-model"),
+                    &session_id,
+                )
+                .await?;
+
+            let session_config = || SessionConfig {
+                id: session_id.clone(),
+                schedule_id: None,
+                max_turns: Some(1),
+                retry_config: None,
+            };
+
+            // The user hits Ctrl-C: the token fires and the caller drops the stream
+            // without reading it, exactly as the CLI and ACP do.
+            let cancel_token = CancellationToken::new();
+            cancel_token.cancel();
+            let abandoned = agent
+                .reply(
+                    Message::user().with_text("write me an essay"),
+                    session_config(),
+                    Some(cancel_token),
+                )
+                .await?;
+            drop(abandoned);
+
+            let reply_stream = agent
+                .reply(
+                    Message::user().with_text("never mind, what time is it"),
+                    session_config(),
+                    None,
+                )
+                .await?;
+            tokio::pin!(reply_stream);
+            while let Some(event) = reply_stream.next().await {
+                event?;
+            }
+
+            let conversation = session_manager
+                .get_session(&session_id, true)
+                .await?
+                .conversation
+                .expect("session should have a conversation");
+            let messages = conversation.messages();
+
+            let marker = messages
+                .iter()
+                .position(|message| !message.is_user_visible() && message.role == Role::Assistant)
+                .expect("the abandoned turn should be marked");
+            let second_question = messages
+                .iter()
+                .position(|message| {
+                    message.role == Role::User && message.as_concat_text().contains("never mind")
+                })
+                .expect("the second question should be stored");
+
+            assert_eq!(marker, second_question - 1);
+            assert!(
+                !messages
+                    .windows(2)
+                    .any(|pair| pair[0].role == Role::User && pair[1].role == Role::User),
+                "two user messages in a row would be merged into one prompt",
+            );
+
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
     mod thinking_preservation_tests {
         use super::*;
         use async_trait::async_trait;

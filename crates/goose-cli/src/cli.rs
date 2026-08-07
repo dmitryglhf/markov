@@ -36,7 +36,7 @@ use crate::session::{build_session, SessionBuilderConfig};
 use goose::agents::Container;
 use goose::session::session_manager::SessionType;
 use goose::session::SessionManager;
-use std::io::Read;
+use std::io::{IsTerminal, Read};
 use std::path::PathBuf;
 use tracing::warn;
 
@@ -392,6 +392,15 @@ pub struct RunBehavior {
         hide = true
     )]
     pub scheduled_job_id: Option<String>,
+}
+
+/// A bare `--resume` offers a choice of sessions. Anything not on a terminal
+/// keeps the old behaviour of taking the most recent one, so scripts stay scripts.
+fn resume_selection_needed(resume: bool, identifier: &Option<Identifier>) -> bool {
+    resume
+        && identifier.is_none()
+        && std::io::stdin().is_terminal()
+        && std::io::stdout().is_terminal()
 }
 
 async fn get_or_create_session_id(
@@ -909,7 +918,7 @@ enum Command {
             short,
             long,
             help = "Resume a previous session (last used or specified by --name/--session-id)",
-            long_help = "Continue from a previous session. If --name or --session-id is provided, resumes that specific session. Otherwise, resumes the most recently used session."
+            long_help = "Continue from a previous session. If --name or --session-id is provided, resumes that specific session. Otherwise, offers a choice of recent sessions, or resumes the most recent one when not on a terminal."
         )]
         resume: bool,
 
@@ -1564,10 +1573,13 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
             } else {
                 match crate::commands::session::prompt_interactive_session_selection(
                     &session_manager,
+                    "Select a session to export:",
+                    None,
                 )
                 .await
                 {
-                    Ok(id) => id,
+                    Ok(Some(id)) => id,
+                    Ok(None) => return Ok(()),
                     Err(e) => {
                         eprintln!("Error: {}", e);
                         return Ok(());
@@ -1593,10 +1605,13 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
             } else {
                 match crate::commands::session::prompt_interactive_session_selection(
                     &session_manager,
+                    "Select a session to inspect:",
+                    None,
                 )
                 .await
                 {
-                    Ok(id) => id,
+                    Ok(Some(id)) => id,
+                    Ok(None) => return Ok(()),
                     Err(e) => {
                         eprintln!("Error: {}", e);
                         return Ok(());
@@ -1649,6 +1664,26 @@ async fn handle_interactive_session(
             std::process::exit(1);
         }
     }
+
+    let identifier = match resume_selection_needed(resume, &identifier) {
+        true => match crate::commands::session::prompt_interactive_session_selection(
+            &SessionManager::instance(),
+            "Resume which session?",
+            Some(&[SessionType::User]),
+        )
+        .await
+        {
+            Ok(Some(id)) => Some(Identifier {
+                session_id: Some(id),
+                name: None,
+                path: None,
+            }),
+            Ok(None) => return Ok(()),
+            // Nothing to pick from, let the usual resume path report it
+            Err(_) => identifier,
+        },
+        false => identifier,
+    };
 
     let goose_mode = Config::global().get_goose_mode().unwrap_or_default();
     let mut session_id = get_or_create_session_id(identifier, resume, false, goose_mode).await?;
