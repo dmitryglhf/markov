@@ -1,12 +1,11 @@
 use anstream::println;
 use bat::WrappingMode;
 use console::{measure_text_width, style, Color, StyledObject, Term};
-use goose::config::{get_available_extensions, Config, GooseMode};
+use goose::config::{Config, GooseMode};
 use goose::conversation::message::{
     ActionRequiredData, Message, MessageContent, SystemNotificationContent, SystemNotificationType,
     ToolNameParts, ToolRequest, ToolResponse,
 };
-use goose::custom_requests::{SourceEntry, SourceType};
 use goose::providers::canonical::maybe_get_canonical_model;
 #[cfg(target_os = "windows")]
 use goose::subprocess::SubprocessExt;
@@ -32,10 +31,6 @@ pub const DEFAULT_CLI_DARK_THEME: &str = "zenburn";
 
 fn accent<T: Display>(value: T) -> StyledObject<T> {
     style(value).cyan()
-}
-
-fn success<T: Display>(value: T) -> StyledObject<T> {
-    style(value).green()
 }
 
 fn warning<T: Display>(value: T) -> StyledObject<T> {
@@ -890,6 +885,11 @@ pub fn render_error(message: &str) {
     println!("\n  {} {}\n", danger("error:").bold(), message);
 }
 
+/// Something changed under the session rather than went wrong.
+pub fn render_note(message: &str) {
+    println!("\n  {} {}\n", warning("note:").bold(), message);
+}
+
 pub fn render_prompts(prompts: &HashMap<String, Vec<String>>) {
     println!();
     for (extension, prompts) in prompts {
@@ -950,63 +950,9 @@ pub fn render_mode_usage(current: GooseMode) {
     println!();
 }
 
-pub fn render_builtin_usage() {
-    let names: Vec<String> = get_available_extensions()
-        .iter()
-        .map(|extension| extension.name())
-        .collect();
-    println!();
-    println!("  {} {}", accent("builtins:"), names.join(", "));
-    println!();
-    println!(
-        "{}",
-        style("  usage: /builtin <names>  (comma-separated)").dim()
-    );
-    println!();
-}
-
-pub fn render_extension_usage() {
-    println!();
-    println!(
-        "{}",
-        style("  usage: /extension ENV1=val1 command args...").dim()
-    );
-    println!();
-}
-
-pub fn render_extension_success(name: &str) {
-    println!();
-    println!("  {} extension `{}`", success("added"), accent(name),);
-    println!();
-}
-
 pub fn render_extension_error(name: &str, error: &str) {
     println!();
     println!("  {} to add extension {}", danger("failed"), danger(name));
-    println!();
-    println!("{}", style(error).dim());
-    println!();
-}
-
-pub fn render_builtin_success(names: &str) {
-    println!();
-    println!(
-        "  {} builtin{}: {}",
-        success("added"),
-        if names.contains(',') { "s" } else { "" },
-        accent(names)
-    );
-    println!();
-}
-
-pub fn render_builtin_error(names: &str, error: &str) {
-    println!();
-    println!(
-        "  {} to add builtin{}: {}",
-        danger("failed"),
-        if names.contains(',') { "s" } else { "" },
-        danger(names)
-    );
     println!();
     println!("{}", style(error).dim());
     println!();
@@ -1562,40 +1508,6 @@ pub fn terminal_width() -> usize {
         .size_checked()
         .map(|(_height, width)| width as usize)
         .unwrap_or(80)
-}
-
-/// One entry per skill: name and location on the first line, description
-/// wrapped underneath, because skill descriptions are author-written prose and
-/// do not fit a column.
-pub fn render_skills(skills: &[SourceEntry], width: usize) -> String {
-    const INDENT: &str = "    ";
-
-    let mut out = format!(
-        "\n  {}\n",
-        style(format!("skills ({})", skills.len())).white()
-    );
-
-    for skill in skills {
-        let location = if skill.source_type == SourceType::BuiltinSkill {
-            "built-in"
-        } else if skill.global {
-            "global"
-        } else {
-            "project"
-        };
-
-        out.push('\n');
-        out.push_str(&format!(
-            "  {} {}\n",
-            style(&skill.name).cyan(),
-            style(format!("· {}", location)).dim()
-        ));
-        for line in wrap_words(&skill.description, width.saturating_sub(INDENT.len())) {
-            out.push_str(&format!("{}{}\n", INDENT, style(line).dim()));
-        }
-    }
-
-    out
 }
 
 fn wrap_words(text: &str, width: usize) -> Vec<String> {
@@ -2371,16 +2283,8 @@ mod tool_parameter_tests {
 }
 
 #[cfg(test)]
-mod skills_tests {
+mod wrap_tests {
     use super::*;
-
-    fn skill(name: &str, description: &str) -> SourceEntry {
-        SourceEntry {
-            name: name.to_string(),
-            description: description.to_string(),
-            ..Default::default()
-        }
-    }
 
     #[test]
     fn words_are_kept_whole_when_wrapping() {
@@ -2396,28 +2300,6 @@ mod skills_tests {
             wrap_words("a loooooooooong tail", 4),
             vec!["a", "loooooooooong", "tail"]
         );
-    }
-
-    #[test]
-    fn each_skill_gets_a_name_line_and_an_indented_description() {
-        let rendered = render_skills(&[skill("code-review", "Review a diff before CI")], 40);
-        let lines: Vec<&str> = rendered.lines().filter(|l| !l.trim().is_empty()).collect();
-
-        assert!(lines[0].contains("skills (1)"));
-        assert!(lines[1].starts_with("  code-review"));
-        assert!(lines[1].contains("project"));
-        assert_eq!(lines[2], "    Review a diff before CI");
-    }
-
-    #[test]
-    fn a_long_description_is_wrapped_under_the_name() {
-        let long = "Reference the documentation to create, configure, or explain \
-                    features like recipes, extensions, sessions, and providers";
-        let rendered = render_skills(&[skill("guide", long)], 40);
-
-        for line in rendered.lines() {
-            assert!(line.chars().count() <= 40, "line too wide: {line}");
-        }
     }
 }
 

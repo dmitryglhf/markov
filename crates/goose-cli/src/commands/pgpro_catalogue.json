@@ -1,0 +1,34 @@
+{
+  "servers": [
+    {
+      "server": {
+        "name": "ru.postgrespro/workspace-search",
+        "title": "Workspace search",
+        "description": "Semantic search over indexed Confluence, plus read-only lookups in Jira, Confluence and GitLab. Each token unlocks its own tools; without one those tools stay hidden.",
+        "remotes": [
+          {
+            "type": "streamable-http",
+            "url": "${PGPRO_WORKSPACE_SEARCH_URL}",
+            "headers": [
+              {
+                "name": "x-atlas-confluence",
+                "description": "Confluence personal access token",
+                "isSecret": true
+              },
+              {
+                "name": "x-atlas-jira",
+                "description": "Jira personal access token",
+                "isSecret": true
+              },
+              {
+                "name": "x-atlas-gitlab",
+                "description": "GitLab personal access token, scopes read_api and read_user",
+                "isSecret": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

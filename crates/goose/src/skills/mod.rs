@@ -71,32 +71,41 @@ pub(crate) fn skill_base_dir(global: bool, project_dir: Option<&str>) -> Result<
     }
 }
 
-pub(crate) fn validate_skill_name(name: &str) -> Result<(), Error> {
+/// The rule `create_source` enforces, in a shape a form can show while the name
+/// is still being typed instead of after the write is attempted.
+pub fn skill_name_problem(name: &str) -> Option<String> {
     if name.is_empty() {
-        return Err(Error::invalid_params().data("Skill name must not be empty"));
+        return Some("Skill name must not be empty".to_string());
     }
     if name.len() > 64 {
-        return Err(Error::invalid_params().data(format!(
+        return Some(format!(
             "Invalid skill name \"{}\". Names must be at most 64 characters.",
             name
-        )));
+        ));
     }
     if !name
         .chars()
         .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
     {
-        return Err(Error::invalid_params().data(format!(
+        return Some(format!(
             "Invalid skill name \"{}\". Names may only contain lowercase letters, digits, and hyphens.",
             name
-        )));
+        ));
     }
     if name.starts_with('-') || name.ends_with('-') {
-        return Err(Error::invalid_params().data(format!(
+        return Some(format!(
             "Invalid skill name \"{}\". Names must not start or end with a hyphen.",
             name
-        )));
+        ));
     }
-    Ok(())
+    None
+}
+
+pub(crate) fn validate_skill_name(name: &str) -> Result<(), Error> {
+    match skill_name_problem(name) {
+        Some(problem) => Err(Error::invalid_params().data(problem)),
+        None => Ok(()),
+    }
 }
 
 const DEFAULT_GOOSE_DOCS_ROOT: &str = "https://goose-docs.ai";
@@ -474,34 +483,44 @@ fn scan_skills_from_dir(dir: &Path, global: bool, seen: &mut HashSet<String>) ->
     sources
 }
 
-/// Discover skills from all configured filesystem locations and built-ins.
-/// Each returned entry has `global` set according to the directory it was
-/// found in (or `true` for built-ins).
-pub fn discover_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
+fn builtin_entry(source: SourceEntry) -> SourceEntry {
+    let path = format!("builtin://skills/{}", source.name);
+    SourceEntry {
+        source_type: SourceType::BuiltinSkill,
+        path,
+        ..source
+    }
+}
+
+/// Every skill found anywhere, in discovery order and without dropping repeated
+/// names. The agent only ever sees the first of each name; the rest are here so
+/// a manager can say why editing one of them changed nothing.
+pub fn discover_all_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
     let mut sources: Vec<SourceEntry> = Vec::new();
-    let mut seen = HashSet::new();
 
     for (dir, is_global) in all_skill_dirs(working_dir) {
-        for source in scan_skills_from_dir(&dir, is_global, &mut seen) {
-            sources.push(source);
-        }
+        let mut seen = HashSet::new();
+        sources.extend(scan_skills_from_dir(&dir, is_global, &mut seen));
     }
 
     for content in builtin::get_all() {
         if let Some(source) = parse_skill_content(content, &PathBuf::new(), true) {
-            if !seen.contains(&source.name) {
-                seen.insert(source.name.clone());
-                let path = format!("builtin://skills/{}", source.name);
-                sources.push(SourceEntry {
-                    source_type: SourceType::BuiltinSkill,
-                    path,
-                    ..source
-                });
-            }
+            sources.push(builtin_entry(source));
         }
     }
 
     sources
+}
+
+/// Discover skills from all configured filesystem locations and built-ins.
+/// Each returned entry has `global` set according to the directory it was
+/// found in (or `true` for built-ins).
+pub fn discover_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
+    let mut seen = HashSet::new();
+    discover_all_skills(working_dir)
+        .into_iter()
+        .filter(|source| seen.insert(source.name.clone()))
+        .collect()
 }
 
 pub fn list_installed_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {

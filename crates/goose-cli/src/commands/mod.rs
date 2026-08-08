@@ -1,7 +1,11 @@
 pub mod configure;
 pub mod doctor;
+pub mod extensions;
 pub mod gateway;
 pub mod info;
+pub mod mcp_manager;
+pub mod mcp_registry;
+pub mod models;
 pub mod plugin;
 pub mod project;
 pub mod recipe;
@@ -12,5 +16,6 @@ pub mod skills;
 pub mod term;
 #[cfg(feature = "tui")]
 pub mod tui;
+pub mod ui;
 #[cfg(feature = "update")]
 pub mod update;

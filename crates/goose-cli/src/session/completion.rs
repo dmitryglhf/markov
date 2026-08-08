@@ -779,7 +779,7 @@ mod tests {
 
         assert!(replacements.contains(&"/edit "));
         assert!(replacements.contains(&"/endplan "));
-        assert!(replacements.contains(&"/extension "));
+        assert!(replacements.contains(&"/exit "));
     }
 
     #[test]

@@ -1164,6 +1164,16 @@ mod tests {
         assert_eq!(blocks, expected);
     }
 
+    /// Only the last user message is ever sent, so a session that started on
+    /// another provider would arrive here with its history dropped. The CLI
+    /// reads this to refuse the switch; it stays false until something like the
+    /// ACP handoff memo exists here too.
+    #[test]
+    fn a_conversation_cannot_be_handed_over_while_only_the_last_message_travels() {
+        assert!(make_provider().manages_own_context());
+        assert!(!make_provider().accepts_conversation_handoff());
+    }
+
     #[test_case(
         &[json!({"type":"text","text":"Hello"})],
         json!({"type":"user","session_id":TEST_SESSION_ID,"message":{"role":"user","content":[{"type":"text","text":"Hello"}]}})

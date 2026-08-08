@@ -62,6 +62,14 @@ pub fn set_provider_entry(
     })
 }
 
+/// The provider written in the config file, ignoring whatever the environment
+/// says. `get_active_provider` answers "who is in charge"; this answers "who
+/// would be in charge without `GOOSE_PROVIDER`", which is what a manager has to
+/// show before it offers to change the file.
+pub fn get_default_provider(config: &Config) -> Option<String> {
+    config.get_param::<String>(ACTIVE_PROVIDER_KEY).ok()
+}
+
 pub fn get_active_provider(config: &Config) -> Option<String> {
     if let Ok(val) = env::var("GOOSE_PROVIDER") {
         return Some(val);

@@ -467,6 +467,12 @@ impl Provider for AcpProvider {
         true
     }
 
+    /// `claim_handoff_context` puts the earlier turns into the first prompt, so
+    /// the adapter starts knowing what was said before it existed.
+    fn accepts_conversation_handoff(&self) -> bool {
+        true
+    }
+
     async fn handle_permission_confirmation(
         &self,
         request_id: &str,
@@ -2208,6 +2214,18 @@ mod tests {
         let second_claim = provider.claim_handoff_context(&messages);
         assert!(!second_claim.first_prompt);
         assert!(!second_claim.include_context);
+    }
+
+    /// What the CLI reads before it lets a live session move onto a provider.
+    /// The two answers belong together: keeping your own history is only safe
+    /// to switch into because the first prompt carries the earlier turns, so
+    /// anything that retires `claim_handoff_context` has to retire this too.
+    #[test]
+    fn taking_a_conversation_over_is_advertised_alongside_owning_it() {
+        let (provider, _) = test_provider();
+
+        assert!(provider.manages_own_context());
+        assert!(provider.accepts_conversation_handoff());
     }
 
     #[test]

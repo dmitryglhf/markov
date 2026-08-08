@@ -294,6 +294,61 @@ pub enum ExtensionConfig {
     },
 }
 
+/// What kind of thing an extension entry is, from the point of view of someone
+/// managing it rather than of the agent running it. The agent reduces all seven
+/// variants to one trait object and stops caring; a person still needs to know
+/// that a server has an address and credentials while a platform extension has
+/// neither and cannot be added or removed at all.
+///
+/// Every screen that lists extensions selects by this, so a new variant of
+/// `ExtensionConfig` reaches `kind` first and the screens straight after.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ExtensionKind {
+    Mcp,
+    Platform,
+    Builtin,
+    Frontend,
+    Inline,
+}
+
+impl ExtensionKind {
+    /// What to call this on screen. `Platform` and `Builtin` deliberately share
+    /// a word: one runs inside the agent and the other speaks MCP over a pipe to
+    /// itself, which decides how they are written but nothing a person can act
+    /// on. Both arrived inside the binary and neither has an address to set.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Mcp => "mcp",
+            Self::Platform | Self::Builtin => "builtin",
+            Self::Frontend => "frontend",
+            Self::Inline => "inline",
+        }
+    }
+
+    /// Where this kind sits when rows are grouped on screen. Follows `label`
+    /// rather than the variant: two kinds that share a word have to sort
+    /// together, or a list shows one heading twice and the run of names breaks
+    /// in the middle.
+    pub fn display_rank(&self) -> u8 {
+        match self {
+            Self::Mcp => 0,
+            Self::Platform | Self::Builtin => 1,
+            Self::Frontend => 2,
+            Self::Inline => 3,
+        }
+    }
+
+    /// The command that owns everything beyond the on/off switch, when there is
+    /// one. Kinds that answer `None` have nothing else to manage: their set is
+    /// fixed in the binary.
+    pub fn managed_by(&self) -> Option<&'static str> {
+        match self {
+            Self::Mcp => Some("/mcp"),
+            Self::Platform | Self::Builtin | Self::Frontend | Self::Inline => None,
+        }
+    }
+}
+
 impl Default for ExtensionConfig {
     fn default() -> Self {
         Self::Builtin {
@@ -308,6 +363,18 @@ impl Default for ExtensionConfig {
 }
 
 impl ExtensionConfig {
+    pub fn kind(&self) -> ExtensionKind {
+        match self {
+            Self::Sse { .. } | Self::Stdio { .. } | Self::StreamableHttp { .. } => {
+                ExtensionKind::Mcp
+            }
+            Self::Platform { .. } => ExtensionKind::Platform,
+            Self::Builtin { .. } => ExtensionKind::Builtin,
+            Self::Frontend { .. } => ExtensionKind::Frontend,
+            Self::InlinePython { .. } => ExtensionKind::Inline,
+        }
+    }
+
     pub fn streamable_http<S: Into<String>, T: Into<u64>>(
         name: S,
         uri: S,
@@ -412,6 +479,18 @@ impl ExtensionConfig {
             Self::InlinePython { name, .. } => name,
         }
         .to_string()
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            Self::Sse { description, .. } => description,
+            Self::StreamableHttp { description, .. } => description,
+            Self::Stdio { description, .. } => description,
+            Self::Builtin { description, .. } => description,
+            Self::Platform { description, .. } => description,
+            Self::Frontend { description, .. } => description,
+            Self::InlinePython { description, .. } => description,
+        }
     }
 
     /// Check if a tool should be available to the LLM
@@ -609,6 +688,59 @@ mod tests {
     use crate::agents::*;
     use crate::config;
     use test_case::test_case;
+
+    #[test]
+    fn every_transport_that_speaks_mcp_over_the_wire_is_one_kind() {
+        let stdio = ExtensionConfig::Stdio {
+            name: "one".to_string(),
+            description: String::new(),
+            cmd: "npx".to_string(),
+            args: Vec::new(),
+            envs: Default::default(),
+            env_keys: Vec::new(),
+            timeout: None,
+            cwd: None,
+            bundled: None,
+            available_tools: Vec::new(),
+        };
+        let remote = ExtensionConfig::streamable_http("two", "https://example.test", "", 30u64);
+        let legacy = ExtensionConfig::Sse {
+            name: "three".to_string(),
+            description: String::new(),
+            uri: None,
+        };
+
+        assert_eq!(stdio.kind(), ExtensionKind::Mcp);
+        assert_eq!(remote.kind(), ExtensionKind::Mcp);
+        assert_eq!(legacy.kind(), ExtensionKind::Mcp);
+        assert_eq!(ExtensionConfig::default().kind(), ExtensionKind::Builtin);
+    }
+
+    #[test]
+    fn only_servers_have_somewhere_else_to_be_managed() {
+        assert_eq!(ExtensionKind::Mcp.managed_by(), Some("/mcp"));
+        assert_eq!(ExtensionKind::Platform.managed_by(), None);
+        assert_eq!(ExtensionKind::Builtin.managed_by(), None);
+    }
+
+    #[test]
+    fn what_shipped_inside_the_binary_reads_as_one_word() {
+        assert_eq!(
+            ExtensionKind::Platform.label(),
+            ExtensionKind::Builtin.label()
+        );
+        assert_eq!(ExtensionKind::Platform.label(), "builtin");
+        assert_ne!(ExtensionKind::Mcp.label(), ExtensionKind::Builtin.label());
+    }
+
+    #[test]
+    fn kinds_that_share_a_label_sort_together() {
+        assert_eq!(
+            ExtensionKind::Platform.display_rank(),
+            ExtensionKind::Builtin.display_rank()
+        );
+        assert!(ExtensionKind::Mcp.display_rank() < ExtensionKind::Builtin.display_rank());
+    }
 
     #[test]
     fn test_deserialize_missing_description() {

@@ -28,7 +28,7 @@ use crate::commands::schedule::{
     handle_schedule_run_now, handle_schedule_services_status, handle_schedule_services_stop,
     handle_schedule_sessions,
 };
-use crate::commands::session::{handle_session_list, handle_session_remove};
+use crate::commands::session::{handle_session_list, handle_session_remove, SessionPick};
 use crate::commands::skills::handle_skills_list;
 use crate::recipes::extract_from_cli::extract_recipe_info_from_cli;
 use crate::recipes::recipe::{explain_recipe, render_recipe_as_yaml};
@@ -392,6 +392,16 @@ pub struct RunBehavior {
         hide = true
     )]
     pub scheduled_job_id: Option<String>,
+}
+
+/// `markov resume <session>` takes one word for both doors, because the lookup
+/// behind it already matches a session by name or by id.
+fn resume_identifier(session: Option<String>) -> Option<Identifier> {
+    session.map(|name| Identifier {
+        name: Some(name),
+        session_id: None,
+        path: None,
+    })
 }
 
 /// A bare `--resume` offers a choice of sessions. Anything not on a terminal
@@ -828,11 +838,20 @@ enum Command {
     #[command(about = "Check that your Markov setup is working")]
     Doctor {},
 
-    /// Manage system prompts and behaviors
-    #[command(about = "Run one of the mcp servers bundled with markov")]
+    /// Choose the provider and model markov starts with
+    #[command(about = "Choose the default provider and model", alias = "models")]
+    Model {},
+
+    /// Turn extensions of every kind on and off
+    #[command(about = "Turn extensions on and off", alias = "extension")]
+    Extensions {},
+
+    /// Manage MCP servers, or run one of the servers bundled with markov
+    #[command(about = "Manage MCP servers, or run one bundled with markov")]
     Mcp {
+        /// Run this bundled server on stdio instead of opening the manager
         #[arg(value_parser = clap::value_parser!(McpCommand))]
-        server: McpCommand,
+        server: Option<McpCommand>,
     },
 
     /// Run markov as an ACP (Agent Client Protocol) agent
@@ -955,6 +974,40 @@ enum Command {
         extension_opts: ExtensionOptions,
     },
 
+    /// Pick up a previous session
+    #[command(
+        about = "Pick up a previous session",
+        long_about = "Continue a previous session. Names it or gives its id to go straight there; otherwise offers a choice of recent sessions."
+    )]
+    Resume {
+        #[arg(
+            value_name = "SESSION",
+            help = "Name or id of the session; omit to choose from a list"
+        )]
+        session: Option<String>,
+
+        #[arg(
+            long,
+            help = "Fork instead of continuing (creates a new session with copied history)"
+        )]
+        fork: bool,
+
+        #[arg(
+            long,
+            help = "Edit the session conversation in $EDITOR before starting"
+        )]
+        edit: bool,
+
+        #[arg(long, help = "Show previous messages when resuming")]
+        history: bool,
+
+        #[command(flatten)]
+        session_opts: SessionOptions,
+
+        #[command(flatten)]
+        extension_opts: ExtensionOptions,
+    },
+
     /// Open the last project directory
     #[command(about = "Open the last project directory", visible_alias = "p")]
     Project {},
@@ -995,15 +1048,20 @@ enum Command {
         command: RecipeCommand,
     },
 
-    /// Skill utilities
-    #[command(about = "Skill utilities")]
+    /// Manage skills
+    #[command(about = "Manage skills")]
     Skills {
         #[command(subcommand)]
-        command: SkillsCommand,
+        command: Option<SkillsCommand>,
     },
 
+    // Hidden rather than removed: installing clones a git repository and can keep
+    // updating it behind the session, and what arrives that way is not manageable
+    // yet — a plugin's servers reach no list, its hooks reach none either, and its
+    // skills read as your own. Discovery is untouched, so a directory dropped into
+    // `.agents/plugins` still works for anyone who knows to do it.
     /// Manage plugins
-    #[command(about = "Manage plugins")]
+    #[command(about = "Manage plugins", hide = true)]
     Plugin {
         #[command(subcommand)]
         command: PluginCommand,
@@ -1099,7 +1157,7 @@ enum Command {
         #[arg(value_enum)]
         shell: CompletionShell,
 
-        #[arg(long, default_value = "goose", help = "Provide a custom binary name")]
+        #[arg(long, default_value = "markov", help = "Provide a custom binary name")]
         bin_name: String,
     },
 
@@ -1354,10 +1412,13 @@ fn get_command_name(command: &Option<Command>) -> &'static str {
         Some(Command::Configure {}) => "configure",
         Some(Command::Doctor {}) => "doctor",
         Some(Command::Info { .. }) => "info",
+        Some(Command::Model {}) => "model",
+        Some(Command::Extensions {}) => "extensions",
         Some(Command::Mcp { .. }) => "mcp",
         Some(Command::Acp { .. }) => "acp",
         Some(Command::Serve { .. }) => "serve",
         Some(Command::Session { .. }) => "session",
+        Some(Command::Resume { .. }) => "resume",
         Some(Command::Project {}) => "project",
         Some(Command::Projects) => "projects",
         Some(Command::Run { .. }) => "run",
@@ -1578,8 +1639,12 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
                 )
                 .await
                 {
-                    Ok(Some(id)) => id,
-                    Ok(None) => return Ok(()),
+                    Ok(SessionPick::Chosen(id)) => id,
+                    Ok(SessionPick::Cancelled) => return Ok(()),
+                    Ok(SessionPick::NoSessions) => {
+                        println!("No sessions to export.");
+                        return Ok(());
+                    }
                     Err(e) => {
                         eprintln!("Error: {}", e);
                         return Ok(());
@@ -1610,8 +1675,12 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
                 )
                 .await
                 {
-                    Ok(Some(id)) => id,
-                    Ok(None) => return Ok(()),
+                    Ok(SessionPick::Chosen(id)) => id,
+                    Ok(SessionPick::Cancelled) => return Ok(()),
+                    Ok(SessionPick::NoSessions) => {
+                        println!("No sessions to inspect.");
+                        return Ok(());
+                    }
                     Err(e) => {
                         eprintln!("Error: {}", e);
                         return Ok(());
@@ -1673,13 +1742,16 @@ async fn handle_interactive_session(
         )
         .await
         {
-            Ok(Some(id)) => Some(Identifier {
+            Ok(SessionPick::Chosen(id)) => Some(Identifier {
                 session_id: Some(id),
                 name: None,
                 path: None,
             }),
-            Ok(None) => return Ok(()),
-            // Nothing to pick from, let the usual resume path report it
+            Ok(SessionPick::Cancelled) => return Ok(()),
+            Ok(SessionPick::NoSessions) => {
+                println!("No sessions yet. Run `markov` to start one.");
+                return Ok(());
+            }
             Err(_) => identifier,
         },
         false => identifier,
@@ -2273,7 +2345,12 @@ pub async fn cli() -> anyhow::Result<()> {
         Some(Command::Configure {}) => handle_configure().await,
         Some(Command::Doctor {}) => crate::commands::doctor::handle_doctor().await,
         Some(Command::Info { verbose, check }) => handle_info(verbose, check).await,
-        Some(Command::Mcp { server }) => handle_mcp_command(server).await,
+        Some(Command::Model {}) => crate::commands::models::handle_model_command().await,
+        Some(Command::Extensions {}) => crate::commands::extensions::handle_extensions_command(),
+        Some(Command::Mcp { server }) => match server {
+            Some(server) => handle_mcp_command(server).await,
+            None => crate::commands::mcp_manager::mcp_dialog().await.map(|_| ()),
+        },
         Some(Command::Acp {
             builtins,
             enable_scheduler,
@@ -2328,6 +2405,25 @@ pub async fn cli() -> anyhow::Result<()> {
             )
             .await
         }
+        Some(Command::Resume {
+            session,
+            fork,
+            edit,
+            history,
+            session_opts,
+            extension_opts,
+        }) => {
+            handle_interactive_session(
+                resume_identifier(session),
+                true,
+                fork,
+                edit,
+                history,
+                session_opts,
+                extension_opts,
+            )
+            .await
+        }
         Some(Command::Project {}) => {
             handle_project_default()?;
             Ok(())
@@ -2367,7 +2463,10 @@ pub async fn cli() -> anyhow::Result<()> {
             Ok(())
         }
         Some(Command::Recipe { command }) => handle_recipe_subcommand(command),
-        Some(Command::Skills { command }) => handle_skills_subcommand(command).await,
+        Some(Command::Skills { command }) => match command {
+            Some(command) => handle_skills_subcommand(command).await,
+            None => crate::commands::skills::skills_dialog().await,
+        },
         Some(Command::Plugin { command }) => handle_plugin_subcommand(command),
         Some(Command::Term { command }) => handle_term_subcommand(command).await,
         #[cfg(feature = "tui")]
@@ -2434,6 +2533,55 @@ pub async fn cli() -> anyhow::Result<()> {
 mod tests {
     use super::*;
 
+    /// One word, both doors: the lookup behind `name` matches an id too, and
+    /// routing it as an id instead would lose everything named.
+    #[test]
+    fn a_named_session_arrives_as_a_name_and_nothing_else() {
+        let identifier = resume_identifier(Some("project-x".to_string())).expect("identifier");
+
+        assert_eq!(identifier.name.as_deref(), Some("project-x"));
+        assert!(identifier.session_id.is_none());
+        assert!(identifier.path.is_none());
+        assert!(resume_identifier(None).is_none());
+    }
+
+    /// Without an argument there is nothing to resume by, which is what sends
+    /// the command to the picker.
+    #[test]
+    fn a_bare_resume_asks_for_the_list() {
+        let cli = Cli::try_parse_from(["markov", "resume"]).expect("parse");
+        let Some(Command::Resume { session, fork, .. }) = cli.command else {
+            panic!("expected resume");
+        };
+
+        assert!(session.is_none());
+        assert!(!fork);
+        assert!(resume_identifier(session).is_none());
+    }
+
+    /// `--fork` is spelled with `--resume` on the session command; here resuming
+    /// is the command, so requiring the flag it no longer has would reject this.
+    #[test]
+    fn resume_takes_the_flags_that_used_to_need_the_resume_flag() {
+        let cli = Cli::try_parse_from(["markov", "resume", "project-x", "--fork", "--history"])
+            .expect("parse");
+        let Some(Command::Resume {
+            session,
+            fork,
+            edit,
+            history,
+            ..
+        }) = cli.command
+        else {
+            panic!("expected resume");
+        };
+
+        assert_eq!(session.as_deref(), Some("project-x"));
+        assert!(fork);
+        assert!(history);
+        assert!(!edit);
+    }
+
     #[test]
     fn completion_command_accepts_nushell_alias() {
         let cli = Cli::try_parse_from(["goose", "completion", "nushell"]).expect("parse failed");
@@ -2458,6 +2606,26 @@ mod tests {
         assert!(script.contains("module completions"));
         assert!(script.contains("export extern goose"));
         assert!(script.contains("export use completions *"));
+    }
+
+    /// The default came over from upstream naming the binary `goose`, so every
+    /// generated script registered completions for a command this fork does not
+    /// install and Tab did nothing for any of them.
+    #[test]
+    fn completions_are_generated_for_the_binary_that_is_actually_installed() {
+        let cli = Cli::try_parse_from(["markov", "completion", "fish"]).expect("parse");
+        let Some(Command::Completion { bin_name, .. }) = cli.command else {
+            panic!("expected the completion command");
+        };
+        assert_eq!(bin_name, "markov");
+
+        let mut cmd = Cli::command();
+        let mut buffer = Vec::new();
+        CompletionShell::Fish.generate(&mut cmd, &bin_name, &mut buffer);
+
+        let script = String::from_utf8(buffer).expect("utf8");
+        assert!(script.contains("complete -c markov"));
+        assert!(!script.contains("complete -c goose"));
     }
 
     #[test]
@@ -2494,9 +2662,19 @@ mod tests {
 
         match cli.command {
             Some(Command::Skills {
-                command: SkillsCommand::List,
+                command: Some(SkillsCommand::List),
             }) => {}
             _ => panic!("expected skills list command"),
+        }
+    }
+
+    #[test]
+    fn skills_command_without_subcommand_opens_the_manager() {
+        let cli = Cli::try_parse_from(["goose", "skills"]).expect("parse failed");
+
+        match cli.command {
+            Some(Command::Skills { command: None }) => {}
+            _ => panic!("expected the skills manager"),
         }
     }
 

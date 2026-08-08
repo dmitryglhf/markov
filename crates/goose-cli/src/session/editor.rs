@@ -156,7 +156,7 @@ fn split_editor_command(editor_cmd: &str) -> Result<Vec<String>> {
 }
 
 /// Launch editor and wait for completion
-fn launch_editor(editor_cmd: &str, file_path: &PathBuf) -> Result<()> {
+pub fn launch_editor(editor_cmd: &str, file_path: &PathBuf) -> Result<()> {
     use std::process::Stdio;
 
     let parts = split_editor_command(editor_cmd)?;
