@@ -21,6 +21,7 @@ use tokio::signal::ctrl_c;
 use tokio_util::task::AbortOnDropHandle;
 
 pub use self::export::{message_to_markdown, user_projected_message_to_markdown};
+use crate::commands::extensions::ExtensionChange;
 pub use builder::{build_session, SessionBuilderConfig};
 use console::Color;
 use goose::agents::AgentEvent;
@@ -466,35 +467,50 @@ impl CliSession {
             .collect()
     }
 
-    async fn add_and_persist_extensions(&mut self, configs: Vec<ExtensionConfig>) -> Result<()> {
-        for config in configs {
-            self.agent
-                .add_extension(config, &self.session_id)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to start extension: {}", e))?;
+    async fn handle_mcp(&mut self) {
+        match crate::commands::mcp_manager::mcp_dialog().await {
+            Ok(changes) => self.apply_extension_changes(&changes).await,
+            Err(e) => output::render_error(&e.to_string()),
+        }
+    }
+
+    async fn handle_extensions(&mut self) {
+        match crate::commands::extensions::extensions_dialog() {
+            Ok(changes) => self.apply_extension_changes(&changes).await,
+            Err(e) => output::render_error(&e.to_string()),
+        }
+    }
+
+    /// The dialog has already written the config; here we only mirror what it
+    /// changed into the running agent so the tools are usable straight away.
+    /// Nothing below depends on which kind of extension it was, so both managers
+    /// end here and a switch means the same thing wherever it was thrown.
+    async fn apply_extension_changes(&mut self, changes: &[ExtensionChange]) {
+        if changes.is_empty() {
+            return;
+        }
+
+        for change in changes {
+            let (name, result) = match change {
+                ExtensionChange::Connected(config) | ExtensionChange::Enabled(config) => (
+                    config.name(),
+                    self.agent
+                        .add_extension(config.clone(), &self.session_id)
+                        .await
+                        .map_err(anyhow::Error::from),
+                ),
+                ExtensionChange::Disabled(name) | ExtensionChange::Removed(name) => (
+                    name.clone(),
+                    self.agent.remove_extension(name, &self.session_id).await,
+                ),
+            };
+
+            if let Err(e) = result {
+                output::render_extension_error(&name, &e.to_string());
+            }
         }
 
         self.invalidate_completion_cache().await;
-
-        Ok(())
-    }
-
-    pub async fn add_extension(&mut self, extension_command: String) -> Result<()> {
-        let config = Self::parse_stdio_extension(&extension_command)?;
-        self.add_and_persist_extensions(vec![config]).await
-    }
-
-    pub async fn add_streamable_http_extension(&mut self, extension_url: String) -> Result<()> {
-        let config = Self::parse_streamable_http_extension(
-            &extension_url,
-            goose::config::DEFAULT_EXTENSION_TIMEOUT,
-        );
-        self.add_and_persist_extensions(vec![config]).await
-    }
-
-    pub async fn add_builtin(&mut self, builtin_name: String) -> Result<()> {
-        let configs = Self::parse_builtin_extensions(&builtin_name);
-        self.add_and_persist_extensions(configs).await
     }
 
     pub async fn list_prompts(
@@ -661,27 +677,13 @@ impl CliSession {
                 self.handle_message_input(&content, history, editor).await?;
             }
             InputResult::Exit => unreachable!("Exit is handled in the main loop"),
-            InputResult::AddExtension(cmd) => {
-                if cmd.is_empty() {
-                    output::render_extension_usage();
-                } else {
-                    history.save(editor);
-                    match self.add_extension(cmd.clone()).await {
-                        Ok(_) => output::render_extension_success(&cmd),
-                        Err(e) => output::render_extension_error(&cmd, &e.to_string()),
-                    }
-                }
+            InputResult::Mcp => {
+                history.save(editor);
+                self.handle_mcp().await;
             }
-            InputResult::AddBuiltin(names) => {
-                if names.is_empty() {
-                    output::render_builtin_usage();
-                } else {
-                    history.save(editor);
-                    match self.add_builtin(names.clone()).await {
-                        Ok(_) => output::render_builtin_success(&names),
-                        Err(e) => output::render_builtin_error(&names, &e.to_string()),
-                    }
-                }
+            InputResult::Extensions => {
+                history.save(editor);
+                self.handle_extensions().await;
             }
             InputResult::ToggleTheme => {
                 history.save(editor);
@@ -769,9 +771,9 @@ impl CliSession {
                 history.save(editor);
                 self.handle_load_skills(&names).await?;
             }
-            InputResult::ListSkills => {
+            InputResult::Skills => {
                 history.save(editor);
-                self.handle_list_skills().await?;
+                self.handle_skills().await;
             }
         }
         Ok(())
@@ -905,7 +907,13 @@ impl CliSession {
         Ok(())
     }
 
+    /// Turns the written form of the command into a provider and a model. The
+    /// bare command has neither, so it asks the manager for both.
     async fn handle_model(&mut self, options: input::ModelCommandOptions) -> Result<()> {
+        if options.provider.is_none() && options.model.is_none() {
+            return self.handle_model_dialog().await;
+        }
+
         let provider = self.agent.provider().await?;
         let current_provider_name = provider.get_name().to_string();
         let current_model_config = self
@@ -913,15 +921,6 @@ impl CliSession {
             .model_config_for_session(&self.session_id)
             .await?;
         let current_model_name = current_model_config.model_name.clone();
-
-        if options.provider.is_none() && options.model.is_none() {
-            output::goose_mode_message(&format!(
-                "Current session model: '{}' (provider '{}')\n\
-                 Tip: use '/model <name>' to switch model, or '/model --provider <name> [model]' to switch provider.",
-                current_model_name, current_provider_name
-            ));
-            return Ok(());
-        }
 
         let requested_provider = options
             .provider
@@ -945,21 +944,6 @@ impl CliSession {
                 return Ok(());
             }
         };
-
-        if target_provider_name.ends_with("-acp") {
-            output::render_error(
-                "Session model switching is not supported for ACP providers in the CLI.",
-            );
-            return Ok(());
-        }
-
-        if provider.manages_own_context() {
-            output::render_error(&format!(
-                "Session model or provider switching is not supported for provider '{}' because it manages its own conversation context.",
-                current_provider_name
-            ));
-            return Ok(());
-        }
 
         if options
             .model
@@ -991,20 +975,87 @@ impl CliSession {
             }
         };
 
+        self.apply_model_switch(target_provider_name, &target_model_name)
+            .await
+    }
+
+    /// The manager reads the same three layers the session was built from, so it
+    /// only needs to be told what is answering right now.
+    async fn handle_model_dialog(&mut self) -> Result<()> {
+        let provider = self.agent.provider().await?;
+        let model_config = self
+            .agent
+            .model_config_for_session(&self.session_id)
+            .await?;
+
+        let choice = crate::commands::models::models_dialog(crate::commands::models::Current {
+            provider: provider.get_name().to_string(),
+            model: model_config.model_name.clone(),
+            in_session: true,
+        })
+        .await;
+
+        match choice {
+            Ok(Some(choice)) => {
+                self.apply_model_switch(&choice.provider, &choice.model)
+                    .await
+            }
+            Ok(None) => Ok(()),
+            Err(e) => {
+                output::render_error(&e.to_string());
+                Ok(())
+            }
+        }
+    }
+
+    /// Every route to another model ends here — the written command, the manager,
+    /// and whatever comes after — so the rules about which switches a live
+    /// session survives are stated once.
+    async fn apply_model_switch(
+        &mut self,
+        target_provider_name: &str,
+        target_model_name: &str,
+    ) -> Result<()> {
+        let provider = self.agent.provider().await?;
+        let current_provider_name = provider.get_name().to_string();
+        let current_model_config = self
+            .agent
+            .model_config_for_session(&self.session_id)
+            .await?;
+        let current_model_name = current_model_config.model_name.clone();
+
+        let Ok(target_entry) = goose::providers::get_from_registry(target_provider_name).await
+        else {
+            output::render_error(&format!("Unknown provider '{target_provider_name}'."));
+            return Ok(());
+        };
+
+        // Leaving is the direction that cannot be made to work: the turns so far
+        // live on the provider's side, and goose holds only what was streamed
+        // back, so there is nothing to hand to whoever comes next.
+        if provider.manages_own_context() {
+            output::render_error(&format!(
+                "Session model or provider switching is not supported for provider '{}' because it manages its own conversation context.",
+                current_provider_name
+            ));
+            return Ok(());
+        }
+
         let new_model_config = build_switched_model_config(
             target_provider_name,
-            &target_model_name,
+            target_model_name,
             &current_model_config,
         )?;
 
-        let configured_effort = Config::global().get_goose_thinking_effort();
-        let new_effort = new_model_config.thinking_effort().or(configured_effort);
-        let current_effort = current_model_config.thinking_effort().or(configured_effort);
+        // Both configs already carry whatever the file said when they were built,
+        // so compare them as they are. Falling back to today's setting on the
+        // current side would hide exactly the case the manager creates: the
+        // effort changed under a session that started without one.
+        let new_effort = new_model_config.thinking_effort();
+        let current_effort = current_model_config.thinking_effort();
+        let model_unchanged = new_model_config.model_name == current_model_config.model_name;
         let provider_unchanged = target_provider_name == current_provider_name;
-        if provider_unchanged
-            && new_model_config.model_name == current_model_config.model_name
-            && new_effort == current_effort
-        {
+        if provider_unchanged && model_unchanged && new_effort == current_effort {
             output::goose_mode_message(&format!(
                 "Session already using model '{}' for provider '{}'",
                 current_model_name, current_provider_name
@@ -1047,13 +1098,19 @@ impl CliSession {
             }
         };
 
-        if new_provider.manages_own_context() {
+        // Arriving is fine as long as the conversation arrives too. A provider
+        // that keeps its own history and takes none of ours would answer the
+        // next question as if the session had just begun.
+        if new_provider.manages_own_context() && !new_provider.accepts_conversation_handoff() {
             output::render_error(&format!(
-                "Session provider switching is not supported for '{}' because it manages its own conversation context.",
+                "Session provider switching is not supported for '{}' because it manages its own conversation context and cannot take over this one.",
                 target_provider_name
             ));
             return Ok(());
         }
+
+        // Only the provider itself knows this, and it is about to be handed over.
+        let brings_own_tools = new_provider.manages_own_context();
 
         self.agent
             .update_provider(new_provider, new_model_config, &self.session_id)
@@ -1064,7 +1121,13 @@ impl CliSession {
 
         self.update_completion_cache().await?;
 
-        if provider_unchanged {
+        if provider_unchanged && model_unchanged {
+            output::goose_mode_message(&format!(
+                "Session reloaded '{}' with thinking effort {}",
+                current_model_name,
+                new_effort.map_or_else(|| "off".to_string(), |effort| effort.to_string())
+            ));
+        } else if provider_unchanged {
             output::goose_mode_message(&format!(
                 "Session model switched from '{}' to '{}' for provider '{}'",
                 current_model_name, target_model_name, current_provider_name
@@ -1073,6 +1136,19 @@ impl CliSession {
             output::goose_mode_message(&format!(
                 "Session switched from provider '{}' / model '{}' to provider '{}' / model '{}'",
                 current_provider_name, current_model_name, target_provider_name, target_model_name
+            ));
+        }
+
+        // The set of tools changes under the session, and nothing else says so:
+        // only stdio and streamable_http servers are passed on, everything
+        // compiled into markov is not, and the adapter answers with its own
+        // configuration on top. Reachable only on a switch, since a provider
+        // like this cannot be switched away from.
+        if brings_own_tools {
+            output::render_note(&format!(
+                "{target_provider_name} runs its own tools, so markov's builtin and platform \
+                 extensions stay behind. MCP servers travel; its own configuration may add \
+                 more that /mcp does not list."
             ));
         }
         Ok(())
@@ -1185,22 +1261,12 @@ impl CliSession {
         Ok(())
     }
 
-    async fn handle_list_skills(&mut self) -> Result<()> {
-        use goose::skills::list_installed_skills;
-        let cwd = std::env::current_dir().unwrap_or_default();
-        let mut skills = list_installed_skills(Some(&cwd));
-
-        if skills.is_empty() {
-            println!("{}", console::style("No skills available.").yellow());
-            return Ok(());
+    /// Skills are read from disk on every turn, so the manager needs no help
+    /// from the live agent: whatever it wrote is picked up by itself.
+    async fn handle_skills(&mut self) {
+        if let Err(e) = crate::commands::skills::skills_dialog().await {
+            output::render_error(&e.to_string());
         }
-
-        skills.sort_by(|a, b| a.name.cmp(&b.name));
-        print!(
-            "{}",
-            output::render_skills(&skills, output::terminal_width())
-        );
-        Ok(())
     }
 
     async fn handle_compact(&mut self) -> Result<()> {

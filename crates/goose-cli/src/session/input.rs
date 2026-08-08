@@ -17,8 +17,8 @@ use strum::VariantNames;
 pub enum InputResult {
     Message(String),
     Exit,
-    AddExtension(String),
-    AddBuiltin(String),
+    Mcp,
+    Extensions,
     ToggleTheme,
     SelectTheme(String),
     Retry,
@@ -33,7 +33,7 @@ pub enum InputResult {
     Compact,
     ToggleFullToolOutput,
     Edit(Option<String>),
-    ListSkills,
+    Skills,
     LoadSkills(Vec<String>),
 }
 
@@ -320,8 +320,6 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
     const CMD_PROMPTS: &str = "/prompts ";
     const CMD_PROMPT: &str = "/prompt";
     const CMD_PROMPT_WITH_SPACE: &str = "/prompt ";
-    const CMD_EXTENSION: &str = "/extension ";
-    const CMD_BUILTIN: &str = "/builtin ";
     const CMD_MODE: &str = "/mode ";
     const CMD_MODEL: &str = "/model";
     const CMD_MODEL_WITH_SPACE: &str = "/model ";
@@ -381,14 +379,8 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
                 None
             }
         }
-        "/extension" => Some(InputResult::AddExtension(String::new())),
-        s if s.starts_with(CMD_EXTENSION) => Some(InputResult::AddExtension(
-            s.get(CMD_EXTENSION.len()..).unwrap_or("").to_string(),
-        )),
-        "/builtin" => Some(InputResult::AddBuiltin(String::new())),
-        s if s.starts_with(CMD_BUILTIN) => Some(InputResult::AddBuiltin(
-            s.get(CMD_BUILTIN.len()..).unwrap_or("").to_string(),
-        )),
+        "/mcp" => Some(InputResult::Mcp),
+        "/extensions" => Some(InputResult::Extensions),
         "/mode" => Some(InputResult::GooseMode(String::new())),
         s if s.starts_with(CMD_MODE) => Some(InputResult::GooseMode(
             s.get(CMD_MODE.len()..).unwrap_or("").to_string(),
@@ -433,7 +425,7 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
         s if s == CMD_SKILLS || s.starts_with(&format!("{CMD_SKILLS} ")) => {
             let args = s.get(CMD_SKILLS.len()..).unwrap_or("").trim();
             if args.is_empty() {
-                Some(InputResult::ListSkills)
+                Some(InputResult::Skills)
             } else {
                 let names: Vec<String> = args.split_whitespace().map(String::from).collect();
                 Some(InputResult::LoadSkills(names))
@@ -559,10 +551,6 @@ pub(super) const REPL_COMMANDS: &[ReplCommand] = &[
         description: "Display the help message",
     },
     ReplCommand {
-        name: "/builtin",
-        description: "Add builtin extensions by name",
-    },
-    ReplCommand {
         name: "/edit",
         description: "Compose a message in your editor",
     },
@@ -575,12 +563,16 @@ pub(super) const REPL_COMMANDS: &[ReplCommand] = &[
         description: "Exit the session",
     },
     ReplCommand {
-        name: "/extension",
-        description: "Add a stdio extension",
-    },
-    ReplCommand {
         name: "/help",
         description: "Display the help message",
+    },
+    ReplCommand {
+        name: "/extensions",
+        description: "Turn any extension on or off, whatever kind it is",
+    },
+    ReplCommand {
+        name: "/mcp",
+        description: "Connect, disable or remove MCP servers",
     },
     ReplCommand {
         name: "/mode",
@@ -588,7 +580,7 @@ pub(super) const REPL_COMMANDS: &[ReplCommand] = &[
     },
     ReplCommand {
         name: "/model",
-        description: "Show the current model, or switch model or provider",
+        description: "Choose a model or provider, or switch by name",
     },
     ReplCommand {
         name: "/plan",
@@ -605,6 +597,10 @@ pub(super) const REPL_COMMANDS: &[ReplCommand] = &[
     ReplCommand {
         name: "/recipe",
         description: "Save this conversation as a recipe",
+    },
+    ReplCommand {
+        name: "/skills",
+        description: "Browse, create, edit or remove skills",
     },
     ReplCommand {
         name: "/t",
@@ -633,12 +629,13 @@ fn help_text() -> String {
 /t - Toggle Light/Dark/Ansi theme
 /t <name> - Set theme directly (light, dark, ansi)
 /r - Toggle full tool output display (show complete tool parameters without truncation)
-/extension <command> - Add a stdio extension (format: ENV1=val1 command args...)
-/builtin <names> - Add builtin extensions by name (comma-separated)
+/extensions - Turn any extension on or off, servers and built-in ones alike (kept across sessions)
+/mcp - Connect an MCP server, or turn configured ones on and off (kept across sessions)
 /prompts [--extension <name>] - List all available prompts, optionally filtered by extension
 /prompt <n> [--info] [key=value...] - Get prompt info or execute a prompt
 /mode <name> - Set the goose mode to use ({modes})
-/model [name] - Show the current model, or switch models for this session while keeping the same provider
+/model - Choose a provider and model, see where the current one comes from, and set the default
+/model <name> - Switch model for this session while keeping the same provider
 /model --provider <name> [model] - Switch to a different provider (optionally specifying a model)
 /plan <message_text> -  Enters 'plan' mode with optional message. Create a plan based on the current messages and asks user if they want to act on it.
                         If user acts on the plan, goose mode is set to 'auto' and returns to 'normal' goose mode.
@@ -652,7 +649,7 @@ fn help_text() -> String {
 {additional_builtin_help}/status - Show session status: model, provider, mode, and token usage.
 /edit [text] - Open your prompt editor to compose a message. Optionally pre-fill with text.
                Uses $GOOSE_PROMPT_EDITOR, $VISUAL, or $EDITOR (in that order).
-/skills - List available skills or enable skills by name (usage: /skills [<name>...])
+/skills - Browse, create, edit or remove skills. With names, loads them (usage: /skills [<name>...])
 /? or /help - Display this help message
 /clear - Clears the current chat history
 
@@ -743,20 +740,6 @@ mod tests {
             Some(InputResult::ToggleFullToolOutput)
         ));
 
-        // Test extension command
-        if let Some(InputResult::AddExtension(cmd)) = handle_slash_command("/extension foo bar") {
-            assert_eq!(cmd, "foo bar");
-        } else {
-            panic!("Expected AddExtension");
-        }
-
-        // Test builtin command
-        if let Some(InputResult::AddBuiltin(names)) = handle_slash_command("/builtin dev,git") {
-            assert_eq!(names, "dev,git");
-        } else {
-            panic!("Expected AddBuiltin");
-        }
-
         // Test model command
         assert!(matches!(
             handle_slash_command("/model"),
@@ -832,14 +815,7 @@ mod tests {
 
     #[test]
     fn bare_commands_do_not_fall_through_to_the_model() {
-        for input in [
-            "/mode",
-            "/mode ",
-            "/builtin",
-            "/builtin ",
-            "/extension",
-            "/extension ",
-        ] {
+        for input in ["/mode", "/mode "] {
             assert!(
                 handle_slash_command(input).is_some(),
                 "{input} should be handled, not sent to the model"
@@ -860,6 +836,36 @@ mod tests {
                 unknown_command_name(input, &known).is_some(),
                 "{input} should be caught before it reaches the model"
             );
+        }
+    }
+
+    #[test]
+    fn the_retired_extension_command_is_answered_not_forwarded() {
+        let known = known_command_names();
+
+        for input in ["/extension", "/extension npx -y server"] {
+            assert!(handle_slash_command(input).is_none());
+            assert_eq!(unknown_command_name(input, &known), Some("extension"));
+        }
+
+        // The singular is not quietly aliased to the manager: it used to take a
+        // command line, and answering one spelling while refusing the same
+        // spelling with arguments reads as a bug rather than a rename.
+        assert!(nearest_command_names("extension", &known).contains(&"/extensions".to_string()));
+    }
+
+    /// `/builtin` was the only in-session door to the extensions compiled into
+    /// the binary, and it was write-only: no list, no completion, no way back
+    /// off. It is gone now that `/extensions` turns those rows on and off, but the
+    /// name is in muscle memory, so it has to be answered rather than typed at
+    /// the model as if it were a sentence.
+    #[test]
+    fn the_retired_builtin_command_is_answered_not_forwarded() {
+        let known = known_command_names();
+
+        for input in ["/builtin", "/builtin memory,tutorial"] {
+            assert!(handle_slash_command(input).is_none());
+            assert_eq!(unknown_command_name(input, &known), Some("builtin"));
         }
     }
 
@@ -968,19 +974,11 @@ mod tests {
     // Test whitespace handling
     #[test]
     fn test_whitespace_handling() {
-        // Leading/trailing whitespace in extension command
-        if let Some(InputResult::AddExtension(cmd)) = handle_slash_command("  /extension foo bar  ")
-        {
-            assert_eq!(cmd, "foo bar");
+        // Leading/trailing whitespace around a command that takes an argument
+        if let Some(InputResult::GooseMode(mode)) = handle_slash_command("  /mode auto  ") {
+            assert_eq!(mode, "auto");
         } else {
-            panic!("Expected AddExtension");
-        }
-
-        // Leading/trailing whitespace in builtin command
-        if let Some(InputResult::AddBuiltin(names)) = handle_slash_command("  /builtin dev,git  ") {
-            assert_eq!(names, "dev,git");
-        } else {
-            panic!("Expected AddBuiltin");
+            panic!("Expected GooseMode");
         }
     }
 
@@ -1190,16 +1188,16 @@ mod tests {
         };
         assert_eq!(names, vec!["my-skill"]);
 
-        // Test with no name: ListSkills
+        // Test with no name: the manager
         assert!(matches!(
             handle_slash_command("/skills"),
-            Some(InputResult::ListSkills)
+            Some(InputResult::Skills)
         ));
 
-        // Test with only whitespace after /skills: ListSkills
+        // Test with only whitespace after /skills: the manager
         assert!(matches!(
             handle_slash_command("/skills   "),
-            Some(InputResult::ListSkills)
+            Some(InputResult::Skills)
         ));
     }
 }

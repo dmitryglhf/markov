@@ -445,6 +445,14 @@ struct SessionChoice {
     working_dir: String,
 }
 
+/// Having nothing to offer is not a failure of the prompt, and every caller has
+/// its own sentence for it, so it travels back as an answer rather than an error.
+pub enum SessionPick {
+    Chosen(String),
+    Cancelled,
+    NoSessions,
+}
+
 /// A human-scale stamp, because an exact timestamp is noise when you are looking
 /// for the session you were in an hour ago.
 fn time_ago(when: DateTime<Utc>, now: DateTime<Utc>) -> String {
@@ -476,9 +484,13 @@ fn session_picker_entries(
             };
             SessionChoice {
                 id: s.id.clone(),
+                // The count sits in the label rather than the hint because
+                // cliclack only draws the hint under the cursor, and telling a
+                // session apart from a false start is what you scan the list for.
                 label: format!(
-                    "{} · {}",
+                    "{} · {} msg · {}",
                     time_ago(session_activity_at(s), now),
+                    s.message_count,
                     safe_truncate(name, TRUNCATED_DESC_LENGTH)
                 ),
                 working_dir: display_path_with_tilde(&s.working_dir),
@@ -489,13 +501,13 @@ fn session_picker_entries(
 
 /// Prompt the user to interactively select a session, newest first.
 ///
-/// `Ok(None)` means the user backed out. Passing session types narrows the list
-/// to the ones worth offering for the task at hand.
+/// `Err` is left for input that actually broke. Passing session types narrows
+/// the list to the ones worth offering for the task at hand.
 pub async fn prompt_interactive_session_selection(
     session_manager: &SessionManager,
     prompt: &str,
     types: Option<&[SessionType]>,
-) -> Result<Option<String>> {
+) -> Result<SessionPick> {
     let sessions = match types {
         Some(types) => session_manager.list_sessions_by_types(types).await?,
         None => session_manager.list_sessions().await?,
@@ -503,7 +515,7 @@ pub async fn prompt_interactive_session_selection(
 
     let choices = session_picker_entries(&sessions, SESSION_PICKER_LIMIT, Utc::now());
     if choices.is_empty() {
-        return Err(anyhow::anyhow!("No sessions found"));
+        return Ok(SessionPick::NoSessions);
     }
 
     let mut selector = select(prompt).max_rows(SESSION_PICKER_ROWS);
@@ -513,8 +525,9 @@ pub async fn prompt_interactive_session_selection(
     selector = selector.item(None, "Cancel", "");
 
     match selector.interact() {
-        Ok(selected) => Ok(selected),
-        Err(e) if e.kind() == io::ErrorKind::Interrupted => Ok(None),
+        Ok(Some(id)) => Ok(SessionPick::Chosen(id)),
+        Ok(None) => Ok(SessionPick::Cancelled),
+        Err(e) if e.kind() == io::ErrorKind::Interrupted => Ok(SessionPick::Cancelled),
         Err(e) => Err(e.into()),
     }
 }
@@ -579,7 +592,7 @@ mod tests {
     fn a_session_without_a_name_still_reads_as_something() {
         let choices = session_picker_entries(&[session("s1", "   ", 5)], 10, at(0));
 
-        assert_eq!(choices[0].label, "5m ago · (no name)");
+        assert_eq!(choices[0].label, "5m ago · 0 msg · (no name)");
         assert_eq!(choices[0].working_dir, "/work");
     }
 
@@ -588,8 +601,23 @@ mod tests {
         let long_name = "n".repeat(TRUNCATED_DESC_LENGTH + 20);
         let choices = session_picker_entries(&[session("s1", &long_name, 5)], 10, at(0));
 
-        let shown = choices[0].label.strip_prefix("5m ago · ").expect("stamp");
+        let shown = choices[0]
+            .label
+            .strip_prefix("5m ago · 0 msg · ")
+            .expect("stamp");
         assert!(shown.chars().count() <= TRUNCATED_DESC_LENGTH);
+    }
+
+    /// The one thing that separates a session worth returning to from a false
+    /// start, so it has to survive into the row itself.
+    #[test]
+    fn the_row_says_how_much_was_said_in_the_session() {
+        let mut worked_in = session("s1", "Real work", 5);
+        worked_in.message_count = 42;
+
+        let choices = session_picker_entries(&[worked_in], 10, at(0));
+
+        assert_eq!(choices[0].label, "5m ago · 42 msg · Real work");
     }
 
     #[test]

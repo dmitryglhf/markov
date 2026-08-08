@@ -5,6 +5,9 @@
 # Secrets go to config_dir/secrets.yaml (0600) instead.
 FEATURES := "rustls-tls,code-mode"
 
+# where `just install` puts the binary
+INSTALL_DIR := env("MARKOV_INSTALL_DIR", home_directory() / ".local/bin")
+
 # list all tasks
 default:
   @just --list
@@ -26,6 +29,56 @@ release-binary:
     @echo "Building release version..."
     cargo build --release -p goose-cli --bin markov --no-default-features --features {{FEATURES}}
     @just copy-binary
+
+# Debug build of the CLI, same features as the release
+debug-binary:
+    @echo "Building debug version..."
+    cargo build -p goose-cli --bin markov --no-default-features --features {{FEATURES}}
+    @echo "Built ./target/debug/markov"
+
+# Build the release binary and put it on PATH as `markov`
+[unix]
+install: release-binary
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    dest="{{INSTALL_DIR}}"
+    mkdir -p "$dest"
+
+    # Copied beside the target and renamed into place: rename swaps the directory
+    # entry, so a markov session running right now keeps the file it started with
+    # instead of having it rewritten underneath.
+    cp ./target/release/markov "$dest/.markov.new"
+    chmod 755 "$dest/.markov.new"
+    mv -f "$dest/.markov.new" "$dest/markov"
+
+    # awk, because `markov --version` answers with a leading space
+    version=$("$dest/markov" --version | awk '{print $1}')
+    echo "Installed markov $version to $dest/markov"
+
+    case ":$PATH:" in
+        *":$dest:"*) ;;
+        *) echo "Note: $dest is not on your PATH, so plain \`markov\` will not find it" ;;
+    esac
+
+    on_path=$(command -v markov || true)
+    if [ -n "$on_path" ] && [ "$on_path" != "$dest/markov" ]; then
+        echo "Note: \`markov\` on your PATH is $on_path, which wins over the copy just installed"
+    fi
+
+# Remove the binary `just install` put on PATH
+[unix]
+uninstall:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    dest="{{INSTALL_DIR}}"
+    if [ -e "$dest/markov" ]; then
+        rm -f "$dest/markov"
+        echo "Removed $dest/markov"
+    else
+        echo "Nothing to remove at $dest/markov"
+    fi
 
 # Build Windows executable on a Windows host
 [unix]

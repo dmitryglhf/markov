@@ -4,13 +4,12 @@ use console::style;
 use goose::agents::extension::{ToolInfo, PLATFORM_EXTENSIONS};
 use goose::agents::extension_manager::get_parameter_names;
 use goose::agents::Agent;
-use goose::agents::{extension::Envs, ExtensionConfig};
+use goose::agents::ExtensionConfig;
 use goose::config::declarative_providers::{
     create_custom_provider, remove_custom_provider, CreateCustomProviderParams,
 };
 use goose::config::extensions::{
-    get_all_extension_names, get_all_extensions, get_enabled_extensions, get_extension_by_name,
-    name_to_key, remove_extension, set_extension, set_extension_enabled,
+    get_all_extensions, get_enabled_extensions, get_extension_by_name, set_extension,
 };
 use goose::config::paths::Paths;
 use goose::config::permission::PermissionLevel;
@@ -27,7 +26,6 @@ use goose::providers::{create, providers, retry_operation, RetryConfig};
 use goose::session::SessionType;
 use goose_providers::thinking::ThinkingEffort;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::io::{IsTerminal, Write};
 
 // useful for light themes where there is no discernible colour contrast between
@@ -403,24 +401,27 @@ async fn handle_existing_config() -> anyhow::Result<()> {
     println!();
 
     cliclack::intro(style(" markov-configure ").on_cyan().black())?;
+    // Turning extensions on and off and removing a server each have a command of
+    // their own now, and each does the job better than the walk that used to live
+    // here. Provider and model kept their place: this is where the first run asks
+    // for them, and disowning them a minute later left the habit with nowhere to
+    // go. The door is here, the form behind it is `markov model` itself.
     let action = cliclack::select("What would you like to configure?")
         .item(
-            "providers",
-            "Configure Providers",
-            "Change provider or update credentials",
+            "provider",
+            "Provider and model",
+            "Choose which model answers, and save it as the default",
         )
         .item(
             "custom_providers",
             "Custom Providers",
             "Add custom provider with compatible API",
         )
-        .item("add", "Add Extension", "Connect to a new extension")
         .item(
-            "toggle",
-            "Toggle Extensions",
-            "Enable or disable connected extensions",
+            "add",
+            "Add Built-in Extension",
+            "Turn on an extension that ships inside markov (servers are /mcp)",
         )
-        .item("remove", "Remove Extension", "Remove an extension")
         .item(
             "settings",
             "markov settings",
@@ -429,11 +430,9 @@ async fn handle_existing_config() -> anyhow::Result<()> {
         .interact()?;
 
     match action {
-        "toggle" => toggle_extensions_dialog(),
+        "provider" => super::models::handle_model_command().await,
         "add" => configure_extensions_dialog(),
-        "remove" => remove_extension_dialog(),
         "settings" => configure_settings_dialog().await,
-        "providers" => configure_provider_dialog().await.map(|_| ()),
         "custom_providers" => configure_custom_provider_dialog().await,
         _ => unreachable!(),
     }
@@ -577,6 +576,38 @@ fn interactive_model_search(
     }
 }
 
+/// Asks the provider what it serves and lets the user pick from the answer. A
+/// provider that refuses to answer is an error for the caller to render: mid-form
+/// that is a line in the log, on the way in it closes the walk.
+pub(crate) async fn fetch_and_select_model(
+    provider: &std::sync::Arc<dyn goose::providers::base::Provider>,
+    provider_meta: &goose::providers::base::ProviderMetadata,
+) -> anyhow::Result<String> {
+    let spin = spinner();
+    spin.start("Attempting to fetch supported models...");
+    let models = retry_operation(&RetryConfig::default(), || async {
+        provider
+            .fetch_recommended_models(goose::model_config::global_toolshim())
+            .await
+    })
+    .await;
+    match &models {
+        Ok(_) => spin.stop(style("Model fetch complete").green()),
+        Err(_) => spin.stop(style("Model fetch failed").red()),
+    }
+
+    match models? {
+        models if !models.is_empty() => select_model_from_list(&models, provider_meta),
+        _ => {
+            let default_model =
+                std::env::var("GOOSE_MODEL").unwrap_or(provider_meta.default_model.clone());
+            Ok(cliclack::input("Enter a model from that provider:")
+                .default_input(&default_model)
+                .interact()?)
+        }
+    }
+}
+
 fn select_model_from_list(
     models: &[String],
     provider_meta: &goose::providers::base::ProviderMetadata,
@@ -667,7 +698,11 @@ fn prompt_unlisted_model(
     Ok(model.trim().to_string())
 }
 
-fn try_store_secret(config: &Config, key_name: &str, value: String) -> anyhow::Result<bool> {
+pub(crate) fn try_store_secret(
+    config: &Config,
+    key_name: &str,
+    value: String,
+) -> anyhow::Result<bool> {
     match config.set_secret(key_name, &value) {
         Ok(_) => Ok(true),
         Err(ConfigError::FallbackToFileStorage) => Ok(true),
@@ -882,8 +917,10 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
     configure_selected_provider(&provider_name).await
 }
 
-/// Configures credentials and a model for a provider that is already chosen.
-pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<bool> {
+/// Walks the provider's config keys, asking for each one. Every key is offered
+/// even when it already has a value, so call this only when the credentials are
+/// the point — the model manager asks for them only for a provider that has none.
+pub(crate) async fn ensure_credentials(provider_name: &str) -> anyhow::Result<bool> {
     let config = Config::global();
 
     let available_providers = providers().await;
@@ -921,34 +958,29 @@ pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<
         }
     }
 
-    let spin = spinner();
-    spin.start("Attempting to fetch supported models...");
-    let temp_provider = create(provider_name, Vec::new()).await?;
-    let models_res = retry_operation(&RetryConfig::default(), || async {
-        temp_provider
-            .fetch_recommended_models(goose::model_config::global_toolshim())
-            .await
-    })
-    .await;
-    match &models_res {
-        Ok(_) => spin.stop(style("Model fetch complete").green()),
-        Err(_) => spin.stop(style("Model fetch failed").red()),
+    Ok(true)
+}
+
+/// Configures credentials and a model for a provider that is already chosen.
+pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<bool> {
+    let config = Config::global();
+
+    let available_providers = providers().await;
+    let (provider_meta, _) = available_providers
+        .iter()
+        .find(|(p, _)| p.name == provider_name)
+        .ok_or_else(|| anyhow::anyhow!("Unknown provider: {provider_name}"))?;
+
+    if !ensure_credentials(provider_name).await? {
+        return Ok(false);
     }
 
-    // Select a model: on fetch error show styled error and abort; if models available, show list; otherwise free-text input
-    let model: String = match models_res {
+    let temp_provider = create(provider_name, Vec::new()).await?;
+    let model = match fetch_and_select_model(&temp_provider, provider_meta).await {
+        Ok(model) => model,
         Err(e) => {
-            // Provider hook error
             cliclack::outro(style(e.to_string()).on_red().white())?;
             return Ok(false);
-        }
-        Ok(models) if !models.is_empty() => select_model_from_list(&models, provider_meta)?,
-        Ok(_) => {
-            let default_model =
-                std::env::var("GOOSE_MODEL").unwrap_or(provider_meta.default_model.clone());
-            cliclack::input("Enter a model from that provider:")
-                .default_input(&default_model)
-                .interact()?
         }
     };
 
@@ -1001,69 +1033,6 @@ pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<
     }
 }
 
-/// Configure extensions that can be used with goose
-/// Dialog for toggling which extensions are enabled/disabled
-pub fn toggle_extensions_dialog() -> anyhow::Result<()> {
-    for warning in goose::config::get_warnings() {
-        eprintln!("{}", style(format!("Warning: {}", warning)).yellow());
-    }
-
-    let extensions = get_all_extensions();
-
-    if extensions.is_empty() {
-        cliclack::outro(
-            "No extensions configured yet. Run configure and add some extensions first.",
-        )?;
-        return Ok(());
-    }
-
-    // Create a list of extension names and their enabled status
-    let mut extension_status: Vec<(String, bool)> = extensions
-        .iter()
-        .map(|entry| (entry.config.name().to_string(), entry.enabled))
-        .collect();
-
-    // Sort extensions alphabetically by name
-    extension_status.sort_by(|a, b| a.0.cmp(&b.0));
-
-    // Get currently enabled extensions for the selection
-    let enabled_extensions: Vec<&String> = extension_status
-        .iter()
-        .filter(|(_, enabled)| *enabled)
-        .map(|(name, _)| name)
-        .collect();
-
-    // Let user toggle extensions
-    let selected = cliclack::multiselect(
-        "enable extensions: (use \"space\" to toggle and \"enter\" to submit)",
-    )
-    .required(false)
-    .items(
-        &extension_status
-            .iter()
-            .map(|(name, _)| (name, name.as_str(), MULTISELECT_VISIBILITY_HINT))
-            .collect::<Vec<_>>(),
-    )
-    .initial_values(enabled_extensions)
-    .filter_mode()
-    .interact()?;
-
-    // Update enabled status for each extension
-    for name in extension_status.iter().map(|(name, _)| name) {
-        set_extension_enabled(
-            &name_to_key(name),
-            selected.iter().any(|s| s.as_str() == name),
-        );
-    }
-
-    let config = Config::global();
-    cliclack::outro(format!(
-        "Extension settings saved successfully to {}",
-        config.path()
-    ))?;
-    Ok(())
-}
-
 fn prompt_extension_timeout() -> anyhow::Result<u64> {
     Ok(
         cliclack::input("Please set the timeout for this tool (in secs):")
@@ -1076,95 +1045,11 @@ fn prompt_extension_timeout() -> anyhow::Result<u64> {
     )
 }
 
-fn prompt_extension_description() -> anyhow::Result<String> {
-    Ok(cliclack::input("Enter a description for this extension:")
-        .placeholder("Description")
-        .validate(|input: &String| {
-            if input.trim().is_empty() {
-                Err("Please enter a valid description")
-            } else {
-                Ok(())
-            }
-        })
-        .interact()?)
-}
-
-fn prompt_extension_name(placeholder: &str) -> anyhow::Result<String> {
-    let extensions = get_all_extension_names();
-    Ok(
-        cliclack::input("What would you like to call this extension?")
-            .placeholder(placeholder)
-            .validate(move |input: &String| {
-                if input.is_empty() {
-                    Err("Please enter a name")
-                } else if extensions.contains(input) {
-                    Err("An extension with this name already exists")
-                } else {
-                    Ok(())
-                }
-            })
-            .interact()?,
-    )
-}
-
-fn collect_env_vars() -> anyhow::Result<(HashMap<String, String>, Vec<String>)> {
-    let envs = HashMap::new();
-    let mut env_keys = Vec::new();
-    let config = Config::global();
-
-    if !cliclack::confirm("Would you like to add environment variables?").interact()? {
-        return Ok((envs, env_keys));
-    }
-
-    loop {
-        let key: String = cliclack::input("Environment variable name:")
-            .placeholder("API_KEY")
-            .interact()?;
-
-        let value: String = cliclack::password("Environment variable value:")
-            .mask('▪')
-            .interact()?;
-
-        if !try_store_secret(config, &key, value)? {
-            return Err(anyhow::anyhow!("Failed to store secret"));
-        }
-        env_keys.push(key);
-
-        if !cliclack::confirm("Add another environment variable?").interact()? {
-            break;
-        }
-    }
-
-    Ok((envs, env_keys))
-}
-
-fn collect_headers() -> anyhow::Result<HashMap<String, String>> {
-    let mut headers = HashMap::new();
-
-    if !cliclack::confirm("Would you like to add custom headers?").interact()? {
-        return Ok(headers);
-    }
-
-    loop {
-        let key: String = cliclack::input("Header name:")
-            .placeholder("Authorization")
-            .interact()?;
-
-        let value: String = cliclack::input("Header value:")
-            .placeholder("Bearer token123")
-            .interact()?;
-
-        headers.insert(key, value);
-
-        if !cliclack::confirm("Add another header?").interact()? {
-            break;
-        }
-    }
-
-    Ok(headers)
-}
-
 fn configure_builtin_extension() -> anyhow::Result<()> {
+    // `developer` used to be on this list and no longer is: it is a platform
+    // extension, so the migration writes it into the config file for everyone and
+    // `/extensions` already carries a row for it. What is left is exactly the set
+    // that nothing seeds — pick one and it gains a row of its own.
     let extensions = vec![
         (
             "autovisualiser",
@@ -1175,11 +1060,6 @@ fn configure_builtin_extension() -> anyhow::Result<()> {
             "computercontroller",
             "Computer Controller",
             "controls for webscraping, file caching, and automations",
-        ),
-        (
-            "developer",
-            "Developer Tools",
-            "Code editing and shell access",
         ),
         (
             "memory",
@@ -1204,6 +1084,9 @@ fn configure_builtin_extension() -> anyhow::Result<()> {
         .map(|(_, name, desc)| (name.to_string(), desc.to_string()))
         .unwrap_or_else(|| (extension.clone(), extension.clone()));
 
+    // The list above is all `Builtin` today, but the check stays: a platform name
+    // written down as a builtin gets a timeout it has no use for and a variant
+    // that spawns a pipe to a server that does not exist.
     let config = if PLATFORM_EXTENSIONS.contains_key(extension.as_str()) {
         ExtensionConfig::Platform {
             name: extension.clone(),
@@ -1233,186 +1116,12 @@ fn configure_builtin_extension() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn configure_stdio_extension() -> anyhow::Result<()> {
-    let name = prompt_extension_name("my-extension")?;
-
-    let command_str: String = cliclack::input("What command should be run?")
-        .placeholder("npx -y @block/gdrive")
-        .validate(|input: &String| {
-            if input.is_empty() {
-                Err("Please enter a command")
-            } else {
-                Ok(())
-            }
-        })
-        .interact()?;
-
-    let timeout = prompt_extension_timeout()?;
-
-    let mut parts = goose::utils::split_command_args(&command_str)?;
-    let cmd = if parts.is_empty() {
-        String::new()
-    } else {
-        parts.remove(0)
-    };
-    let args = parts;
-
-    let description = prompt_extension_description()?;
-    let (envs, env_keys) = collect_env_vars()?;
-
-    set_extension(ExtensionEntry {
-        enabled: true,
-        config: ExtensionConfig::Stdio {
-            name: name.clone(),
-            cmd,
-            args,
-            envs: Envs::new(envs),
-            env_keys,
-            description,
-            timeout: Some(timeout),
-            cwd: None,
-            bundled: None,
-            available_tools: Vec::new(),
-        },
-    });
-
-    cliclack::outro(format!("Added {} extension", style(name).green()))?;
-    Ok(())
-}
-
-fn configure_streamable_http_extension() -> anyhow::Result<()> {
-    let name = prompt_extension_name("my-remote-extension")?;
-
-    let uri: String = cliclack::input("What is the Streaming HTTP endpoint URI?")
-        .placeholder("http://localhost:8000/messages")
-        .validate(|input: &String| {
-            if input.is_empty() {
-                Err("Please enter a URI")
-            } else if !(input.starts_with("http://") || input.starts_with("https://")) {
-                Err("URI should start with http:// or https://")
-            } else {
-                Ok(())
-            }
-        })
-        .interact()?;
-
-    let timeout = prompt_extension_timeout()?;
-    let description = prompt_extension_description()?;
-    let headers = collect_headers()?;
-
-    // Original behavior: no env var collection for Streamable HTTP
-    let envs = HashMap::new();
-    let env_keys = Vec::new();
-
-    set_extension(ExtensionEntry {
-        enabled: true,
-        config: ExtensionConfig::StreamableHttp {
-            name: name.clone(),
-            uri,
-            envs: Envs::new(envs),
-            env_keys,
-            headers,
-            description,
-            timeout: Some(timeout),
-            socket: None,
-            bundled: None,
-            available_tools: Vec::new(),
-        },
-    });
-
-    cliclack::outro(format!("Added {} extension", style(name).green()))?;
-    Ok(())
-}
-
+/// The one kind of extension that has nowhere else to be added. Servers are
+/// `/mcp`, and everything already written into the config file is `/extensions`;
+/// what remains are the extensions compiled into the binary that no migration
+/// seeds, so without this list they cannot be reached at all.
 pub fn configure_extensions_dialog() -> anyhow::Result<()> {
-    let extension_type = cliclack::select("What type of extension would you like to add?")
-        .item(
-            "built-in",
-            "Built-in Extension",
-            "Use an extension that comes with markov",
-        )
-        .item(
-            "stdio",
-            "Command-line Extension",
-            "Run a local command or script",
-        )
-        .item(
-            "streamable_http",
-            "Remote Extension (Streamable HTTP)",
-            "Connect to a remote extension via MCP Streamable HTTP",
-        )
-        .interact()?;
-
-    match extension_type {
-        "built-in" => configure_builtin_extension()?,
-        "stdio" => configure_stdio_extension()?,
-        "streamable_http" => configure_streamable_http_extension()?,
-        _ => unreachable!(),
-    };
-
-    print_config_file_saved()?;
-    Ok(())
-}
-
-pub fn remove_extension_dialog() -> anyhow::Result<()> {
-    for warning in goose::config::get_warnings() {
-        eprintln!("{}", style(format!("Warning: {}", warning)).yellow());
-    }
-
-    let extensions = get_all_extensions();
-
-    // Create a list of extension names and their enabled status
-    let mut extension_status: Vec<(String, bool)> = extensions
-        .iter()
-        .map(|entry| (entry.config.name().to_string(), entry.enabled))
-        .collect();
-
-    // Sort extensions alphabetically by name
-    extension_status.sort_by(|a, b| a.0.cmp(&b.0));
-
-    if extensions.is_empty() {
-        cliclack::outro(
-            "No extensions configured yet. Run configure and add some extensions first.",
-        )?;
-        return Ok(());
-    }
-
-    // Check if all extensions are enabled
-    if extension_status.iter().all(|(_, enabled)| *enabled) {
-        cliclack::outro(
-            "All extensions are currently enabled. You must first disable extensions before removing them.",
-        )?;
-        return Ok(());
-    }
-
-    // Filter out only disabled extensions
-    let disabled_extensions: Vec<_> = extensions
-        .iter()
-        .filter(|entry| !entry.enabled)
-        .map(|entry| (entry.config.name().to_string(), entry.enabled))
-        .collect();
-
-    let selected = cliclack::multiselect("Select extensions to remove (note: you can only remove disabled extensions - use \"space\" to toggle and \"enter\" to submit)")
-        .required(false)
-        .items(
-            &disabled_extensions
-                .iter()
-                .filter(|(_, enabled)| !enabled)
-                .map(|(name, _)| (name, name.as_str(), MULTISELECT_VISIBILITY_HINT))
-                .collect::<Vec<_>>(),
-        )
-        .filter_mode()
-        .interact()?;
-
-    for name in selected {
-        remove_extension(&name_to_key(name));
-        PermissionManager::instance().remove_extension(&name_to_key(name));
-        cliclack::outro(format!("Removed {} extension", style(name).green()))?;
-    }
-
-    print_config_file_saved()?;
-
-    Ok(())
+    configure_builtin_extension()
 }
 
 pub async fn configure_settings_dialog() -> anyhow::Result<()> {
@@ -2317,6 +2026,10 @@ pub async fn configure_custom_provider_dialog() -> anyhow::Result<()> {
         _ => unreachable!(),
     }?;
 
+    // Adding a provider used to be followed by the provider walk one item up in
+    // the same menu; that walk is `markov model` now, and a new provider is of no
+    // use until something picks a model from it.
+    cliclack::log::info("To use it, choose a model with `markov model`")?;
     print_config_file_saved()?;
 
     Ok(())
