@@ -2282,7 +2282,12 @@ async fn handle_local_models_command(command: LocalModelsCommand) -> Result<()> 
 
 async fn handle_default_session() -> Result<()> {
     if !Config::global().exists() {
-        return handle_configure().await;
+        handle_configure().await?;
+        // Setup that saved nothing leaves no provider to talk to, and it has
+        // already said so; dropping into a chat here would only fail again.
+        if !Config::global().exists() {
+            return Ok(());
+        }
     }
 
     #[cfg(feature = "telemetry")]

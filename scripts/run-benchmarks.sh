@@ -101,20 +101,20 @@ fi
 echo "" >> "$SUMMARY_FILE"
 
 # Determine which binary to use
-GOOSE_CMD="goose"
+GOOSE_CMD="markov"
 if [ "$DEBUG_MODE" = true ]; then
-  if [ -f "./target/debug/goose" ]; then
-    GOOSE_CMD="./target/debug/goose"
+  if [ -f "./target/debug/markov" ]; then
+    GOOSE_CMD="./target/debug/markov"
     echo "Using debug binary: $GOOSE_CMD"
   else
-    echo "Warning: Debug binary not found at ./target/debug/goose. Falling back to system-installed goose."
+    echo "Warning: Debug binary not found at ./target/debug/markov. Falling back to system-installed markov."
   fi
 else
-  if [ -f "./target/release/goose" ]; then
-    GOOSE_CMD="./target/release/goose"
+  if [ -f "./target/release/markov" ]; then
+    GOOSE_CMD="./target/release/markov"
     echo "Using release binary: $GOOSE_CMD"
   else
-    echo "Warning: Release binary not found at ./target/release/goose. Falling back to system-installed goose."
+    echo "Warning: Release binary not found at ./target/release/markov. Falling back to system-installed markov."
   fi
 fi
 
