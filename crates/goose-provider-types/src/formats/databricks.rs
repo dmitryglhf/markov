@@ -30,8 +30,16 @@ struct DatabricksMessage {
     tool_call_id: Option<String>,
 }
 
-fn format_text_content(text: &str, image_format: &ImageFormat) -> (Vec<Value>, bool) {
+fn format_text_content(
+    text: &str,
+    image_format: &ImageFormat,
+    carries_image: bool,
+) -> (Vec<Value>, bool) {
     let mut items = vec![json!({"type": "text", "text": text})];
+    if carries_image {
+        return (items, false);
+    }
+
     let has_image = if let Some(path) = detect_image_path(text) {
         if let Ok(image) = load_image_file(path.as_ref()) {
             items.push(convert_image(&image, image_format));
@@ -127,6 +135,12 @@ fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Data
         let mut content_array = Vec::new();
         let mut has_tool_calls = false;
         let mut has_multiple_content = false;
+        // A client that attached an image also tends to name its path in the
+        // text; reading the file again would send the same picture twice.
+        let carries_image = message
+            .content
+            .iter()
+            .any(|content| matches!(content, MessageContentBlock::Image(_)));
         // Deferred so all tool-role messages stay consecutive (required by Claude via Databricks).
         let mut pending_image_messages: Vec<DatabricksMessage> = Vec::new();
 
@@ -134,7 +148,8 @@ fn format_messages(messages: &[Message], image_format: &ImageFormat) -> Vec<Data
             match content {
                 MessageContentBlock::Text(text) => {
                     if !text.text.is_empty() {
-                        let (items, multi) = format_text_content(&text.text, image_format);
+                        let (items, multi) =
+                            format_text_content(&text.text, image_format, carries_image);
                         content_array.extend(items);
                         has_multiple_content |= multi;
                     }
@@ -688,6 +703,36 @@ mod tests {
     use rmcp::model::CallToolResult;
     use rmcp::object;
     use serde_json::json;
+
+    #[test]
+    fn an_attached_image_is_not_loaded_a_second_time_from_its_path() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let png_path = temp_dir.path().join("pasted.png");
+        std::fs::write(
+            &png_path,
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00],
+        )?;
+        let png_path_str = png_path.to_str().unwrap();
+
+        let message = Message::user()
+            .with_text(format!("what is this? {}", png_path_str))
+            .with_image("aW1hZ2VkYXRh", "image/png");
+
+        let formatted = format_messages(&[message], &ImageFormat::OpenAi);
+        let content = formatted[0].content.as_array().unwrap();
+
+        let images: Vec<_> = content
+            .iter()
+            .filter(|item| item["type"] == "image_url")
+            .collect();
+        assert_eq!(images.len(), 1, "the same picture was sent twice");
+        assert_eq!(
+            images[0]["image_url"]["url"],
+            "data:image/png;base64,aW1hZ2VkYXRh"
+        );
+
+        Ok(())
+    }
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
         "choices": [{
