@@ -62,12 +62,12 @@ const existingFile = (candidate: string): boolean => {
 
 export const findGooseBinaryPath = (options: FindGooseBinaryOptions = {}): string => {
   const { isPackaged = false, resourcesPath } = options;
-  const pathFromEnv = process.env.GOOSE_BINARY;
+  // A packaged app ships its own binary and nobody develops against it, so a
+  // stray override must not keep it from starting. It reaches an installed app
+  // easily: `open` passes the calling shell's environment through, and our own
+  // ink TUI sets this variable for the processes it spawns.
+  const pathFromEnv = isPackaged ? undefined : process.env.GOOSE_BINARY;
   if (pathFromEnv) {
-    if (isPackaged) {
-      throw new Error('GOOSE_BINARY is only supported in development builds');
-    }
-
     const resolvedPath = path.resolve(pathFromEnv);
     if (existingFile(resolvedPath)) {
       return resolvedPath;
@@ -336,6 +336,9 @@ export const startGooseServe = async ({
   }
 
   let goosePath: string;
+  if (isPackaged && process.env.GOOSE_BINARY) {
+    startupTrace?.record('binary_override_ignored', { path: process.env.GOOSE_BINARY });
+  }
   try {
     goosePath = findGooseBinaryPath({ isPackaged, resourcesPath });
   } catch (error) {

@@ -60,16 +60,23 @@ describe('findGooseBinaryPath', () => {
     expect(findGooseBinaryPath({ isPackaged: false })).toBe(overridePath);
   });
 
-  it('rejects GOOSE_BINARY in packaged builds', () => {
+  it('ignores GOOSE_BINARY in packaged builds', () => {
     const tempDir = makeTempDir();
     const resourcesPath = path.join(tempDir, 'resources');
     const overridePath = makeFile(path.join(tempDir, 'override-goose'));
-    makeFile(path.join(resourcesPath, 'bin', binaryName));
+    const bundledPath = makeFile(path.join(resourcesPath, 'bin', binaryName));
     vi.stubEnv('GOOSE_BINARY', overridePath);
 
-    expect(() => findGooseBinaryPath({ isPackaged: true, resourcesPath })).toThrow(
-      'GOOSE_BINARY is only supported in development builds'
-    );
+    expect(findGooseBinaryPath({ isPackaged: true, resourcesPath })).toBe(bundledPath);
+  });
+
+  it('starts a packaged build even when GOOSE_BINARY points nowhere', () => {
+    const tempDir = makeTempDir();
+    const resourcesPath = path.join(tempDir, 'resources');
+    const bundledPath = makeFile(path.join(resourcesPath, 'bin', binaryName));
+    vi.stubEnv('GOOSE_BINARY', path.join(tempDir, 'not-a-file'));
+
+    expect(findGooseBinaryPath({ isPackaged: true, resourcesPath })).toBe(bundledPath);
   });
 
   it('prefers the staged binary over target builds in development builds', () => {
