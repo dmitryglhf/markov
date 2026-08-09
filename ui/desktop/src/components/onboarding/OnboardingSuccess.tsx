@@ -65,7 +65,6 @@ export default function OnboardingSuccess({ providerName, onFinish }: Onboarding
           </div>
         </div>
       </div>
-
     </div>
   );
 }

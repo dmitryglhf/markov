@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Guardar"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "También en"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (sin usar)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argumentos"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Cerrar"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Archivos"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Sin usar"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} responde a este nombre"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Abrir carpeta"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Origen"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Ruta"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Viene integrada en la aplicación, así que no se puede cambiar aquí."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Llegó desde un complemento, que conserva el original. Editarla aquí duraría solo hasta la próxima actualización del complemento."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Cancelar"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Instrucciones"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Qué debe hacer el agente cuando cargue esta habilidad"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Una habilidad es un archivo SKILL.md que el agente carga cuando su descripción encaja con la tarea."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Nueva habilidad"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Descripción"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Cuándo debería el agente recurrir a esta habilidad"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Por la descripción el agente decide si carga la habilidad"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Editar habilidad"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Los nombres solo pueden contener minúsculas, dígitos y guiones"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "El nombre de la habilidad no puede estar vacío"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Los nombres no deben empezar ni terminar con guion"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Los nombres deben tener como máximo 64 caracteres"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Nombre"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "minusculas-con-guiones"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Guardar"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Guardando..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "En todas partes"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "¿Dónde debe vivir?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Solo en este proyecto"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Agregar Skill"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Intenta ajustar los términos de búsqueda"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Próximamente"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "¿Eliminar «{name}»?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Esto elimina el directorio completo: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "No se pudo eliminar la habilidad"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Eliminar habilidad"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Habilidad eliminada"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Editar {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Error al cargar las Skills"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "No se encontraron Skills que coincidan"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Las Skills se cargan desde archivos SKILL.md en ~/.config/agents/skills/, .goose/skills/ u otros directorios admitidos."
+    "defaultMessage": "Las habilidades son archivos SKILL.md. Las tuyas están en ~/.agents/skills o en .agents/skills dentro de un proyecto."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "No hay Skills instaladas"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "integrada"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "complemento"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "proyecto"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Eliminar {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Habilidad guardada"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Guardada, pero sin usar: {path} ya responde a «{name}»"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Buscar Skills..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "eclipsada"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Mira las Skills instaladas que amplían las capacidades de Goose. {shortcut} para buscar."

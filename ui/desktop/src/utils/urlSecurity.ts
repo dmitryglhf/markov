@@ -86,7 +86,12 @@ export const isProtocolSafe = (url: string): boolean => {
 export const isLoopbackUrl = (url: string): boolean => {
   try {
     const { hostname } = new URL(url);
-    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '[::1]'
+    );
   } catch {
     return false;
   }

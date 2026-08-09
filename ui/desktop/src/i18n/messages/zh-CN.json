@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "保存"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "另有副本"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path}（未使用）"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "参数"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "关闭"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "文件"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "未使用"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "响应该名称的是 {path}"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "打开文件夹"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "来源"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "路径"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "它内置于应用中，因此无法在此修改。"
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "它来自插件，原件保存在插件里。在此修改只能保留到插件下次更新。"
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "取消"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "说明"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "加载该技能后，智能体应当做什么"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "技能是一个 SKILL.md 文件，当其描述与任务相符时，智能体会加载它。"
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "新建技能"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "描述"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "智能体何时应当使用该技能"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "智能体正是依据描述来决定是否加载技能"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "编辑技能"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "名称只能包含小写字母、数字和连字符"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "技能名称不能为空"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "名称不能以连字符开头或结尾"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "名称最多 64 个字符"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "名称"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "小写字母-加连字符"
+  },
+  "skillForm.save": {
+    "defaultMessage": "保存"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "正在保存..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "所有项目"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "它应该放在哪里？"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "仅限本项目"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "添加技能"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "尝试调整搜索关键词"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "即将推出"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "删除“{name}”？"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "这会删除整个目录：{path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "删除技能失败"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "删除技能"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "技能已删除"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "编辑 {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "加载技能出错"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "未找到匹配的技能"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "技能从 ~/.config/agents/skills/、.goose/skills/ 或其他受支持目录中的 SKILL.md 文件加载。"
+    "defaultMessage": "技能就是 SKILL.md 文件。你自己的技能位于 ~/.agents/skills，或项目内的 .agents/skills。"
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "未安装任何技能"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "内置"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "全局"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "插件"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "项目"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "移除 {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "技能已保存"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "已保存，但不会被使用：{path} 已经响应“{name}”"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "搜索技能…"
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "被遮蔽"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "查看已安装的用于扩展 Goose 能力的技能。按 {shortcut} 搜索。"

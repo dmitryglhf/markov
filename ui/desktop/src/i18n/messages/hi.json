@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "सहेजें"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "यहाँ भी"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (उपयोग में नहीं)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "आर्ग्युमेंट"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "बंद करें"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "फ़ाइलें"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "उपयोग में नहीं"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "इस नाम का उत्तर {path} देता है"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "फ़ोल्डर खोलें"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "स्रोत"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "पथ"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "यह ऐप में अंतर्निहित है, इसलिए इसे यहाँ बदला नहीं जा सकता।"
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "यह किसी प्लगइन से आया है, मूल प्रति वहीं रहती है। यहाँ किया गया बदलाव प्लगइन के अगले अपडेट तक ही टिकेगा।"
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "रद्द करें"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "निर्देश"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "यह स्किल लोड होने के बाद एजेंट को क्या करना चाहिए"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "स्किल एक SKILL.md फ़ाइल है, जिसे एजेंट तब लोड करता है जब उसका विवरण कार्य से मेल खाता है।"
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "नई स्किल"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "विवरण"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "एजेंट को यह स्किल कब लेनी चाहिए"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "विवरण के आधार पर ही एजेंट तय करता है कि स्किल लोड करनी है या नहीं"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "स्किल संपादित करें"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "नाम में केवल छोटे अक्षर, अंक और हाइफ़न हो सकते हैं"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "स्किल का नाम खाली नहीं हो सकता"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "नाम हाइफ़न से शुरू या समाप्त नहीं होना चाहिए"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "नाम अधिकतम 64 वर्ण का होना चाहिए"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "नाम"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "छोटे-अक्षर-हाइफ़न-सहित"
+  },
+  "skillForm.save": {
+    "defaultMessage": "सहेजें"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "सहेजा जा रहा है..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "हर जगह"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "यह कहाँ रहेगी?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "केवल इस प्रोजेक्ट में"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "कौशल जोड़ें"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "अपने खोज शब्दों को समायोजित करने का प्रयास करें"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "जल्द आ रहा है"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "“{name}” हटाएँ?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "इससे पूरी डायरेक्टरी हट जाती है: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "स्किल हटाने में विफल"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "स्किल हटाएँ"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "स्किल हटा दी गई"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} संपादित करें"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "कौशल लोड करने में त्रुटि"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "कोई मिलान कौशल नहीं मिला"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "कौशल SKILL.md फ़ाइलों से ~/.config/agents/skills/, .goose/skills/, या अन्य समर्थित निर्देशिकाओं में लोड किए जाते हैं।"
+    "defaultMessage": "स्किल SKILL.md फ़ाइलें होती हैं। आपकी ~/.agents/skills में, या किसी प्रोजेक्ट के .agents/skills में रहती हैं।"
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "कोई कौशल स्थापित नहीं"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "अंतर्निहित"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "वैश्विक"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "प्लगइन"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "प्रोजेक्ट"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} हटाएँ"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "स्किल सहेजी गई"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "सहेजी गई, पर उपयोग में नहीं: “{name}” नाम का उत्तर पहले से {path} देता है"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "खोज कौशल..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "ढकी हुई"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "स्थापित कौशल देखें जो Goose क्षमताओं का विस्तार करते हैं। {shortcut} खोजने के लिए."

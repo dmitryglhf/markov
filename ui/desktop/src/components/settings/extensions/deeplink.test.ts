@@ -89,8 +89,7 @@ describe('addExtensionFromDeepLink', () => {
 
   describe('stdio command validation', () => {
     it('should allow goose for bundled MCP deeplinks', async () => {
-      const url =
-        'goose://extension?cmd=goose&arg=mcp&arg=memory&name=Memory&description=Memory';
+      const url = 'goose://extension?cmd=goose&arg=mcp&arg=memory&name=Memory&description=Memory';
 
       await addExtensionFromDeepLink(url, mockAddExtension, mockSetView);
 
@@ -110,8 +109,7 @@ describe('addExtensionFromDeepLink', () => {
         throw new Error('Invalid command');
       });
 
-      const url =
-        'goose://extension?cmd=goosed&arg=mcp&arg=memory&name=Memory&description=Memory';
+      const url = 'goose://extension?cmd=goosed&arg=mcp&arg=memory&name=Memory&description=Memory';
 
       await expect(addExtensionFromDeepLink(url, mockAddExtension, mockSetView)).rejects.toThrow(
         'Invalid command'

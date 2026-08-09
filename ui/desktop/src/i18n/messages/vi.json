@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Lưu"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Cũng ở"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (không dùng)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Tham số"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Đóng"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Tệp"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Không dùng"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} mới là bản đáp lại tên này"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Mở thư mục"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Nguồn gốc"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Đường dẫn"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Được tích hợp sẵn trong ứng dụng nên không thể sửa ở đây."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Đến từ một plugin, nơi giữ bản gốc. Sửa ở đây chỉ có tác dụng đến lần cập nhật plugin kế tiếp."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Hủy"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Hướng dẫn"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Tác nhân nên làm gì sau khi kỹ năng này được nạp"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Kỹ năng là một tệp SKILL.md mà tác nhân nạp khi mô tả của nó khớp với công việc."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Kỹ năng mới"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Mô tả"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Khi nào tác nhân nên dùng đến kỹ năng này"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Tác nhân dựa vào mô tả để quyết định có nạp kỹ năng hay không"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Sửa kỹ năng"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Tên chỉ được chứa chữ thường, chữ số và dấu gạch ngang"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Tên kỹ năng không được để trống"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Tên không được bắt đầu hoặc kết thúc bằng dấu gạch ngang"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Tên dài tối đa 64 ký tự"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Tên"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "chu-thuong-co-gach-ngang"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Lưu"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Đang lưu..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Mọi nơi"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Nó nên nằm ở đâu?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Chỉ dự án này"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Thêm kỹ năng"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Hãy thử điều chỉnh từ khóa tìm kiếm của bạn"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Sắp ra mắt"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Xóa “{name}”?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Thao tác này xóa toàn bộ thư mục: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Không xóa được kỹ năng"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Xóa kỹ năng"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Đã xóa kỹ năng"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Sửa {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Lỗi khi tải kỹ năng"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "Không tìm thấy kỹ năng phù hợp"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Kỹ năng được tải từ các tệp SKILL.md trong ~/.config/agents/skills/, .goose/skills/, hoặc các thư mục được hỗ trợ khác."
+    "defaultMessage": "Kỹ năng là các tệp SKILL.md. Của bạn nằm trong ~/.agents/skills, hoặc trong .agents/skills bên trong một dự án."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Chưa cài đặt kỹ năng nào"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "dựng sẵn"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "toàn cục"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "dự án"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Xóa {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Đã lưu kỹ năng"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Đã lưu nhưng không được dùng: {path} đã đáp lại tên “{name}”"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Tìm kiếm kỹ năng..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "bị che"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Xem các kỹ năng đã cài đặt giúp mở rộng khả năng của Goose. {shortcut} để tìm kiếm."

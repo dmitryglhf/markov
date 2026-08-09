@@ -1,16 +1,22 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Zap, AlertCircle, Plus } from 'lucide-react';
+import { Zap, AlertCircle, Plus, Pencil, Trash2 } from 'lucide-react';
+import type { SourceEntry } from '@aaif/goose-sdk';
 import { ScrollArea } from '../ui/scroll-area';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
+import { ConfirmationModal } from '../ui/ConfirmationModal';
 import { MainPanelLayout } from '../Layout/MainPanelLayout';
 import { errorMessage } from '../../utils/conversionUtils';
 import { getInitialWorkingDir } from '../../utils/workingDir';
 import { defineMessages, useIntl } from '../../i18n';
 import { SearchView } from '../conversation/SearchView';
 import { getSearchShortcutText } from '../../utils/keyboardShortcuts';
-import { listSkillSources } from '../../acp/sources';
+import { toastError, toastSuccess } from '../../toasts';
+import { deleteSkill, listSkillSources } from '../../acp/sources';
+import { isEditable, skillOrigin, withShadows, type FoundSkill } from './shadows';
+import SkillDetails from './SkillDetails';
+import SkillFormModal from './SkillFormModal';
 
 const i18n = defineMessages({
   errorLoadingSkills: {
@@ -28,7 +34,7 @@ const i18n = defineMessages({
   noSkillsDescription: {
     id: 'skillsView.noSkillsDescription',
     defaultMessage:
-      'Skills are loaded from SKILL.md files in ~/.config/agents/skills/, .goose/skills/, or other supported directories.',
+      'Skills are SKILL.md files. Yours live in ~/.agents/skills, or in .agents/skills inside a project.',
   },
   noMatchingSkills: {
     id: 'skillsView.noMatchingSkills',
@@ -54,27 +60,121 @@ const i18n = defineMessages({
     id: 'skillsView.searchSkillsPlaceholder',
     defaultMessage: 'Search skills...',
   },
-  comingSoon: {
-    id: 'skillsView.comingSoon',
-    defaultMessage: 'Coming soon',
+  originBuiltin: {
+    id: 'skillsView.originBuiltin',
+    defaultMessage: 'builtin',
+  },
+  originPlugin: {
+    id: 'skillsView.originPlugin',
+    defaultMessage: 'plugin',
+  },
+  originGlobal: {
+    id: 'skillsView.originGlobal',
+    defaultMessage: 'global',
+  },
+  originProject: {
+    id: 'skillsView.originProject',
+    defaultMessage: 'project',
+  },
+  shadowed: {
+    id: 'skillsView.shadowed',
+    defaultMessage: 'shadowed',
+  },
+  editSkill: {
+    id: 'skillsView.editSkill',
+    defaultMessage: 'Edit {name}',
+  },
+  removeSkill: {
+    id: 'skillsView.removeSkill',
+    defaultMessage: 'Remove {name}',
+  },
+  deleteTitle: {
+    id: 'skillsView.deleteTitle',
+    defaultMessage: 'Delete skill',
+  },
+  deleteConfirm: {
+    id: 'skillsView.deleteConfirm',
+    defaultMessage: 'Delete "{name}"?',
+  },
+  deleteDetail: {
+    id: 'skillsView.deleteDetail',
+    defaultMessage: 'This removes the whole directory: {path}',
+  },
+  deleted: {
+    id: 'skillsView.deleted',
+    defaultMessage: 'Skill deleted',
+  },
+  deleteFailed: {
+    id: 'skillsView.deleteFailed',
+    defaultMessage: 'Failed to delete skill',
+  },
+  saved: {
+    id: 'skillsView.saved',
+    defaultMessage: 'Skill saved',
+  },
+  savedButShadowed: {
+    id: 'skillsView.savedButShadowed',
+    defaultMessage: 'Saved, but not in use: {path} already answers to "{name}"',
   },
 });
 
-interface SkillEntry {
-  name: string;
-  description: string;
-}
+const ORIGIN_LABELS = {
+  builtin: i18n.originBuiltin,
+  plugin: i18n.originPlugin,
+  global: i18n.originGlobal,
+  project: i18n.originProject,
+} as const;
 
-function SkillItem({ skill }: { skill: SkillEntry }) {
+function SkillItem({
+  skill,
+  onInspect,
+  onEdit,
+  onRemove,
+}: {
+  skill: FoundSkill;
+  onInspect: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const intl = useIntl();
+  const origin = skillOrigin(skill.entry);
+  const editable = isEditable(skill.entry);
+
   return (
     <Card className="py-2 px-4 mb-2 bg-background-primary border-none hover:bg-background-secondary transition-all duration-150">
       <div className="flex justify-between items-center gap-4">
-        <div className="min-w-0 flex-1">
+        <button className="min-w-0 flex-1 text-left" onClick={onInspect}>
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-base truncate">{skill.name}</h3>
+            <h3 className="text-base truncate">{skill.entry.name}</h3>
+            <span className="text-xs text-text-secondary shrink-0">
+              {intl.formatMessage(ORIGIN_LABELS[origin])}
+            </span>
+            {skill.shadowedBy && (
+              <span className="text-xs text-text-secondary shrink-0">
+                · {intl.formatMessage(i18n.shadowed)}
+              </span>
+            )}
           </div>
-          <p className="text-text-secondary text-sm line-clamp-2">{skill.description}</p>
-        </div>
+          <p className="text-text-secondary text-sm line-clamp-2">{skill.entry.description}</p>
+        </button>
+        {editable && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              className="text-text-secondary hover:text-text-primary"
+              aria-label={intl.formatMessage(i18n.editSkill, { name: skill.entry.name })}
+              onClick={onEdit}
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              className="text-text-secondary hover:text-text-primary"
+              aria-label={intl.formatMessage(i18n.removeSkill, { name: skill.entry.name })}
+              onClick={onRemove}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -95,22 +195,36 @@ function SkillSkeleton() {
 
 export default function SkillsView() {
   const intl = useIntl();
-  const [skills, setSkills] = useState<SkillEntry[]>([]);
+  const [skills, setSkills] = useState<FoundSkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showContent, setShowContent] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [inspected, setInspected] = useState<FoundSkill | null>(null);
+  const [editing, setEditing] = useState<SourceEntry | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState<FoundSkill | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const projectDir = getInitialWorkingDir();
 
   const filteredSkills = useMemo(() => {
     if (!searchTerm) return skills;
     const searchLower = searchTerm.toLowerCase();
     return skills.filter(
       (skill) =>
-        skill.name.toLowerCase().includes(searchLower) ||
-        skill.description.toLowerCase().includes(searchLower)
+        skill.entry.name.toLowerCase().includes(searchLower) ||
+        skill.entry.description.toLowerCase().includes(searchLower)
     );
   }, [skills, searchTerm]);
+
+  const load = useCallback(async (): Promise<FoundSkill[]> => {
+    const sources = await listSkillSources(projectDir, true);
+    const found = withShadows(sources);
+    setSkills(found);
+    return found;
+  }, [projectDir]);
 
   const loadSkills = useCallback(async () => {
     try {
@@ -118,18 +232,13 @@ export default function SkillsView() {
       setShowSkeleton(true);
       setShowContent(false);
       setError(null);
-      const sources = await listSkillSources(getInitialWorkingDir());
-      const skillEntries: SkillEntry[] = sources.map((source) => ({
-        name: source.name,
-        description: source.description,
-      }));
-      setSkills(skillEntries);
+      await load();
     } catch (err) {
       setError(errorMessage(err, 'Failed to load skills'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     loadSkills();
@@ -145,6 +254,51 @@ export default function SkillsView() {
     }
     return undefined;
   }, [loading, showSkeleton]);
+
+  // A saved skill that lost a name collision is on disk but never loaded, so
+  // silence here would read as success.
+  const handleSaved = async (saved: SourceEntry) => {
+    setCreating(false);
+    setEditing(null);
+    try {
+      const found = await load();
+      const shadowedBy = found.find((skill) => skill.entry.path === saved.path)?.shadowedBy;
+      if (shadowedBy) {
+        toastSuccess({
+          title: saved.name,
+          msg: intl.formatMessage(i18n.savedButShadowed, {
+            path: shadowedBy,
+            name: saved.name,
+          }),
+        });
+        return;
+      }
+      toastSuccess({ title: saved.name, msg: intl.formatMessage(i18n.saved) });
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to load skills'));
+    }
+  };
+
+  const confirmRemoval = async () => {
+    if (!pendingRemoval) return;
+    setIsRemoving(true);
+    try {
+      await deleteSkill(pendingRemoval.entry.path);
+      toastSuccess({
+        title: pendingRemoval.entry.name,
+        msg: intl.formatMessage(i18n.deleted),
+      });
+      setPendingRemoval(null);
+      await load();
+    } catch (err) {
+      toastError({
+        title: intl.formatMessage(i18n.deleteFailed),
+        msg: errorMessage(err, 'Failed to delete skill'),
+      });
+    } finally {
+      setIsRemoving(false);
+    }
+  };
 
   const renderContent = () => {
     if (loading || showSkeleton) {
@@ -194,7 +348,13 @@ export default function SkillsView() {
     return (
       <div className="space-y-2">
         {filteredSkills.map((skill) => (
-          <SkillItem key={skill.name} skill={skill} />
+          <SkillItem
+            key={skill.entry.path}
+            skill={skill}
+            onInspect={() => setInspected(skill)}
+            onEdit={() => setEditing(skill.entry)}
+            onRemove={() => setPendingRemoval(skill)}
+          />
         ))}
       </div>
     );
@@ -211,8 +371,7 @@ export default function SkillsView() {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
-                hidden
-                title={intl.formatMessage(i18n.comingSoon)}
+                onClick={() => setCreating(true)}
               >
                 <Plus className="w-4 h-4" />
                 {intl.formatMessage(i18n.addSkill)}
@@ -243,6 +402,39 @@ export default function SkillsView() {
           </ScrollArea>
         </div>
       </div>
+
+      {inspected && (
+        <SkillDetails skill={inspected} found={skills} onClose={() => setInspected(null)} />
+      )}
+
+      {(creating || editing) && (
+        <SkillFormModal
+          skill={editing ?? undefined}
+          projectDir={projectDir}
+          globalDirLabel="~/.agents/skills"
+          projectDirLabel={`${projectDir}/.agents/skills`}
+          onClose={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
+          onSaved={handleSaved}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={pendingRemoval !== null}
+        title={intl.formatMessage(i18n.deleteTitle)}
+        message={intl.formatMessage(i18n.deleteConfirm, {
+          name: pendingRemoval?.entry.name ?? '',
+        })}
+        detail={intl.formatMessage(i18n.deleteDetail, {
+          path: pendingRemoval?.entry.path ?? '',
+        })}
+        onConfirm={confirmRemoval}
+        onCancel={() => setPendingRemoval(null)}
+        isSubmitting={isRemoving}
+        confirmVariant="destructive"
+      />
     </MainPanelLayout>
   );
 }

@@ -1,7 +1,4 @@
-import type {
-  GetPromptResponse_unstable,
-  PromptTemplateEntry,
-} from '@aaif/goose-sdk';
+import type { GetPromptResponse_unstable, PromptTemplateEntry } from '@aaif/goose-sdk';
 import { getAcpClient } from './acpConnection';
 
 export type PromptTemplate = PromptTemplateEntry;
