@@ -4,7 +4,7 @@
 
 use crate::config::paths::Paths;
 use crate::skills::{
-    build_skill_md, discover_skills, infer_skill_name, is_global_skill_dir,
+    build_skill_md, discover_all_skills, discover_skills, infer_skill_name, is_global_skill_dir,
     parse_skill_frontmatter, resolve_discoverable_skill_dir, resolve_skill_dir, skill_base_dir,
     validate_skill_name,
 };
@@ -846,20 +846,40 @@ pub fn delete_source_with_roots(
     Ok(())
 }
 
+#[derive(Default)]
+pub struct ListSourcesOptions<'a> {
+    pub include_project_sources: bool,
+    /// Keep every copy of a repeated name instead of only the one discovery
+    /// would use. See [`crate::skills::discover_all_skills`].
+    pub include_shadowed: bool,
+    pub additional_roots: &'a [SourceRoot],
+}
+
 pub fn list_sources(
     source_type: Option<SourceType>,
     project_dir: Option<&str>,
     include_project_sources: bool,
 ) -> Result<Vec<SourceEntry>, Error> {
-    list_sources_with_roots(source_type, project_dir, include_project_sources, &[])
+    list_sources_with_roots(
+        source_type,
+        project_dir,
+        ListSourcesOptions {
+            include_project_sources,
+            ..Default::default()
+        },
+    )
 }
 
 pub fn list_sources_with_roots(
     source_type: Option<SourceType>,
     project_dir: Option<&str>,
-    include_project_sources: bool,
-    additional_roots: &[SourceRoot],
+    options: ListSourcesOptions<'_>,
 ) -> Result<Vec<SourceEntry>, Error> {
+    let ListSourcesOptions {
+        include_project_sources,
+        include_shadowed,
+        additional_roots,
+    } = options;
     if let Some(t) = source_type {
         require_listable_type(Some(t))?;
     }
@@ -876,8 +896,12 @@ pub fn list_sources_with_roots(
                     .map(str::trim)
                     .filter(|p| !p.is_empty())
                     .map(PathBuf::from);
+                let discovered = match include_shadowed {
+                    true => discover_all_skills(working_dir.as_deref()),
+                    false => discover_skills(working_dir.as_deref()),
+                };
                 sources.extend(
-                    discover_skills(working_dir.as_deref())
+                    discovered
                         .into_iter()
                         .filter(|s| s.source_type == SourceType::Skill),
                 );
@@ -1245,8 +1269,10 @@ mod tests {
         let sources = list_sources_with_roots(
             Some(SourceType::Agent),
             None,
-            false,
-            &[SourceRoot::read_only(root.clone())],
+            ListSourcesOptions {
+                additional_roots: &[SourceRoot::read_only(root.clone())],
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -1774,6 +1800,46 @@ mod tests {
 
         let exported = export_source(SourceType::Skill, matching[0].path.as_str()).unwrap();
         assert!(exported.0.contains("preferred"));
+    }
+
+    /// The loser of a name collision is dropped from the normal listing, which
+    /// is what a manager has to be able to show: otherwise editing it looks like
+    /// it did nothing.
+    #[test]
+    fn shadowed_copies_are_listed_only_when_asked_for() {
+        let tmp = TempDir::new().unwrap();
+        for (dir, description) in [(".agents", "preferred"), (".goose", "shadowed")] {
+            let skill_dir = tmp.path().join(dir).join("skills").join("shared-skill");
+            std::fs::create_dir_all(&skill_dir).unwrap();
+            std::fs::write(
+                skill_dir.join("SKILL.md"),
+                build_skill_md("shared-skill", description, "Body", &HashMap::new()),
+            )
+            .unwrap();
+        }
+        let project_dir = tmp.path().to_str().unwrap();
+
+        let names = |include_shadowed: bool| {
+            list_sources_with_roots(
+                Some(SourceType::Skill),
+                Some(project_dir),
+                ListSourcesOptions {
+                    include_shadowed,
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .into_iter()
+            .filter(|source| source.name == "shared-skill" && !source.global)
+            .map(|source| source.description)
+            .collect::<Vec<_>>()
+        };
+
+        assert_eq!(names(false), vec!["preferred".to_string()]);
+        assert_eq!(
+            names(true),
+            vec!["preferred".to_string(), "shadowed".to_string()]
+        );
     }
 
     #[test]
