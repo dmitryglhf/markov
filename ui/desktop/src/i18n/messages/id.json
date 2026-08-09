@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Simpan"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Juga di"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (tidak dipakai)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argumen"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Tutup"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Berkas"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Tidak dipakai"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} yang menjawab nama ini"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Buka folder"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Asal"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Jalur"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Sudah tertanam di aplikasi, jadi tidak bisa diubah di sini."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Datang dari plugin, yang menyimpan aslinya. Suntingan di sini hanya bertahan sampai plugin diperbarui."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Batal"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Instruksi"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Apa yang harus dilakukan agen setelah skill ini dimuat"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Skill adalah berkas SKILL.md yang dimuat agen ketika deskripsinya cocok dengan tugas."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Skill baru"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Deskripsi"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Kapan agen sebaiknya memakai skill ini"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Dari deskripsi inilah agen memutuskan memuat sebuah skill"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Sunting skill"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Nama hanya boleh berisi huruf kecil, angka, dan tanda hubung"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Nama skill tidak boleh kosong"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Nama tidak boleh diawali atau diakhiri tanda hubung"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Nama maksimal 64 karakter"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Nama"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "huruf-kecil-dengan-tanda-hubung"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Simpan"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Menyimpan..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Di mana saja"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Di mana skill ini disimpan?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Hanya proyek ini"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Tambah Keterampilan"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Coba sesuaikan kata kunci pencarian Anda"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Segera hadir"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Hapus “{name}”?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Ini menghapus seluruh direktori: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Gagal menghapus skill"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Hapus skill"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Skill dihapus"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Sunting {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Kesalahan Memuat Keterampilan"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "Tidak ada keterampilan yang cocok ditemukan"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Keterampilan dimuat dari file SKILL.md di ~/.config/agents/skills/, .goose/skills/, atau direktori lain yang didukung."
+    "defaultMessage": "Skill adalah berkas SKILL.md. Milik Anda ada di ~/.agents/skills, atau di .agents/skills dalam sebuah proyek."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Tidak ada keterampilan yang terpasang"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "bawaan"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "proyek"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Hapus {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Skill disimpan"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Tersimpan, tetapi tidak dipakai: {path} sudah menjawab nama “{name}”"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Cari keterampilan..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "tertutupi"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Lihat keterampilan terpasang yang memperluas kemampuan Goose. {shortcut} untuk mencari."

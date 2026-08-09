@@ -12,7 +12,7 @@ use rmcp::transport::streamable_http_client::{
 use rmcp::transport::{
     ConfigureCommandExt, DynamicTransportError, StreamableHttpClientTransport, TokioChildProcess,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Stdio;
@@ -42,7 +42,7 @@ use crate::agents::mcp_client::{
     GooseMcpClientCapabilities, GooseMcpHostInfo, McpClient, McpClientTrait,
 };
 use crate::builtin_extension::get_builtin_extension;
-use crate::config::extensions::name_to_key;
+use crate::config::extensions::{name_to_key, ExtensionEntry};
 use crate::config::search_path::SearchPaths;
 use crate::config::{get_all_extensions, Config};
 use crate::oauth::{oauth_flow, GooseCredentialStore};
@@ -390,6 +390,59 @@ pub fn is_hidden_extension(name: &str) -> bool {
     PLATFORM_EXTENSIONS
         .get(name_to_key(name).as_str())
         .is_some_and(|def| def.hidden)
+}
+
+fn extension_description(config: &ExtensionConfig) -> &str {
+    match config {
+        ExtensionConfig::Builtin {
+            description,
+            display_name,
+            ..
+        } => match description.is_empty() {
+            true => display_name.as_deref().unwrap_or("Built-in extension"),
+            false => description,
+        },
+        ExtensionConfig::Sse { .. } => "SSE extension (unsupported)",
+        ExtensionConfig::Platform { description, .. }
+        | ExtensionConfig::StreamableHttp { description, .. }
+        | ExtensionConfig::Stdio { description, .. }
+        | ExtensionConfig::Frontend { description, .. }
+        | ExtensionConfig::InlinePython { description, .. } => description,
+    }
+}
+
+/// Sorts what the config knows about into what this session could still load
+/// and what it already has, returning both as display lines.
+///
+/// The session decides, not the config's `enabled` flag. Enabling an extension
+/// in the desktop's settings writes that flag but leaves running sessions
+/// alone, so an extension can be enabled on disk and absent here — and used to
+/// be offered by neither list, leaving no way to reach it from a chat.
+fn split_by_session_state(
+    configured: Vec<ExtensionEntry>,
+    loaded: &HashSet<String>,
+) -> (Vec<String>, Vec<String>) {
+    let mut to_enable = vec![];
+    for extension in configured {
+        let name = extension.config.name();
+        if loaded.contains(&name_to_key(&name)) || is_hidden_extension(&name) {
+            continue;
+        }
+        to_enable.push(format!(
+            "- {} - {}",
+            name,
+            extension_description(&extension.config)
+        ));
+    }
+
+    let mut to_disable: Vec<String> = loaded
+        .iter()
+        .filter(|name| !is_hidden_extension(name))
+        .cloned()
+        .collect();
+    to_disable.sort();
+
+    (to_enable, to_disable)
 }
 
 /// Result of resolving a tool call to its owning extension
@@ -1998,43 +2051,9 @@ impl ExtensionManager {
     pub async fn search_available_extensions(&self) -> Result<Vec<ContentBlock>, ErrorData> {
         let mut output_parts = vec![];
 
-        // First get disabled extensions from current config (skip hidden ones)
-        let mut disabled_extensions: Vec<String> = vec![];
-        for extension in get_all_extensions() {
-            if !extension.enabled && !is_hidden_extension(&extension.config.name()) {
-                let config = extension.config.clone();
-                let description = match &config {
-                    ExtensionConfig::Builtin {
-                        description,
-                        display_name,
-                        ..
-                    } => {
-                        if description.is_empty() {
-                            display_name.as_deref().unwrap_or("Built-in extension")
-                        } else {
-                            description
-                        }
-                    }
-                    ExtensionConfig::Sse { .. } => "SSE extension (unsupported)",
-                    ExtensionConfig::Platform { description, .. }
-                    | ExtensionConfig::StreamableHttp { description, .. }
-                    | ExtensionConfig::Stdio { description, .. }
-                    | ExtensionConfig::Frontend { description, .. }
-                    | ExtensionConfig::InlinePython { description, .. } => description,
-                };
-                disabled_extensions.push(format!("- {} - {}", config.name(), description));
-            }
-        }
-
-        // Get currently enabled extensions that can be disabled (skip hidden ones)
-        let enabled_extensions: Vec<String> = self
-            .extensions
-            .lock()
-            .await
-            .keys()
-            .filter(|name| !is_hidden_extension(name))
-            .cloned()
-            .collect();
+        let loaded: HashSet<String> = self.extensions.lock().await.keys().cloned().collect();
+        let (disabled_extensions, enabled_extensions) =
+            split_by_session_state(get_all_extensions(), &loaded);
 
         // Build output string
         if !disabled_extensions.is_empty() {
@@ -2118,6 +2137,45 @@ mod tests {
     use rmcp::model::ServerNotification;
 
     use tokio::sync::mpsc;
+
+    fn builtin(name: &str, enabled: bool) -> ExtensionEntry {
+        ExtensionEntry {
+            enabled,
+            config: ExtensionConfig::Builtin {
+                name: name.to_string(),
+                description: format!("{name} description"),
+                display_name: Some(name.to_string()),
+                timeout: None,
+                bundled: Some(true),
+                available_tools: Vec::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn an_extension_the_config_enabled_but_the_session_never_loaded_is_offered() {
+        let loaded = HashSet::from(["developer".to_string()]);
+        let configured = vec![builtin("developer", true), builtin("autovisualiser", true)];
+
+        let (to_enable, to_disable) = split_by_session_state(configured, &loaded);
+
+        assert_eq!(
+            to_enable,
+            vec!["- autovisualiser - autovisualiser description"]
+        );
+        assert_eq!(to_disable, vec!["developer"]);
+    }
+
+    #[test]
+    fn a_loaded_extension_is_never_also_offered_for_enabling() {
+        let loaded = HashSet::from(["developer".to_string()]);
+
+        let (to_enable, to_disable) =
+            split_by_session_state(vec![builtin("developer", false)], &loaded);
+
+        assert!(to_enable.is_empty());
+        assert_eq!(to_disable, vec!["developer"]);
+    }
 
     impl ExtensionManager {
         async fn add_mock_extension(&self, name: String, client: McpClientBox) {

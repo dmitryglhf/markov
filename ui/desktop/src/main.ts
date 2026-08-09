@@ -29,7 +29,12 @@ import 'dotenv/config';
 import { checkBackendStatus } from './backendStatus';
 import { startGooseServe } from './gooseServe';
 import { GooseServeLeaseRegistry, type GooseServeLease } from './gooseServeLeaseRegistry';
-import { acpWebSocketUrlFromHttpBase, normalizeAcpHttpBaseUrl } from './acp/url';
+import {
+  acpWebSocketUrlFromHttpBase,
+  isLoopbackAcpWebSocketUrl,
+  normalizeAcpHttpBaseUrl,
+} from './acp/url';
+import { savePastedImage } from './pastedImages';
 import { expandTilde, sanitizeGoosePathRoot } from './utils/pathUtils';
 import log from './utils/logger';
 import { ensureWinShims } from './utils/winShims';
@@ -176,6 +181,7 @@ function translateMenuLabels(items: MenuItem[]): void {
 // Settings management
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 const STARTUP_LOGS_DIR = path.join(app.getPath('userData'), 'logs', 'startup');
+const PASTED_IMAGES_DIR = path.join(app.getPath('userData'), 'pasted-images');
 const validLanguageSettings = new Set<Settings['language']>([
   'system',
   'en',
@@ -2306,6 +2312,22 @@ ipcMain.handle('read-file', async (_event, filePath) => {
   } catch (error) {
     console.error('Error reading file:', error);
     return { file: '', filePath: expandTilde(filePath), error, found: false };
+  }
+});
+
+ipcMain.handle('save-pasted-image', async (event, bytes: Uint8Array, mimeType: string) => {
+  const windowId = BrowserWindow.fromWebContents(event.sender)?.id;
+  const acpUrl = windowId ? gooseServeLeases.getAcpUrl(windowId) : null;
+  // A path only means something to an agent sharing this filesystem.
+  if (!acpUrl || !isLoopbackAcpWebSocketUrl(acpUrl)) {
+    return null;
+  }
+
+  try {
+    return savePastedImage(PASTED_IMAGES_DIR, bytes, mimeType);
+  } catch (error) {
+    log.error('Failed to save pasted image:', error);
+    return null;
   }
 });
 

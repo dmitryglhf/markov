@@ -65,7 +65,9 @@ describe('AuthSettingsSection', () => {
     renderWithIntl(<AuthSettingsSection />);
 
     expect(screen.getByText('Loading credentials...')).toBeInTheDocument();
-    expect(await screen.findByText('No locally stored provider credentials were found.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No locally stored provider credentials were found.')
+    ).toBeInTheDocument();
   });
 
   it('renders provider credentials with storage and expiry status', async () => {
@@ -98,9 +100,7 @@ describe('AuthSettingsSection', () => {
 
   it('deletes a credential after confirmation and refreshes the list', async () => {
     const user = userEvent.setup();
-    mockedListProviderSecrets
-      .mockResolvedValueOnce([providerSecret])
-      .mockResolvedValueOnce([]);
+    mockedListProviderSecrets.mockResolvedValueOnce([providerSecret]).mockResolvedValueOnce([]);
 
     renderWithIntl(<AuthSettingsSection />);
 
@@ -108,7 +108,9 @@ describe('AuthSettingsSection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete credential' }));
 
-    expect(screen.getByText('Delete the OPENAI_API_KEY credential for OpenAI?')).toBeInTheDocument();
+    expect(
+      screen.getByText('Delete the OPENAI_API_KEY credential for OpenAI?')
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         'This is the active provider. New requests may fail until you configure another credential.'
@@ -123,7 +125,9 @@ describe('AuthSettingsSection', () => {
     await waitFor(() => {
       expect(mockedToast.success).toHaveBeenCalledWith('Credential deleted');
     });
-    expect(await screen.findByText('No locally stored provider credentials were found.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No locally stored provider credentials were found.')
+    ).toBeInTheDocument();
   });
 
   it('configures the permanent Hugging Face credential row', async () => {
@@ -143,16 +147,14 @@ describe('AuthSettingsSection', () => {
       configureProvider: 'huggingface',
     };
 
-    mockedListProviderSecrets
-      .mockResolvedValueOnce([huggingFaceSecret])
-      .mockResolvedValueOnce([
-        {
-          ...huggingFaceSecret,
-          configured: true,
-          hasSecret: true,
-          canDelete: true,
-        },
-      ]);
+    mockedListProviderSecrets.mockResolvedValueOnce([huggingFaceSecret]).mockResolvedValueOnce([
+      {
+        ...huggingFaceSecret,
+        configured: true,
+        hasSecret: true,
+        canDelete: true,
+      },
+    ]);
 
     renderWithIntl(<AuthSettingsSection />);
 

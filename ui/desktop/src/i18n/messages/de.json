@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Speichern"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Auch unter"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (nicht verwendet)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argumente"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Schließen"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Dateien"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Nicht verwendet"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} antwortet auf diesen Namen"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Ordner öffnen"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Herkunft"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Pfad"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "In der App eingebaut und hier nicht änderbar."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Kommt aus einem Plugin, das das Original behält. Eine Änderung hier hält nur bis zum nächsten Plugin-Update."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Abbrechen"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Anweisungen"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Was der Agent tun soll, sobald dieser Skill geladen ist"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Ein Skill ist eine SKILL.md-Datei, die der Agent lädt, wenn die Beschreibung zur Aufgabe passt."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Neuer Skill"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Beschreibung"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Wann der Agent zu diesem Skill greifen soll"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Anhand der Beschreibung entscheidet der Agent, ob er den Skill lädt"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Skill bearbeiten"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Namen dürfen nur Kleinbuchstaben, Ziffern und Bindestriche enthalten"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Der Skill-Name darf nicht leer sein"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Namen dürfen nicht mit einem Bindestrich beginnen oder enden"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Namen dürfen höchstens 64 Zeichen lang sein"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Name"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "kleinbuchstaben-mit-bindestrich"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Speichern"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Wird gespeichert..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Überall"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Wo soll er liegen?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Nur in diesem Projekt"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Skill hinzufügen"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Versuchen Sie, Ihre Suchbegriffe anzupassen"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Demnächst verfügbar"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "„{name}“ löschen?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Damit wird das ganze Verzeichnis entfernt: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Skill konnte nicht gelöscht werden"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Skill löschen"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Skill gelöscht"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} bearbeiten"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Fehler beim Laden der Skills"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "Keine passenden Skills gefunden"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Skills werden aus SKILL.md-Dateien in ~/.config/agents/skills/, .goose/skills/ oder anderen unterstützten Verzeichnissen geladen."
+    "defaultMessage": "Skills sind SKILL.md-Dateien. Deine liegen in ~/.agents/skills oder in .agents/skills innerhalb eines Projekts."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Keine Skills installiert"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "eingebaut"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "Plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "Projekt"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} entfernen"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Skill gespeichert"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Gespeichert, aber nicht in Verwendung: {path} antwortet bereits auf „{name}“"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Skills durchsuchen..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "verdeckt"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Zeigen Sie installierte Skills an, die die Fähigkeiten von Goose erweitern. {shortcut} zum Suchen."

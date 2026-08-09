@@ -52,9 +52,7 @@ export default function HuggingFaceSignInPrompt({
     setLoading(true);
     try {
       const secrets = await acpListProviderSecrets();
-      const huggingFaceSecret = secrets.find(
-        (secret) => secret.id === HUGGINGFACE_OAUTH_SECRET_ID
-      );
+      const huggingFaceSecret = secrets.find((secret) => secret.id === HUGGINGFACE_OAUTH_SECRET_ID);
       setLoggedIn(Boolean(huggingFaceSecret?.hasSecret && huggingFaceSecret.status !== 'expired'));
     } catch {
       setLoggedIn(false);

@@ -191,9 +191,7 @@ export default function AppsView() {
 
   const handleDeleteApp = async (app: GooseApp) => {
     if (
-      !window.confirm(
-        intl.formatMessage(i18n.deleteConfirm, { name: formatAppName(app.name) })
-      )
+      !window.confirm(intl.formatMessage(i18n.deleteConfirm, { name: formatAppName(app.name) }))
     ) {
       return;
     }

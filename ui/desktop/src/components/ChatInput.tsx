@@ -9,6 +9,7 @@ import { Attach, Close, Microphone } from './icons';
 import { ChatState } from '../types/chatState';
 import debounce from 'lodash/debounce';
 import { LocalMessageStorage } from '../utils/localMessageStorage';
+import { appendAttachmentPaths } from './attachedPaths';
 import { DirSwitcher } from './bottom_menu/DirSwitcher';
 import ModelsBottomBar from './settings/models/bottom_bar/ModelsBottomBar';
 import { BottomMenuExtensionSelection } from './bottom_menu/BottomMenuExtensionSelection';
@@ -64,7 +65,37 @@ interface PastedImage {
   dataUrl: string;
   isLoading: boolean;
   error?: string;
+  /** Absent when the backend cannot reach this filesystem, or the write failed. */
+  path?: string;
 }
+
+const readDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (evt) => resolve(evt.target?.result as string);
+    reader.onerror = () => reject(new Error(`Failed to read image file: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+
+/**
+ * A file copied in Finder brings its own path. A screenshot does not — the
+ * clipboard holds pixels no file backs — so we write one, otherwise the model
+ * has nothing to point a tool at.
+ */
+const resolveImagePath = async (file: File): Promise<string | undefined> => {
+  const existing = window.electron.getPathForFile(file);
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return (await window.electron.savePastedImage(bytes, file.type)) ?? undefined;
+  } catch (error) {
+    console.error('Failed to save pasted image:', error);
+    return undefined;
+  }
+};
 
 const moveQueuedMessageToFront = (
   messages: QueuedMessage[],
@@ -664,7 +695,7 @@ export default function ChatInput({
       });
     }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalTokens, tokenLimit, isTokenLimitLoaded, isLoading, addAlert, clearAlerts]);
 
   // Cleanup effect for component unmount - prevent memory leaks
@@ -805,19 +836,9 @@ export default function ChatInput({
     return [...pastedImageData, ...droppedImageData];
   }, [pastedImages, allDroppedFiles]);
 
-  const appendDroppedFilePaths = useCallback(
-    (text: string): string => {
-      const droppedFilePaths = allDroppedFiles
-        .filter((file) => !file.isImage && !file.error && !file.isLoading)
-        .map((file) => file.path);
-
-      if (droppedFilePaths.length > 0) {
-        const pathsString = droppedFilePaths.join(' ');
-        return text ? `${text} ${pathsString}` : pathsString;
-      }
-      return text;
-    },
-    [allDroppedFiles]
+  const appendAttachedFilePaths = useCallback(
+    (text: string): string => appendAttachmentPaths(text, [...allDroppedFiles, ...pastedImages]),
+    [allDroppedFiles, pastedImages]
   );
 
   const clearInputState = useCallback(() => {
@@ -906,30 +927,30 @@ export default function ChatInput({
         isLoading: true,
       });
 
-      // Process the image asynchronously
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const dataUrl = e.target?.result as string;
-        if (dataUrl) {
-          const compressedDataUrl = await compressImageDataUrl(dataUrl);
+      // Both the preview and the path have to be in hand before the image counts
+      // as ready: sending clears the input, and a path arriving late is a path lost.
+      void (async () => {
+        try {
+          const [dataUrl, path] = await Promise.all([
+            readDataUrl(file).then(compressImageDataUrl),
+            resolveImagePath(file),
+          ]);
           setPastedImages((prev) =>
             prev.map((img) =>
-              img.id === imageId ? { ...img, dataUrl: compressedDataUrl, isLoading: false } : img
+              img.id === imageId ? { ...img, dataUrl, path, isLoading: false } : img
+            )
+          );
+        } catch (error) {
+          console.error('Failed to read image file:', error);
+          setPastedImages((prev) =>
+            prev.map((img) =>
+              img.id === imageId
+                ? { ...img, error: intl.formatMessage(i18n.failedToReadImage), isLoading: false }
+                : img
             )
           );
         }
-      };
-      reader.onerror = () => {
-        console.error('Failed to read image file:', file.name);
-        setPastedImages((prev) =>
-          prev.map((img) =>
-            img.id === imageId
-              ? { ...img, error: intl.formatMessage(i18n.failedToReadImage), isLoading: false }
-              : img
-          )
-        );
-      };
-      reader.readAsDataURL(file);
+      })();
     }
 
     // Add all new images to the existing list
@@ -1036,7 +1057,7 @@ export default function ChatInput({
     }
 
     const imageData = convertImagesToImageData();
-    const contentToQueue = appendDroppedFilePaths(displayValue.trim());
+    const contentToQueue = appendAttachedFilePaths(displayValue.trim());
 
     const interruptionMatch = detectInterruption(displayValue.trim());
 
@@ -1090,7 +1111,7 @@ export default function ChatInput({
   const performSubmit = useCallback(
     (text?: string) => {
       const imageData = convertImagesToImageData();
-      const textToSend = appendDroppedFilePaths(text ?? displayValue.trim());
+      const textToSend = appendAttachedFilePaths(text ?? displayValue.trim());
 
       if (textToSend || imageData.length > 0) {
         // Store original message in history
@@ -1127,7 +1148,7 @@ export default function ChatInput({
     },
     [
       convertImagesToImageData,
-      appendDroppedFilePaths,
+      appendAttachedFilePaths,
       displayValue,
       allDroppedFiles,
       handleSubmit,
@@ -1250,6 +1271,7 @@ export default function ChatInput({
           dataUrl: '',
           isLoading: true,
           error: undefined,
+          path: window.electron.getPathForFile(file) || undefined,
         },
       ]);
 
@@ -1550,7 +1572,7 @@ export default function ChatInput({
         <div className="flex flex-wrap gap-2 p-4 mt-2 border-t border-border-primary">
           {/* Render pasted images first */}
           {pastedImages.map((img) => (
-            <div key={img.id} className="relative group w-20 h-20">
+            <div key={img.id} className="relative group w-20 h-20" title={img.path}>
               {img.dataUrl && (
                 <img
                   src={img.dataUrl}

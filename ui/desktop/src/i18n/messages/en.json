@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Save"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Also at"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (not used)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Arguments"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Close"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Files"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Not used"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} answers to this name"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Open folder"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Origin"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Path"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Built into the app, so it cannot be changed here."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "This came from a plugin, which keeps the original. Editing it here would last only until the plugin updates."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Cancel"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Instructions"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "What the agent should do once this skill is loaded"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "A skill is a SKILL.md file the agent loads when its description fits the task."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "New skill"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Description"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "When the agent should reach for this skill"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "The description is how the agent decides to load a skill"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Edit skill"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Names may only contain lowercase letters, digits, and hyphens"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Skill name must not be empty"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Names must not start or end with a hyphen"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Name"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "lowercase-with-hyphens"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "Names must be at most 64 characters"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Save"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Saving..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Everywhere"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Where should it live?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "This project only"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Add Skill"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Try adjusting your search terms"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Coming soon"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Delete \"{name}\"?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "This removes the whole directory: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Failed to delete skill"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Delete skill"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Skill deleted"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Edit {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Error Loading Skills"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "No matching skills found"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Skills are loaded from SKILL.md files in ~/.config/agents/skills/, .goose/skills/, or other supported directories."
+    "defaultMessage": "Skills are SKILL.md files. Yours live in ~/.agents/skills, or in .agents/skills inside a project."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "No skills installed"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "builtin"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "project"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Remove {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Skill saved"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Saved, but not in use: {path} already answers to \"{name}\""
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Search skills..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "shadowed"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "View installed skills that extend Goose capabilities. {shortcut} to search."

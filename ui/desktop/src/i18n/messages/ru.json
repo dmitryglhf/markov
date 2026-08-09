@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Сохранить"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Также в"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (не используется)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Аргументы"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Закрыть"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Файлы"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Не используется"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "на это имя отвечает {path}"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Открыть каталог"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Происхождение"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Путь"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Встроен в приложение, поэтому изменить его здесь нельзя."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Навык пришёл из плагина, оригинал хранится там. Правка здесь продержится до следующего обновления плагина."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Отмена"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Инструкции"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Что агенту делать, когда навык загружен"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Навык — это файл SKILL.md, который агент загружает, когда описание подходит к задаче."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Новый навык"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Описание"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Когда агенту стоит взять этот навык"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "По описанию агент решает, загружать ли навык"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Изменить навык"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "В имени допустимы только строчные латинские буквы, цифры и дефисы"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Имя навыка не может быть пустым"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Имя не должно начинаться или заканчиваться дефисом"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Имя длиннее 64 символов"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Имя"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "строчными-через-дефис"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Сохранить"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Сохранение..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Везде"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Где он будет жить?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Только в этом проекте"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Добавить навык"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Попробуйте изменить поисковый запрос"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Скоро"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Удалить «{name}»?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Удаляется каталог целиком: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Не удалось удалить навык"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Удаление навыка"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Навык удалён"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Изменить {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Ошибка загрузки навыков"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "Подходящие навыки не найдены"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Навыки загружаются из файлов SKILL.md в ~/.config/agents/skills/, .goose/skills/ или других поддерживаемых каталогах."
+    "defaultMessage": "Навыки — это файлы SKILL.md. Ваши лежат в ~/.agents/skills или в .agents/skills внутри проекта."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Навыки не установлены"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "встроенный"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "глобальный"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "плагин"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "проектный"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Удалить {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Навык сохранён"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Сохранено, но не используется: на имя «{name}» уже отвечает {path}"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Поиск навыков..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "затенён"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Просматривайте установленные навыки, расширяющие возможности Goose. {shortcut} для поиска."

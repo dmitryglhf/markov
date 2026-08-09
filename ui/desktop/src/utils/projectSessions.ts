@@ -61,7 +61,9 @@ export function groupSessionsByProject(sessions: SessionListItem[]): ProjectGrou
       path,
       label: getProjectLabel(path),
       sessions: sortedSessions,
-      lastActivityAt: getSessionActivityTime(sortedSessions[0] ?? { updatedAt: '' } as SessionListItem),
+      lastActivityAt: getSessionActivityTime(
+        sortedSessions[0] ?? ({ updatedAt: '' } as SessionListItem)
+      ),
     };
   });
 
@@ -78,9 +80,7 @@ export function groupSessionsByProject(sessions: SessionListItem[]): ProjectGrou
           ? getDisambiguatedProjectLabel(group.path)
           : group.label,
     }))
-    .sort(
-      (a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()
-    );
+    .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
 }
 
 function getDisambiguatedProjectLabel(workingDir: string): string {

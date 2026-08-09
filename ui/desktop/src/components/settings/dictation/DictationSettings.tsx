@@ -86,9 +86,9 @@ export const DictationSettings = () => {
   const intl = useIntl();
   const { localInference, isLoading: isFeaturesLoading } = useFeatures();
   const [provider, setProvider] = useState<DictationProvider | null>(null);
-  const [providerStatuses, setProviderStatuses] = useState<Record<string, DictationProviderStatusEntry>>(
-    {}
-  );
+  const [providerStatuses, setProviderStatuses] = useState<
+    Record<string, DictationProviderStatusEntry>
+  >({});
   const [preferredMic, setPreferredMic] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [isEditingKey, setIsEditingKey] = useState(false);
@@ -203,12 +203,16 @@ export const DictationSettings = () => {
               value={provider ?? 'disabled'}
               onValueChange={handleProviderChange}
             >
-              <DropdownMenuRadioItem value="disabled">{intl.formatMessage(i18n.disabled)}</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="disabled">
+                {intl.formatMessage(i18n.disabled)}
+              </DropdownMenuRadioItem>
               {visibleProviders.map((p) => (
                 <DropdownMenuRadioItem key={p} value={p}>
                   {getProviderLabel(p)}
                   {!providerStatuses[p]?.configured && (
-                    <span className="text-xs ml-1 text-text-secondary">{intl.formatMessage(i18n.notConfigured)}</span>
+                    <span className="text-xs ml-1 text-text-secondary">
+                      {intl.formatMessage(i18n.notConfigured)}
+                    </span>
                   )}
                 </DropdownMenuRadioItem>
               ))}
@@ -227,11 +231,16 @@ export const DictationSettings = () => {
             <div className="py-2 px-2 bg-background-secondary rounded-lg">
               {!providerStatuses[provider].configured ? (
                 <p className="text-xs text-text-secondary">
-                  {intl.formatMessage(i18n.configureApiKey, { settingsPath: providerStatuses[provider].settingsPath, b: (chunks: React.ReactNode) => <b>{chunks}</b> })}
+                  {intl.formatMessage(i18n.configureApiKey, {
+                    settingsPath: providerStatuses[provider].settingsPath,
+                    b: (chunks: React.ReactNode) => <b>{chunks}</b>,
+                  })}
                 </p>
               ) : (
                 <p className="text-xs text-green-600">
-                  {intl.formatMessage(i18n.configuredIn, { settingsPath: providerStatuses[provider].settingsPath })}
+                  {intl.formatMessage(i18n.configuredIn, {
+                    settingsPath: providerStatuses[provider].settingsPath,
+                  })}
                 </p>
               )}
             </div>
@@ -242,7 +251,9 @@ export const DictationSettings = () => {
                 <p className="text-xs text-text-secondary mt-[2px]">
                   {intl.formatMessage(i18n.requiredForTranscription)}
                   {providerStatuses[provider]?.configured && (
-                    <span className="text-green-600 ml-2">{intl.formatMessage(i18n.configured)}</span>
+                    <span className="text-green-600 ml-2">
+                      {intl.formatMessage(i18n.configured)}
+                    </span>
                   )}
                 </p>
               </div>
@@ -250,7 +261,9 @@ export const DictationSettings = () => {
               {!isEditingKey ? (
                 <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" onClick={() => setIsEditingKey(true)}>
-                    {providerStatuses[provider]?.configured ? intl.formatMessage(i18n.updateApiKey) : intl.formatMessage(i18n.addApiKey)}
+                    {providerStatuses[provider]?.configured
+                      ? intl.formatMessage(i18n.updateApiKey)
+                      : intl.formatMessage(i18n.addApiKey)}
                   </Button>
                   {providerStatuses[provider]?.configured && (
                     <Button variant="destructive" size="sm" onClick={handleRemoveKey}>

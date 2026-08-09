@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "저장"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "다른 위치"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path}(사용 안 함)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "인자"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "닫기"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "파일"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "사용 안 함"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "이 이름에는 {path}가 응답합니다"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "폴더 열기"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "출처"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "경로"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "앱에 내장되어 있어 여기서는 바꿀 수 없습니다."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "플러그인에서 온 것으로 원본은 그쪽에 있습니다. 여기서 수정해도 플러그인이 업데이트될 때까지만 유지됩니다."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "취소"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "지침"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "이 스킬을 불러온 뒤 에이전트가 할 일"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "스킬은 SKILL.md 파일이며, 설명이 작업과 맞을 때 에이전트가 불러옵니다."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "새 스킬"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "설명"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "에이전트가 이 스킬을 써야 할 때"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "에이전트는 설명을 보고 스킬을 불러올지 정합니다"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "스킬 편집"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "이름에는 소문자, 숫자, 하이픈만 쓸 수 있습니다"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "스킬 이름은 비워 둘 수 없습니다"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "이름은 하이픈으로 시작하거나 끝날 수 없습니다"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "이름은 최대 64자여야 합니다"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "이름"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "소문자와-하이픈"
+  },
+  "skillForm.save": {
+    "defaultMessage": "저장"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "저장 중..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "어디에서나"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "어디에 둘까요?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "이 프로젝트에만"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "스킬 추가"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "검색어를 조정해 보세요."
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "곧 출시 예정"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "“{name}”을(를) 삭제할까요?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "디렉터리 전체가 지워집니다: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "스킬을 삭제하지 못했습니다"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "스킬 삭제"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "스킬을 삭제했습니다"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} 편집"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "스킬 로딩 오류"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "일치하는 스킬을 찾을 수 없습니다."
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "스킬은 ~/.config/agents/skills/, .goose/skills/ 또는 기타 지원되는 디렉터리의 SKILL.md 파일에서 로드됩니다."
+    "defaultMessage": "스킬은 SKILL.md 파일입니다. 내 스킬은 ~/.agents/skills 또는 프로젝트 안의 .agents/skills에 있습니다."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "설치된 스킬 없음"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "내장"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "전역"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "플러그인"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "프로젝트"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} 제거"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "스킬을 저장했습니다"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "저장했지만 사용되지 않습니다: “{name}”에는 이미 {path}가 응답합니다"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "스킬 검색..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "가려짐"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "goose 기능을 확장하는 스킬을 확인하세요. {shortcut}로 검색할 수 있습니다."

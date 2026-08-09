@@ -93,17 +93,22 @@ struct Found {
 
 impl Found {
     fn editable(&self) -> bool {
-        self.entry.source_type == SourceType::Skill
+        self.entry.source_type == SourceType::Skill && self.entry.writable
     }
 
     fn origin(&self) -> &'static str {
-        match (
-            self.entry.source_type == SourceType::BuiltinSkill,
-            self.entry.global,
-        ) {
-            (true, _) => "builtin",
-            (false, true) => "global",
-            (false, false) => "project",
+        if self.entry.source_type == SourceType::BuiltinSkill {
+            return "builtin";
+        }
+        // A skill a plugin brought keeps its source of truth in that plugin's
+        // repository, so saying "global" here would invite editing something the
+        // next update overwrites.
+        if !self.entry.writable {
+            return "from a plugin";
+        }
+        match self.entry.global {
+            true => "global",
+            false => "project",
         }
     }
 
@@ -348,7 +353,9 @@ fn create(working_dir: &Path) -> Result<bool> {
 fn edit(found: &[Found], working_dir: &Path) -> Result<bool> {
     let editable: Vec<&Found> = found.iter().filter(|skill| skill.editable()).collect();
     if editable.is_empty() {
-        cliclack::log::warning("Only built-in skills here, and those are read-only")?;
+        cliclack::log::warning(
+            "Nothing here is yours to change: built-in and plugin skills are read-only",
+        )?;
         return Ok(false);
     }
 
@@ -366,7 +373,9 @@ fn edit(found: &[Found], working_dir: &Path) -> Result<bool> {
 fn remove(found: &[Found]) -> Result<usize> {
     let removable: Vec<&Found> = found.iter().filter(|skill| skill.editable()).collect();
     if removable.is_empty() {
-        cliclack::log::warning("Only built-in skills here, and those are read-only")?;
+        cliclack::log::warning(
+            "Nothing here is yours to change: built-in and plugin skills are read-only",
+        )?;
         return Ok(0);
     }
 
@@ -599,7 +608,15 @@ mod tests {
             description: format!("what {name} is for"),
             path: path.to_string(),
             global,
+            writable: true,
             ..Default::default()
+        }
+    }
+
+    fn found(entry: SourceEntry) -> Found {
+        Found {
+            entry,
+            shadowed_by: None,
         }
     }
 
@@ -632,6 +649,28 @@ mod tests {
             summary(&with_shadows(vec![entry("review", "/a/review", false)])),
             "1 skill(s)"
         );
+    }
+
+    /// Editing a plugin's copy is undone by the plugin's next update, and
+    /// removing it deletes a directory inside somebody else's checkout, so
+    /// neither is offered.
+    #[test]
+    fn only_what_we_own_is_offered_for_editing() {
+        let mine = found(entry("review", "/home/.agents/skills/review", true));
+
+        let mut from_plugin = entry("release-notes", "/home/.agents/plugins/kit/skills", true);
+        from_plugin.writable = false;
+
+        let mut builtin = entry("goose-doc-guide", "builtin://skills/goose-doc-guide", true);
+        builtin.source_type = SourceType::BuiltinSkill;
+
+        assert!(mine.editable());
+        assert!(!found(from_plugin.clone()).editable());
+        assert!(!found(builtin.clone()).editable());
+
+        assert_eq!(mine.origin(), "global");
+        assert_eq!(found(from_plugin).origin(), "from a plugin");
+        assert_eq!(found(builtin).origin(), "builtin");
     }
 
     #[test]

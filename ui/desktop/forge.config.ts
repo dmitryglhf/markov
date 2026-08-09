@@ -50,9 +50,40 @@ if (process.env.APPLE_TEAM_ID) {
   };
 }
 
+/**
+ * Packaging renames the app and rewrites Info.plist, which voids the signature
+ * Electron shipped with — `codesign -vv` then reports an invalid bundle. The
+ * fuses plugin re-signs only the executable, and osxSign with an ad-hoc identity
+ * leaves the nested Electron Framework on its old signature, which dyld refuses
+ * to load. Re-sealing the whole bundle inside-out is what actually holds.
+ *
+ * This is not a substitute for notarization: recipients still clear quarantine.
+ */
+const adHocSignBundle = async (
+  _forgeConfig: unknown,
+  options: { outputPaths: string[] }
+): Promise<void> => {
+  if (process.platform !== 'darwin' || process.env.APPLE_TEAM_ID) {
+    return;
+  }
+
+  const { execFileSync } = require('child_process');
+  const { readdirSync } = require('fs');
+  for (const outputPath of options.outputPaths) {
+    for (const entry of readdirSync(outputPath).filter((name: string) => name.endsWith('.app'))) {
+      execFileSync('codesign', ['--force', '--deep', '--sign', '-', resolve(outputPath, entry)], {
+        stdio: 'inherit',
+      });
+    }
+  }
+};
+
 module.exports = {
   packagerConfig: cfg,
   rebuildConfig: {},
+  hooks: {
+    postPackage: adHocSignBundle,
+  },
   publishers: [
     {
       name: '@electron-forge/publisher-github',

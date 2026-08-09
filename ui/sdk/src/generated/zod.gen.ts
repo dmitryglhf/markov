@@ -2080,7 +2080,8 @@ export const zListSourcesRequest_unstable = z.object({
         z.string(),
         z.null()
     ]).optional(),
-    includeProjectSources: z.boolean().optional().default(false)
+    includeProjectSources: z.boolean().optional().default(false),
+    includeShadowed: z.boolean().optional().default(false)
 });
 
 export const zListSourcesResponse_unstable = z.object({

@@ -25,8 +25,11 @@ impl GooseAcpAgent {
         let sources = crate::sources::list_sources_with_roots(
             req.source_type,
             req.project_dir.as_deref(),
-            req.include_project_sources,
-            &self.additional_source_roots,
+            crate::sources::ListSourcesOptions {
+                include_project_sources: req.include_project_sources,
+                include_shadowed: req.include_shadowed,
+                additional_roots: &self.additional_source_roots,
+            },
         )?;
         Ok(ListSourcesResponse { sources })
     }

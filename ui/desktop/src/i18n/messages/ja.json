@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "保存"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "他の場所"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path}（未使用）"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "引数"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "閉じる"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "ファイル"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "未使用"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "この名前には {path} が応答します"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "フォルダを開く"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "由来"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "パス"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "アプリに組み込まれているため、ここでは変更できません。"
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "プラグイン由来で、原本はそちらにあります。ここでの編集はプラグインが更新されるまでしか残りません。"
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "キャンセル"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "指示"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "このスキルを読み込んだ後にエージェントがすべきこと"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "スキルは SKILL.md ファイルで、説明がタスクに合うときにエージェントが読み込みます。"
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "新しいスキル"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "説明"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "エージェントがこのスキルを使うべき場面"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "エージェントは説明を見てスキルを読み込むか決めます"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "スキルを編集"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "名前に使えるのは英小文字・数字・ハイフンだけです"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "スキル名は空にできません"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "名前をハイフンで始めたり終えたりはできません"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "名前は64文字以内にしてください"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "名前"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "小文字とハイフン"
+  },
+  "skillForm.save": {
+    "defaultMessage": "保存"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "保存中..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "どこでも"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "どこに置きますか？"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "このプロジェクトのみ"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "スキルを追加"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "検索条件を変更してみてください"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "近日公開"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "「{name}」を削除しますか？"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "ディレクトリごと削除されます: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "スキルを削除できませんでした"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "スキルを削除"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "スキルを削除しました"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} を編集"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "スキルの読み込みエラー"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "一致するスキルが見つかりません"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "スキルは ~/.config/agents/skills/、.goose/skills/、またはその他の対応ディレクトリ内の SKILL.md ファイルから読み込まれます。"
+    "defaultMessage": "スキルは SKILL.md ファイルです。自分のものは ~/.agents/skills、またはプロジェクト内の .agents/skills にあります。"
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "スキルがインストールされていません"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "組み込み"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "グローバル"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "プラグイン"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "プロジェクト"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} を削除"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "スキルを保存しました"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "保存しましたが使われません: 「{name}」には既に {path} が応答しています"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "スキルを検索..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "隠れている"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Gooseの機能を拡張するインストール済みスキルを表示します。{shortcut}で検索。"

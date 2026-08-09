@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Kaydet"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Ayrıca şurada"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (kullanılmıyor)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argümanlar"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Kapat"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Dosyalar"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Kullanılmıyor"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "Bu ada {path} yanıt veriyor"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Klasörü aç"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Köken"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Yol"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Uygulamanın içinde geldiği için burada değiştirilemez."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Bir eklentiden geldi, aslını o tutuyor. Buradaki düzenleme yalnızca eklentinin bir sonraki güncellemesine kadar kalır."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "İptal"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Yönergeler"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Bu beceri yüklendiğinde ajanın ne yapması gerektiği"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Beceri, açıklaması göreve uyduğunda ajanın yüklediği bir SKILL.md dosyasıdır."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Yeni beceri"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Açıklama"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Ajan bu beceriye ne zaman başvurmalı"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Ajan bir beceriyi yükleyip yüklemeyeceğine açıklamaya bakarak karar verir"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Beceriyi düzenle"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Adlar yalnızca küçük harf, rakam ve kısa çizgi içerebilir"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Beceri adı boş olamaz"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Adlar kısa çizgiyle başlayamaz ve bitemez"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Adlar en fazla 64 karakter olmalıdır"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Ad"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "kucuk-harf-ve-cizgi"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Kaydet"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Kaydediliyor..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Her yerde"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Nerede yaşasın?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Yalnızca bu projede"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Beceri Ekle"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Arama terimlerinizi ayarlamayı deneyin"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Yakında"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "“{name}” silinsin mi?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Bu, dizinin tamamını kaldırır: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Beceri silinemedi"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Beceriyi sil"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Beceri silindi"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} düzenle"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Beceriler Yüklenirken Hata Oluştu"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "Eşleşen beceri bulunamadı"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Beceriler ~/.config/agents/skills/,.goose/skills/ veya desteklenen diğer dizinlerdeki SKILL.md dosyalarından yüklenir."
+    "defaultMessage": "Beceriler SKILL.md dosyalarıdır. Sizinkiler ~/.agents/skills içinde ya da bir projenin .agents/skills dizininde bulunur."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Hiçbir beceri yüklü değil"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "yerleşik"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "genel"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "eklenti"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "proje"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} kaldır"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Beceri kaydedildi"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Kaydedildi ama kullanılmıyor: “{name}” adına zaten {path} yanıt veriyor"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Arama becerileri..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "gölgelenmiş"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Goose yeteneklerini genişleten yüklü becerileri görüntüleyin. Aramak için {shortcut}."

@@ -206,9 +206,7 @@ export const LocalInferenceSettings = () => {
       if (models) {
         setModels(models);
         const downloadedIds = new Set(
-          models
-            .filter((model) => model.status.state === 'Downloaded')
-            .map((model) => model.id)
+          models.filter((model) => model.status.state === 'Downloaded').map((model) => model.id)
         );
         if (downloadedIds.size > 0) {
           setDownloads((prev) => {

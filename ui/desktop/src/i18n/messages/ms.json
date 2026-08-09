@@ -4061,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Simpan"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Juga di"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (tidak digunakan)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argumen"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Tutup"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Fail"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Tidak digunakan"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} yang menjawab nama ini"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Buka folder"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Asal"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Laluan"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Terbina dalam aplikasi, jadi ia tidak boleh diubah di sini."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Datang daripada pemalam, yang menyimpan salinan asal. Suntingan di sini hanya bertahan sehingga pemalam dikemas kini."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Batal"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Arahan"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Apa yang patut ejen lakukan setelah kemahiran ini dimuatkan"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Kemahiran ialah fail SKILL.md yang dimuatkan ejen apabila penerangannya sepadan dengan tugasan."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Kemahiran baharu"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Penerangan"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Bila ejen patut menggunakan kemahiran ini"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Penerangan inilah yang menentukan sama ada ejen memuatkan kemahiran"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Sunting kemahiran"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Nama hanya boleh mengandungi huruf kecil, digit dan sengkang"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Nama kemahiran tidak boleh kosong"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Nama tidak boleh bermula atau berakhir dengan sengkang"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Nama mestilah tidak melebihi 64 aksara"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Nama"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "huruf-kecil-dengan-sengkang"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Simpan"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Menyimpan..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Di mana-mana"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Di mana ia patut disimpan?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Projek ini sahaja"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Tambah Kemahiran"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Cuba laraskan terma carian anda"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Akan datang"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Padam “{name}”?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Ini membuang seluruh direktori: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Gagal memadam kemahiran"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Padam kemahiran"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Kemahiran dipadam"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Sunting {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Ralat Memuatkan Kemahiran"
@@ -4077,13 +4188,37 @@
     "defaultMessage": "Tiada kemahiran sepadan ditemui"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Kemahiran dimuatkan daripada fail SKILL.md dalam ~/.config/agents/skills/, .goose/skills/, atau direktori lain yang disokong."
+    "defaultMessage": "Kemahiran ialah fail SKILL.md. Milik anda berada di ~/.agents/skills, atau di .agents/skills dalam sesebuah projek."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Tiada kemahiran dipasang"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "terbina"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "pemalam"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "projek"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Buang {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Kemahiran disimpan"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Disimpan, tetapi tidak digunakan: {path} sudah menjawab nama “{name}”"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Cari kemahiran..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "terlindung"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Lihat kemahiran terpasang yang meluaskan keupayaan Goose. {shortcut} untuk mencari."
