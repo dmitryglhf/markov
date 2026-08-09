@@ -62,7 +62,10 @@ for pair in desktop:zip cli:tar.gz; do
         "$STAGE/latest/markov-${pair%%:*}-latest-$TARGET.${pair#*:}"
 done
 
+# The installer travels with what it installs: raw files in the repository need
+# a login, the registry does not, so this is the only copy a one-liner can read.
 for channel in "$VERSION" latest; do
+  cp scripts/install.sh "$STAGE/$channel/install.sh"
   (cd "$STAGE/$channel" && shasum -a 256 -- *.zip *.tar.gz > SHA256SUMS)
 done
 
