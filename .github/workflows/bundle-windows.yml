@@ -62,8 +62,8 @@ permissions:
   contents: read
 
 jobs:
-  build-goose-windows:
-    name: Build Goose (Windows)
+  build-markov-windows:
+    name: Build Markov (Windows)
     runs-on: ${{ inputs.windows_variant == 'cuda' && 'windows-2022' || 'windows-latest' }}
     steps:
       - name: Checkout repository
@@ -123,12 +123,12 @@ jobs:
           $isCuda = "${{ inputs.windows_variant }}" -eq "cuda"
 
           if ($isCuda) {
-            cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin goose --features cuda
+            cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov --features cuda
           } else {
-            cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin goose
+            cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov
           }
 
-          $binaryPath = "./target/x86_64-pc-windows-msvc/release/goose.exe"
+          $binaryPath = "./target/x86_64-pc-windows-msvc/release/markov.exe"
           if (-not (Test-Path $binaryPath)) {
             Write-Error "Windows binary not found: $binaryPath"
             Get-ChildItem ./target/x86_64-pc-windows-msvc/release/ -ErrorAction SilentlyContinue
@@ -139,8 +139,8 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: internal-goose-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-          path: target/x86_64-pc-windows-msvc/release/goose.exe
+          name: internal-markov-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          path: target/x86_64-pc-windows-msvc/release/markov.exe
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -148,13 +148,13 @@ jobs:
   package-cli-windows:
     name: Package CLI (Windows)
     if: ${{ inputs.package_cli }}
-    needs: build-goose-windows
+    needs: build-markov-windows
     runs-on: ${{ inputs.windows_variant == 'cuda' && 'windows-2022' || 'windows-latest' }}
     steps:
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-goose-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-markov-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
           path: package
 
       - name: Package CLI
@@ -162,22 +162,22 @@ jobs:
         env:
           VARIANT_SUFFIX: ${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
         run: |
-          mkdir -p goose-package
-          cp package/goose.exe goose-package/
-          7z a -tzip "goose-x86_64-pc-windows-msvc${VARIANT_SUFFIX}.zip" goose-package/
+          mkdir -p markov-package
+          cp package/markov.exe markov-package/
+          7z a -tzip "markov-cli-x86_64-pc-windows-msvc${VARIANT_SUFFIX}.zip" markov-package/
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: goose-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-          path: goose-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}.zip
+          name: markov-cli-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          path: markov-cli-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}.zip
           if-no-files-found: error
           overwrite: true
 
   build-desktop-windows:
     name: Build Desktop (Windows)
     if: ${{ inputs.package_desktop }}
-    needs: build-goose-windows
+    needs: build-markov-windows
     runs-on: ${{ inputs.windows_variant == 'cuda' && 'windows-2022' || 'windows-latest' }}
     steps:
       - name: Checkout repository
@@ -216,7 +216,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-goose-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-markov-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
           path: backend
 
       - name: Prepare Windows binary
