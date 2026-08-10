@@ -173,6 +173,7 @@ jobs:
         with:
           tag: canary
           name: Canary
+          prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
             markov-cli-*.tar.gz

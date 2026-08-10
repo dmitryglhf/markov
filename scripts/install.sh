@@ -4,7 +4,7 @@ set -euo pipefail
 ##############################################################################
 # Markov installer.
 #
-#   curl -fsSL https://github.com/dmitryglhf/markov/releases/latest/download/install.sh | bash
+#   curl -fsSL https://github.com/dmitryglhf/markov/releases/download/stable/install.sh | bash
 #   curl -fsSL <same url> | bash -s -- --cli-only
 #   curl -fsSL <same url> | bash -s -- --uninstall
 #
@@ -16,7 +16,8 @@ set -euo pipefail
 # Installs into the user's own home, so no administrator rights are needed.
 #
 # Environment:
-#   MARKOV_VERSION          version to install, e.g. 1.45.0 (default: latest)
+#   MARKOV_VERSION          exact version to install, e.g. 1.45.0
+#   MARKOV_CHANNEL          stable|canary (default: stable)
 #   MARKOV_REPO             GitHub repository releases are read from
 #   MARKOV_BASE_URL         full release asset base, overrides the two above
 #   MARKOV_APP_DIR          where Markov.app goes (default: ~/Applications)
@@ -26,7 +27,8 @@ set -euo pipefail
 #   MARKOV_WINDOWS_VARIANT  standard|cuda
 ##############################################################################
 
-VERSION="${MARKOV_VERSION:-latest}"
+VERSION="${MARKOV_VERSION:-}"
+CHANNEL="${MARKOV_CHANNEL:-stable}"
 REPO="${MARKOV_REPO:-dmitryglhf/markov}"
 APP_DIR="${MARKOV_APP_DIR:-$HOME/Applications}"
 
@@ -45,7 +47,7 @@ Markov installer.
   install.sh --cli-only   CLI only, no desktop app
   install.sh --uninstall  remove the app and the CLI, keep settings
 
-Environment: MARKOV_VERSION, MARKOV_REPO, MARKOV_BASE_URL, MARKOV_APP_DIR,
+Environment: MARKOV_VERSION, MARKOV_CHANNEL, MARKOV_REPO, MARKOV_BASE_URL, MARKOV_APP_DIR,
 MARKOV_INSTALL_DIR, MARKOV_OS, MARKOV_LINUX_VARIANT, MARKOV_WINDOWS_VARIANT
 USAGE
       exit 0
@@ -185,14 +187,23 @@ case "$OS" in
     ;;
 esac
 
-# Release assets carry no version in their names, which is what lets GitHub
-# serve the newest release under a fixed `latest` URL.
+case "$CHANNEL" in
+  stable|canary) ;;
+  *) die "unsupported MARKOV_CHANNEL '$CHANNEL' (stable|canary)" ;;
+esac
+
+# Assets carry no version in their names, so a moving tag serves the current
+# build. The channel is named outright rather than resolved through GitHub's
+# "latest", which the canary release would otherwise claim on every push.
 if [ -n "${MARKOV_BASE_URL:-}" ]; then
   BASE_URL="$MARKOV_BASE_URL"
-elif [ "$VERSION" = "latest" ]; then
-  BASE_URL="https://github.com/$REPO/releases/latest/download"
-else
+  LABEL="$CHANNEL"
+elif [ -n "$VERSION" ]; then
   BASE_URL="https://github.com/$REPO/releases/download/v${VERSION#v}"
+  LABEL="${VERSION#v}"
+else
+  BASE_URL="https://github.com/$REPO/releases/download/$CHANNEL"
+  LABEL="$CHANNEL"
 fi
 
 ##############################################################################
@@ -226,9 +237,9 @@ verify() {
     die "checksum mismatch — the download is not what the release published"
 }
 
-echo "Installing Markov $VERSION ($TARGET)"
+echo "Installing Markov $LABEL ($TARGET)"
 curl -fsSL "$BASE_URL/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS" ||
-  die "no release '$VERSION' at $BASE_URL"
+  die "no release '$LABEL' at $BASE_URL"
 
 if $CLI_ONLY; then
   fetch "$CLI_ARCHIVE"
@@ -283,7 +294,7 @@ else
   mv "$WORK_DIR/unpacked/$APP_NAME" "$APP_PATH"
   ln -sfn "$BUNDLED_BINARY" "$LINK_PATH"
 
-  installed="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "$VERSION")"
+  installed="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist" 2>/dev/null || echo "$LABEL")"
   echo
   echo "Markov $installed installed."
   echo "  app: $APP_PATH"

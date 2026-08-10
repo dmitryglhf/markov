@@ -10,9 +10,9 @@ set -euo pipefail
 # Expects a desktop bundle and a release CLI to exist already:
 #   just make-ui
 #
-# Assets carry no version in their names: that is what lets GitHub serve the
-# newest release under a fixed /releases/latest/download/ URL, which is the
-# address scripts/install.sh reads.
+# Assets carry no version in their names, so a moving tag can serve the current
+# build. Everything is published twice: under the version tag and under
+# `stable`, which is the channel scripts/install.sh reads.
 #
 # Authentication comes from `gh auth login` (or GH_TOKEN in the environment).
 #
@@ -85,21 +85,31 @@ gh api "repos/$REPO/commits/$COMMIT" --jq .sha >/dev/null 2>&1 ||
 # find an archive that has not landed yet.
 ASSETS=("$STAGE/markov-desktop-$TARGET.zip" "$STAGE/markov-cli-$TARGET.tar.gz" "$STAGE/install.sh")
 
+publish_release() {
+  tag="$1"
+  title="$2"
+  printf '  %-22s ' "$tag"
+  if gh release view "$tag" --repo "$REPO" >/dev/null 2>&1; then
+    gh release edit "$tag" --repo "$REPO" --target "$COMMIT" >/dev/null
+    gh release upload "$tag" --repo "$REPO" --clobber "${ASSETS[@]}" >/dev/null
+    gh release upload "$tag" --repo "$REPO" --clobber "$STAGE/SHA256SUMS" >/dev/null
+  else
+    # Drafted first so the release becomes visible only once every asset is up.
+    gh release create "$tag" --repo "$REPO" --target "$COMMIT" --draft \
+      --title "$title" --notes "$title" >/dev/null
+    gh release upload "$tag" --repo "$REPO" "${ASSETS[@]}" "$STAGE/SHA256SUMS" >/dev/null
+    gh release edit "$tag" --repo "$REPO" --draft=false >/dev/null
+  fi
+  echo "ok"
+}
+
 echo
-if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-  echo "Updating existing release $TAG"
-  gh release upload "$TAG" --repo "$REPO" --clobber "${ASSETS[@]}"
-  gh release upload "$TAG" --repo "$REPO" --clobber "$STAGE/SHA256SUMS"
-else
-  echo "Creating release $TAG"
-  # Drafted first so the release becomes visible only once every asset is up.
-  gh release create "$TAG" --repo "$REPO" --target "$COMMIT" --draft \
-    --title "Markov $VERSION" --notes "Markov $VERSION"
-  gh release upload "$TAG" --repo "$REPO" "${ASSETS[@]}" "$STAGE/SHA256SUMS"
-  gh release edit "$TAG" --repo "$REPO" --draft=false --latest
-fi
+publish_release "$TAG" "Markov $VERSION"
+# The installer reads the `stable` channel, so a publish that skipped it would
+# be invisible to the one-liner.
+publish_release stable "Stable"
 
 echo
 echo "Published $TAG"
 echo "  https://github.com/$REPO/releases/tag/$TAG"
-echo "  curl -fsSL https://github.com/$REPO/releases/latest/download/install.sh | bash"
+echo "  curl -fsSL https://github.com/$REPO/releases/download/stable/install.sh | bash"
