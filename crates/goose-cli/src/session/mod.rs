@@ -1042,6 +1042,7 @@ impl CliSession {
         }
 
         let new_model_config = build_switched_model_config(
+            Config::global(),
             target_provider_name,
             target_model_name,
             &current_model_config,
@@ -2617,11 +2618,12 @@ fn format_elapsed_time(duration: std::time::Duration) -> String {
 }
 
 fn build_switched_model_config(
+    config: &Config,
     provider_name: &str,
     model_name: &str,
     current_model_config: &goose_providers::model::ModelConfig,
 ) -> Result<goose_providers::model::ModelConfig> {
-    goose::model_config::model_config_from_user_config(provider_name, model_name)
+    goose::model_config::model_config_from_user_config_with(config, provider_name, model_name)
         .map(|config| {
             config
                 .with_temperature(current_model_config.temperature)
@@ -2639,6 +2641,14 @@ mod tests {
     use std::collections::HashMap;
     use std::time::Duration;
     use test_case::test_case;
+
+    /// Model resolution reads a configuration file, and a test that read the
+    /// developer's own would depend on whatever they happened to have set.
+    fn empty_config() -> (tempfile::TempDir, Config) {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config::new(dir.path().join("config.yaml"), "markov-test").unwrap();
+        (dir, config)
+    }
 
     #[test]
     fn fetched_models_are_appended_after_the_known_ones() {
@@ -2858,8 +2868,10 @@ mod tests {
             request_headers: None,
         };
 
+        let (_config_dir, config) = empty_config();
         let switched =
-            build_switched_model_config("openai", "gpt-5.4", &current_model_config).unwrap();
+            build_switched_model_config(&config, "openai", "gpt-5.4", &current_model_config)
+                .unwrap();
         let expected = goose_providers::model::ModelConfig::new("gpt-5.4")
             .with_canonical_limits("openai")
             .with_temperature(Some(0.25))
@@ -2895,7 +2907,8 @@ mod tests {
             Some(goose_providers::thinking::ThinkingEffort::High)
         );
 
-        let switched = build_switched_model_config("openai", "gpt-5.4", &current).unwrap();
+        let (_config_dir, config) = empty_config();
+        let switched = build_switched_model_config(&config, "openai", "gpt-5.4", &current).unwrap();
 
         assert_eq!(switched.model_name, current.model_name);
         assert_ne!(switched.thinking_effort(), current.thinking_effort());
