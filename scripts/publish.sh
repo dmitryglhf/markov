@@ -2,30 +2,29 @@
 set -euo pipefail
 
 ##############################################################################
-# Packages the built macOS artifacts and uploads them to the GitLab generic
-# package registry, under both the version and the `latest` channel.
+# Packages the built macOS artifacts and publishes them as a GitHub release.
 #
-#   scripts/publish.sh              package and upload
+#   scripts/publish.sh              package and publish
 #   scripts/publish.sh --dry-run    package only, print what would be uploaded
 #
 # Expects a desktop bundle and a release CLI to exist already:
 #   just make-ui
 #
-# Token: GITLAB_TOKEN_WRITE, from the environment or from .env at the repo
-# root. It is passed through a curl config file rather than a command line
-# argument, which would show up in `ps` for every user on the machine.
+# Assets carry no version in their names: that is what lets GitHub serve the
+# newest release under a fixed /releases/latest/download/ URL, which is the
+# address scripts/install.sh reads.
+#
+# Authentication comes from `gh auth login` (or GH_TOKEN in the environment).
 #
 # Environment:
-#   GITLAB_TOKEN_WRITE  token with the `api` scope
-#   MARKOV_VERSION      version to publish (default: ui/desktop/package.json)
-#   MARKOV_REGISTRY     package registry base
+#   MARKOV_VERSION  version to publish (default: ui/desktop/package.json)
+#   MARKOV_REPO     GitHub repository to publish to
 ##############################################################################
 
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 
-REGISTRY="${MARKOV_REGISTRY:-https://git.postgrespro.ru/api/v4/projects/askpostgres%2Fmarkov/packages/generic/markov}"
-TARGET="aarch64-apple-darwin"
+REPO="${MARKOV_REPO:-dmitryglhf/markov}"
 STAGE="ui/desktop/out/release"
 
 DRY_RUN=false
@@ -36,68 +35,71 @@ die() {
   exit 1
 }
 
+command -v gh >/dev/null 2>&1 || die "the GitHub CLI is required: brew install gh"
+
 VERSION="${MARKOV_VERSION:-$(sed -n 's/^  "version": "\(.*\)",$/\1/p' ui/desktop/package.json)}"
 [ -n "$VERSION" ] || die "could not read a version from ui/desktop/package.json"
+TAG="v${VERSION#v}"
 
 # An artifact nobody can rebuild is not worth publishing.
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
-COMMIT="$(git rev-parse --short HEAD)"
+COMMIT="$(git rev-parse HEAD)"
 
-DESKTOP_BUILT="ui/desktop/out/make/zip/darwin/arm64/Markov-darwin-arm64-$VERSION.zip"
+case "$(uname -m)" in
+  arm64) TARGET="aarch64-apple-darwin"; FORGE_ARCH="arm64" ;;
+  x86_64) TARGET="x86_64-apple-darwin"; FORGE_ARCH="x64" ;;
+  *) die "no packaging for $(uname -m)" ;;
+esac
+
+DESKTOP_BUILT="ui/desktop/out/make/zip/darwin/$FORGE_ARCH/Markov-darwin-$FORGE_ARCH-$VERSION.zip"
 CLI_BUILT="target/release/markov"
 [ -f "$DESKTOP_BUILT" ] || die "no desktop bundle at $DESKTOP_BUILT — run: just make-ui"
 [ -f "$CLI_BUILT" ] || die "no CLI at $CLI_BUILT — run: just release-binary"
 
-echo "Packaging Markov $VERSION from $COMMIT"
+echo "Packaging Markov $VERSION from $(git rev-parse --short HEAD) ($TARGET)"
 
 rm -rf "$STAGE"
-mkdir -p "$STAGE/$VERSION" "$STAGE/latest"
-ln -f "$DESKTOP_BUILT" "$STAGE/$VERSION/markov-desktop-$VERSION-$TARGET.zip"
-tar -czf "$STAGE/$VERSION/markov-cli-$VERSION-$TARGET.tar.gz" -C "$(dirname "$CLI_BUILT")" markov
+mkdir -p "$STAGE"
+ln -f "$DESKTOP_BUILT" "$STAGE/markov-desktop-$TARGET.zip"
+# gzip stamps the current time into its header unless told not to, which would
+# give the same binary a different checksum on every packaging run.
+tar -cf - -C "$(dirname "$CLI_BUILT")" markov | gzip -n > "$STAGE/markov-cli-$TARGET.tar.gz"
 
-# `latest` is the same bytes under another name: hard links keep one copy on
-# disk and save compressing the CLI a second time.
-for pair in desktop:zip cli:tar.gz; do
-  ln -f "$STAGE/$VERSION/markov-${pair%%:*}-$VERSION-$TARGET.${pair#*:}" \
-        "$STAGE/latest/markov-${pair%%:*}-latest-$TARGET.${pair#*:}"
-done
-
-# The installer travels with what it installs: raw files in the repository need
-# a login, the registry does not, so this is the only copy a one-liner can read.
-for channel in "$VERSION" latest; do
-  cp scripts/install.sh "$STAGE/$channel/install.sh"
-  (cd "$STAGE/$channel" && shasum -a 256 -- *.zip *.tar.gz > SHA256SUMS)
-done
+# The installer travels with what it installs, so the one-liner needs no
+# checkout and no credentials.
+cp scripts/install.sh "$STAGE/install.sh"
+(cd "$STAGE" && shasum -a 256 -- *.zip *.tar.gz > SHA256SUMS)
 
 if $DRY_RUN; then
   echo
-  echo "Would upload to $REGISTRY:"
-  (cd "$STAGE" && find . -type f | sed 's|^\./|  |' | sort)
+  echo "Would publish $TAG to $REPO:"
+  (cd "$STAGE" && ls -1 | sed 's/^/  /')
   exit 0
 fi
 
-TOKEN="${GITLAB_TOKEN_WRITE:-}"
-if [ -z "$TOKEN" ] && [ -f .env ]; then
-  TOKEN="$(sed -n 's/^GITLAB_TOKEN_WRITE=//p' .env | tail -1 | tr -d "\"'")"
+# A tag can only point at a commit GitHub already has.
+gh api "repos/$REPO/commits/$COMMIT" --jq .sha >/dev/null 2>&1 ||
+  die "$REPO does not have $COMMIT — push it first"
+
+# Assets first and sums last: a reader that already has SHA256SUMS must never
+# find an archive that has not landed yet.
+ASSETS=("$STAGE/markov-desktop-$TARGET.zip" "$STAGE/markov-cli-$TARGET.tar.gz" "$STAGE/install.sh")
+
+echo
+if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+  echo "Updating existing release $TAG"
+  gh release upload "$TAG" --repo "$REPO" --clobber "${ASSETS[@]}"
+  gh release upload "$TAG" --repo "$REPO" --clobber "$STAGE/SHA256SUMS"
+else
+  echo "Creating release $TAG"
+  # Drafted first so the release becomes visible only once every asset is up.
+  gh release create "$TAG" --repo "$REPO" --target "$COMMIT" --draft \
+    --title "Markov $VERSION" --notes "Markov $VERSION"
+  gh release upload "$TAG" --repo "$REPO" "${ASSETS[@]}" "$STAGE/SHA256SUMS"
+  gh release edit "$TAG" --repo "$REPO" --draft=false --latest
 fi
-[ -n "$TOKEN" ] || die "GITLAB_TOKEN_WRITE is not set and .env does not carry it"
-
-CURL_CONFIG="$(mktemp)"
-chmod 600 "$CURL_CONFIG"
-trap 'rm -f "$CURL_CONFIG"' EXIT
-printf 'header = "PRIVATE-TOKEN: %s"\n' "$TOKEN" > "$CURL_CONFIG"
 
 echo
-for channel in "$VERSION" latest; do
-  for file in "$STAGE/$channel"/*; do
-    name="$(basename "$file")"
-    printf '  %-52s ' "$channel/$name"
-    curl --config "$CURL_CONFIG" --fail --silent --show-error \
-      --upload-file "$file" "$REGISTRY/$channel/$name" >/dev/null
-    echo "ok"
-  done
-done
-
-echo
-echo "Published $VERSION ($COMMIT)"
-echo "  https://git.postgrespro.ru/askpostgres/markov/-/packages"
+echo "Published $TAG"
+echo "  https://github.com/$REPO/releases/tag/$TAG"
+echo "  curl -fsSL https://github.com/$REPO/releases/latest/download/install.sh | bash"

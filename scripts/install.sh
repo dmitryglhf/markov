@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ##############################################################################
-# Markov installer for macOS (Apple Silicon).
+# Markov installer for macOS.
 #
-#   curl -fsSL <registry>/install.sh | bash
-#   curl -fsSL <registry>/install.sh | bash -s -- --uninstall
+#   curl -fsSL https://github.com/dmitryglhf/markov/releases/latest/download/install.sh | bash
+#   curl -fsSL https://github.com/dmitryglhf/markov/releases/latest/download/install.sh | bash -s -- --uninstall
 #
 # Installs into the user's own home, so no administrator rights are needed:
 # the app lands in ~/Applications and `markov` becomes a symlink into the
@@ -13,13 +13,14 @@ set -euo pipefail
 #
 # Environment:
 #   MARKOV_VERSION      version to install, e.g. 1.45.0 (default: latest)
-#   MARKOV_BASE_URL     package registry base
+#   MARKOV_REPO         GitHub repository releases are read from
+#   MARKOV_BASE_URL     full release asset base, overrides the two above
 #   MARKOV_APP_DIR      where Markov.app goes (default: ~/Applications)
 #   MARKOV_INSTALL_DIR  where the `markov` symlink goes (default: ~/.local/bin)
 ##############################################################################
 
 VERSION="${MARKOV_VERSION:-latest}"
-BASE_URL="${MARKOV_BASE_URL:-https://git.postgrespro.ru/api/v4/projects/askpostgres%2Fmarkov/packages/generic/markov}"
+REPO="${MARKOV_REPO:-dmitryglhf/markov}"
 APP_DIR="${MARKOV_APP_DIR:-$HOME/Applications}"
 INSTALL_DIR="${MARKOV_INSTALL_DIR:-$HOME/.local/bin}"
 
@@ -61,7 +62,6 @@ if [ "${1:-}" = "--uninstall" ]; then
 fi
 
 [ "$(uname -s)" = "Darwin" ] || die "this installer is for macOS"
-[ "$(uname -m)" = "arm64" ] || die "no build for $(uname -m) yet — Apple Silicon only"
 
 for tool in curl shasum ditto; do
   command -v "$tool" >/dev/null 2>&1 || die "'$tool' is required"
@@ -69,28 +69,50 @@ done
 
 running_instance && die "Markov is running — quit it first, then run this again"
 
-TARGET="aarch64-apple-darwin"
-ARCHIVE="markov-desktop-$VERSION-$TARGET.zip"
+ARCH="$(uname -m)"
+# Under Rosetta `uname -m` answers for the translated process, not the machine,
+# and would install the slower build on an Apple Silicon Mac.
+if [ "$ARCH" = "x86_64" ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = "1" ]; then
+  ARCH="arm64"
+fi
+
+case "$ARCH" in
+  arm64) TARGET="aarch64-apple-darwin" ;;
+  x86_64) TARGET="x86_64-apple-darwin" ;;
+  *) die "no build for $ARCH" ;;
+esac
+
+# Release assets carry no version in their names, which is what lets GitHub
+# serve the newest release under a fixed `latest` URL.
+if [ -n "${MARKOV_BASE_URL:-}" ]; then
+  BASE_URL="$MARKOV_BASE_URL"
+elif [ "$VERSION" = "latest" ]; then
+  BASE_URL="https://github.com/$REPO/releases/latest/download"
+else
+  BASE_URL="https://github.com/$REPO/releases/download/v${VERSION#v}"
+fi
+
+ARCHIVE="markov-desktop-$TARGET.zip"
 
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-echo "Downloading Markov $VERSION..."
-curl -fsSL "$BASE_URL/$VERSION/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS" ||
-  die "no SHA256SUMS for version '$VERSION' at $BASE_URL"
-curl -fSL --progress-bar "$BASE_URL/$VERSION/$ARCHIVE" -o "$WORK_DIR/$ARCHIVE" ||
+echo "Downloading Markov $VERSION ($TARGET)..."
+curl -fsSL "$BASE_URL/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS" ||
+  die "no release '$VERSION' at $BASE_URL"
+curl -fSL --progress-bar "$BASE_URL/$ARCHIVE" -o "$WORK_DIR/$ARCHIVE" ||
   die "could not download $ARCHIVE"
 
 echo "Verifying..."
 (cd "$WORK_DIR" && grep " $ARCHIVE\$" SHA256SUMS | shasum -a 256 -c -) ||
-  die "checksum mismatch — the download is not what the registry published"
+  die "checksum mismatch — the download is not what the release published"
 
 ditto -x -k "$WORK_DIR/$ARCHIVE" "$WORK_DIR/unpacked"
 [ -d "$WORK_DIR/unpacked/$APP_NAME" ] || die "$ARCHIVE does not contain $APP_NAME"
 
 # Harmless after a curl download, which sets no quarantine; it matters when the
-# archive reached this machine some other way, because the app is signed ad-hoc
-# and Gatekeeper refuses those.
+# archive reached this machine some other way, because an unnotarized app is
+# something Gatekeeper refuses.
 xattr -dr com.apple.quarantine "$WORK_DIR/unpacked/$APP_NAME" 2>/dev/null || true
 
 mkdir -p "$APP_DIR" "$INSTALL_DIR"
