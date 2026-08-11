@@ -10,7 +10,8 @@ set -euo pipefail
 #
 # macOS gets the desktop app in ~/Applications plus a `markov` symlink into the
 # bundle, which keeps the CLI and the app on one version. Linux and Windows get
-# the CLI on its own. Everything is checked against SHA256SUMS before it is
+# the CLI on its own; on Windows install.ps1 is the supported route and the one
+# that installs the app. Everything is checked against SHA256SUMS before it is
 # unpacked.
 #
 # Installs into the user's own home, so no administrator rights are needed.
@@ -299,6 +300,12 @@ else
   echo "Markov $installed installed."
   echo "  app: $APP_PATH"
   echo "  cli: $LINK_PATH -> $BUNDLED_BINARY"
+fi
+
+if [ "$OS" = "windows" ]; then
+  echo
+  echo "For the desktop app, use install.ps1 from PowerShell:"
+  echo "  irm $BASE_URL/install.ps1 | iex"
 fi
 
 case ":$PATH:" in

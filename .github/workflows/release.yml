@@ -41,6 +41,10 @@ jobs:
         with:
           name: install.sh
           path: scripts/install.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: install.ps1
+          path: scripts/install.ps1
 
   # ------------------------------------------------------------
   # 3) Bundle CLI and Desktop (macOS ARM64)
@@ -53,7 +57,9 @@ jobs:
       target: aarch64-apple-darwin
       package_cli: true
       package_desktop: true
-      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      # Signing certificates are optional: without the variable a tag builds
+      # exactly what canary already proves, instead of failing on empty secrets.
+      signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_APPLE_SIGNING == 'true' }}
 
   # ------------------------------------------------------------
   # 4) Bundle CLI and Desktop (macOS x64)
@@ -66,7 +72,7 @@ jobs:
       target: x86_64-apple-darwin
       package_cli: true
       package_desktop: true
-      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_APPLE_SIGNING == 'true' }}
 
   # ------------------------------------------------------------
   # 5) Bundle Desktop App (Linux)
@@ -85,7 +91,7 @@ jobs:
     with:
       package_cli: true
       package_desktop: true
-      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_WINDOWS_SIGNING == 'true' }}
 
   bundle-windows-cuda:
     uses: ./.github/workflows/bundle-windows.yml
@@ -95,7 +101,7 @@ jobs:
     with:
       package_cli: true
       package_desktop: true
-      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_WINDOWS_SIGNING == 'true' }}
       windows_variant: cuda
 
   # ------------------------------------
@@ -134,7 +140,7 @@ jobs:
       - name: Generate checksums
         run: |
           shopt -s nullglob
-          files=(markov-cli-*.tar.gz markov-desktop-*.zip *.deb *.rpm *.flatpak)
+          files=(markov-cli-*.tar.gz markov-cli-*.zip markov-desktop-*.zip *.deb *.rpm *.flatpak)
           [ ${#files[@]} -gt 0 ] || { echo "no artifacts to publish"; exit 1; }
           shasum -a 256 -- "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
@@ -144,11 +150,13 @@ jobs:
         with:
           subject-path: |
             markov-cli-*.tar.gz
+            markov-cli-*.zip
             markov-desktop-*.zip
             *.deb
             *.rpm
             *.flatpak
             install.sh
+            install.ps1
             SHA256SUMS
 
       # Create/update the versioned release
@@ -158,11 +166,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
             markov-cli-*.tar.gz
+            markov-cli-*.zip
             markov-desktop-*.zip
             *.deb
             *.rpm
             *.flatpak
             install.sh
+            install.ps1
             SHA256SUMS
           allowUpdates: true
           omitBody: true
@@ -177,11 +187,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
             markov-cli-*.tar.gz
+            markov-cli-*.zip
             markov-desktop-*.zip
             *.deb
             *.rpm
             *.flatpak
             install.sh
+            install.ps1
             SHA256SUMS
           allowUpdates: true
           omitBody: true
