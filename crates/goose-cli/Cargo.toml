@@ -84,7 +84,6 @@ default = [
     "tui",
     "aws-providers",
     "telemetry",
-    "nostr",
     "otel",
     "rustls-tls",
     "update",
