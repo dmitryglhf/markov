@@ -212,6 +212,16 @@ fi
 ##############################################################################
 
 command -v curl >/dev/null 2>&1 || die "'curl' is required"
+
+# Plain --retry covers timeouts and 5xx, but not a stream that breaks mid-transfer,
+# which is how a two-hundred-megabyte download usually dies. --retry-all-errors does
+# cover it, and exists since curl 7.71, so it is added only where it is understood —
+# and only for the archives, because it would also sit retrying the 404 that tells
+# us a release is simply not there.
+RETRY=(--retry 3 --retry-delay 2)
+RETRY_ARCHIVE=("${RETRY[@]}")
+curl --retry-all-errors --version >/dev/null 2>&1 && RETRY_ARCHIVE+=(--retry-all-errors)
+
 if command -v shasum >/dev/null 2>&1; then
   SUM_CMD="shasum -a 256"
 elif command -v sha256sum >/dev/null 2>&1; then
@@ -226,7 +236,8 @@ WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 fetch() {
-  curl -fSL --progress-bar "$BASE_URL/$1" -o "$WORK_DIR/$1" || die "could not download $1"
+  curl -fSL "${RETRY_ARCHIVE[@]}" --progress-bar "$BASE_URL/$1" -o "$WORK_DIR/$1" ||
+    die "could not download $1"
 }
 
 verify() {
@@ -239,7 +250,7 @@ verify() {
 }
 
 echo "Installing Markov $LABEL ($TARGET)"
-curl -fsSL "$BASE_URL/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS" ||
+curl -fsSL "${RETRY[@]}" "$BASE_URL/SHA256SUMS" -o "$WORK_DIR/SHA256SUMS" ||
   die "no release '$LABEL' at $BASE_URL"
 
 if $CLI_ONLY; then

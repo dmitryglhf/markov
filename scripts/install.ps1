@@ -86,6 +86,25 @@ $shortcut   = Join-Path ([Environment]::GetFolderPath('Programs')) 'Markov.lnk'
 $cliArchive = "markov-cli-$target.zip"
 $appArchive = "markov-desktop-$target.zip"
 
+function Get-WithRetry([string]$uri, [string]$outFile) {
+    # Invoke-WebRequest learned -MaximumRetryCount only in PowerShell 6, and a stock
+    # Windows still runs 5.1.
+    for ($attempt = 1; $true; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $uri -OutFile $outFile -UseBasicParsing
+            return
+        } catch {
+            # A file that is not there stays not there; only a broken transfer is
+            # worth repeating.
+            $code = $_.Exception.Response.StatusCode
+            if ($attempt -ge 3 -or ($code -and [int]$code -ge 400 -and [int]$code -lt 500)) {
+                throw
+            }
+            Start-Sleep -Seconds 2
+        }
+    }
+}
+
 function Assert-NotRunning {
     # A running app holds Markov.exe open, so an overwrite would fail halfway.
     if (Get-Process -Name 'Markov' -ErrorAction SilentlyContinue) {
@@ -164,7 +183,7 @@ try {
 
     $sums = Join-Path $workDir 'SHA256SUMS'
     try {
-        Invoke-WebRequest -Uri "$baseUrl/SHA256SUMS" -OutFile $sums -UseBasicParsing
+        Get-WithRetry "$baseUrl/SHA256SUMS" $sums
     } catch {
         throw "no release '$label' at $baseUrl"
     }
@@ -174,7 +193,7 @@ try {
 
     Write-Host "Downloading $archive..."
     try {
-        Invoke-WebRequest -Uri "$baseUrl/$archive" -OutFile $archivePath -UseBasicParsing
+        Get-WithRetry "$baseUrl/$archive" $archivePath
     } catch {
         throw "could not download $archive"
     }
