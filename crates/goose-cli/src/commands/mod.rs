@@ -2,6 +2,7 @@ pub mod configure;
 pub mod doctor;
 pub mod extensions;
 pub mod gateway;
+pub mod ide;
 pub mod info;
 pub mod mcp_manager;
 pub mod mcp_registry;

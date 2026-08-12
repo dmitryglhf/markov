@@ -15,6 +15,8 @@ use goose_mcp::{AutoVisualiserRouter, ComputerControllerServer, MemoryServer, Tu
 #[cfg(feature = "telemetry")]
 use crate::commands::configure::configure_telemetry_consent_dialog;
 use crate::commands::configure::handle_configure;
+use crate::commands::ide::manager::ide_dialog;
+use crate::commands::ide::{handle_ide_remove, handle_ide_setup, SetupOptions, TargetSelector};
 use crate::commands::info::handle_info;
 use crate::commands::plugin::{handle_plugin_install, handle_plugin_update};
 use crate::commands::project::{handle_project_default, handle_projects_interactive};
@@ -1102,6 +1104,31 @@ enum Command {
         reconfigure: bool,
     },
 
+    /// Register markov as an ACP agent in your IDE
+    #[command(
+        about = "Connect markov to your IDE",
+        long_about = "Registers markov as an ACP agent in Zed, JetBrains IDEs and VS Code.\n\n\
+                      Usage:\n  \
+                        markov ide                what is installed and what is already set up\n  \
+                        markov ide setup          configure every IDE that is installed\n  \
+                        markov ide setup zed      configure one of them\n  \
+                        markov ide setup --print  show the snippet instead of writing it\n  \
+                        markov ide remove         take our entry back out"
+    )]
+    Ide {
+        #[command(subcommand)]
+        command: Option<IdeCommand>,
+
+        /// Name the entry appears under in the IDE
+        #[arg(
+            long,
+            global = true,
+            default_value = "markov",
+            help = "Name the entry appears under in the IDE"
+        )]
+        name: String,
+    },
+
     /// Terminal-integrated session (one session per terminal)
     #[command(
         about = "Terminal-integrated markov session",
@@ -1304,6 +1331,46 @@ enum LocalModelsCommand {
 }
 
 #[derive(Subcommand)]
+enum IdeCommand {
+    /// Write the agent entry into an IDE's settings
+    #[command(
+        about = "Write the agent entry into an IDE's settings",
+        long_about = "Adds markov to the IDE's list of ACP agents.\n\n\
+                      Existing settings are preserved, comments and all, and running\n\
+                      this again only updates our own entry."
+    )]
+    Setup {
+        /// Which IDE to configure
+        #[arg(value_enum, default_value = "all")]
+        target: TargetSelector,
+
+        /// Binary the IDE should launch, when it is not where install.sh puts it
+        #[arg(long, help = "Binary the IDE should launch")]
+        command: Option<PathBuf>,
+
+        /// Print the snippet and the file it belongs in, change nothing
+        #[arg(long, help = "Print the snippet instead of writing it")]
+        print: bool,
+
+        /// Report what would change without touching anything
+        #[arg(long = "dry-run", help = "Report what would change, write nothing")]
+        dry_run: bool,
+
+        /// Install the VS Code extension from a file instead of the marketplace
+        #[arg(long, help = "Install the VS Code extension from a .vsix")]
+        vsix: Option<PathBuf>,
+    },
+
+    /// Remove our entry from an IDE's settings
+    #[command(about = "Remove our entry from an IDE's settings")]
+    Remove {
+        /// Which IDE to clean up
+        #[arg(value_enum, default_value = "all")]
+        target: TargetSelector,
+    },
+}
+
+#[derive(Subcommand)]
 enum TermCommand {
     /// Print shell initialization script
     #[command(
@@ -1429,6 +1496,7 @@ fn get_command_name(command: &Option<Command>) -> &'static str {
         Some(Command::Recipe { .. }) => "recipe",
         Some(Command::Skills { .. }) => "skills",
         Some(Command::Plugin { .. }) => "plugin",
+        Some(Command::Ide { .. }) => "ide",
         Some(Command::Term { .. }) => "term",
         #[cfg(feature = "tui")]
         Some(Command::Tui { .. }) => "tui",
@@ -2473,6 +2541,26 @@ pub async fn cli() -> anyhow::Result<()> {
             None => crate::commands::skills::skills_dialog().await,
         },
         Some(Command::Plugin { command }) => handle_plugin_subcommand(command),
+        Some(Command::Ide { command, name }) => match command {
+            Some(IdeCommand::Setup {
+                target,
+                command,
+                print,
+                dry_run,
+                vsix,
+            }) => handle_ide_setup(
+                target,
+                SetupOptions {
+                    name,
+                    command,
+                    print,
+                    dry_run,
+                    vsix,
+                },
+            ),
+            Some(IdeCommand::Remove { target }) => handle_ide_remove(target, &name),
+            None => ide_dialog(&name),
+        },
         Some(Command::Term { command }) => handle_term_subcommand(command).await,
         #[cfg(feature = "tui")]
         Some(Command::Tui { args }) => crate::commands::tui::handle_tui(args),
