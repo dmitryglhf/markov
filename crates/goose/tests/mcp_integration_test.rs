@@ -295,7 +295,7 @@ async fn test_replayed_session(
 
         let mut results_path = replay_file_path.clone();
         results_path.pop();
-        results_path.push(format!("{}.results.json", &replay_file_name));
+        results_path.push(format!("{replay_file_name}.results.json"));
 
         match mode {
             TestMode::Record => {
