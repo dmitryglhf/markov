@@ -1,6 +1,6 @@
 use anstream::println;
 use bat::WrappingMode;
-use console::{measure_text_width, style, Color, StyledObject, Term};
+use console::{Color, StyledObject, Term, measure_text_width, style};
 use goose::config::{Config, GooseMode};
 use goose::conversation::message::{
     ActionRequiredData, Message, MessageContent, SystemNotificationContent, SystemNotificationType,
@@ -831,11 +831,7 @@ fn print_tool_output(text: &str, is_error: bool, is_the_answer: bool) {
     };
     let paint = |line: &str| {
         let styled = style(line.to_string());
-        if is_error {
-            styled.red()
-        } else {
-            styled.dim()
-        }
+        if is_error { styled.red() } else { styled.dim() }
     };
     if lines.len() <= max_lines {
         for line in &lines {
@@ -1549,7 +1545,7 @@ fn starts_like_markdown(word: &str) -> bool {
 }
 
 fn print_table(table_lines: &[&str], theme: Theme) {
-    use comfy_table::{presets, Cell, CellAlignment, ContentArrangement, Table};
+    use comfy_table::{Cell, CellAlignment, ContentArrangement, Table, presets};
 
     let mut table = Table::new();
     table.set_content_arrangement(ContentArrangement::Dynamic);

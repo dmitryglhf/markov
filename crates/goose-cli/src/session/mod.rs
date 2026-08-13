@@ -11,9 +11,9 @@ mod task_execution_display;
 mod thinking;
 
 use crate::session::task_execution_display::{
-    format_task_execution_notification, TASK_EXECUTION_NOTIFICATION_TYPE,
+    TASK_EXECUTION_NOTIFICATION_TYPE, format_task_execution_notification,
 };
-use goose::conversation::{fix_conversation, Conversation};
+use goose::conversation::{Conversation, fix_conversation};
 use std::env;
 use std::io::Write;
 use std::str::FromStr;
@@ -22,13 +22,13 @@ use tokio_util::task::AbortOnDropHandle;
 
 pub use self::export::{message_to_markdown, user_projected_message_to_markdown};
 use crate::commands::extensions::ExtensionChange;
-pub use builder::{build_session, SessionBuilderConfig};
+pub use builder::{SessionBuilderConfig, build_session};
 use console::Color;
 use goose::agents::AgentEvent;
 use goose::agents::SUBAGENT_TOOL_REQUEST_TYPE;
-use goose::permission::permission_confirmation::PrincipalType;
 use goose::permission::Permission;
 use goose::permission::PermissionConfirmation;
+use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::Provider;
 use goose::providers::base::ProviderUsage;
 use goose::utils::safe_truncate;
@@ -37,7 +37,7 @@ use anyhow::{Context, Result};
 use completion::GooseCompleter;
 use goose::agents::extension::{Envs, ExtensionConfig, PLATFORM_EXTENSIONS};
 use goose::agents::types::RetryConfig;
-use goose::agents::{Agent, SessionConfig, COMPACT_TRIGGERS};
+use goose::agents::{Agent, COMPACT_TRIGGERS, SessionConfig};
 use goose::config::extensions::name_to_key;
 use goose::config::{Config, GooseMode};
 use goose::slash_commands::types::SlashCommandEntry;
@@ -51,7 +51,7 @@ use goose::config::paths::Paths;
 use goose::config::providers;
 use goose::conversation::message::{ActionRequiredData, Message, MessageContent};
 use goose::providers::inventory::ProviderInventoryService;
-use goose::session::SessionManager;
+use goose::session::{SessionManager, SessionType};
 use rustyline::EditMode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -595,9 +595,25 @@ impl CliSession {
                 console::style("●").red(),
                 console::style(format!("session closed · {}", self.session_id)).dim()
             );
+            if let Some(command) = self.resume_command().await {
+                println!("    {}", console::style(command).dim());
+            }
         }
 
         result
+    }
+
+    /// The id above is only worth spelling out as a command when it will still
+    /// be there tomorrow: an ephemeral session is never offered back, and one
+    /// that was opened and closed has nothing to return to.
+    async fn resume_command(&self) -> Option<String> {
+        if self.messages.user_visible_messages().is_empty() {
+            return None;
+        }
+
+        let session = self.get_session().await.ok()?;
+        matches!(session.session_type, SessionType::User)
+            .then(|| format!("markov resume {}", self.session_id))
     }
 
     async fn run_interactive(&mut self, prompt: Option<String>) -> Result<()> {
@@ -2561,8 +2577,8 @@ fn handle_agent_error(e: &anyhow::Error, is_stream_json_mode: bool) {
     }
 }
 
-async fn get_reasoner(
-) -> Result<(Arc<dyn Provider>, goose_providers::model::ModelConfig), anyhow::Error> {
+async fn get_reasoner()
+-> Result<(Arc<dyn Provider>, goose_providers::model::ModelConfig), anyhow::Error> {
     use goose::providers::create;
 
     let config = Config::global();
@@ -2687,10 +2703,12 @@ mod tests {
             planner_classification_text(&mixed).unwrap(),
             "agent classification text"
         );
-        assert!(planner_classification_text(
-            &Message::assistant().with_content(MessageContent::Text(user_only))
-        )
-        .is_err());
+        assert!(
+            planner_classification_text(
+                &Message::assistant().with_content(MessageContent::Text(user_only))
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -2715,9 +2733,11 @@ mod tests {
             provider_messages[0].as_concat_text(),
             "first request\nsecond request"
         );
-        assert!(!provider_messages[0]
-            .as_concat_text()
-            .contains("hidden separator"));
+        assert!(
+            !provider_messages[0]
+                .as_concat_text()
+                .contains("hidden separator")
+        );
     }
 
     #[test]
