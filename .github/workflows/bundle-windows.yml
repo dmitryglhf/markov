@@ -122,11 +122,12 @@ jobs:
         run: |
           $isCuda = "${{ inputs.windows_variant }}" -eq "cuda"
 
+          # Explicit list rather than the upstream default, which enables telemetry.
+          $features = "code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update"
           if ($isCuda) {
-            cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov --features cuda
-          } else {
-            cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov
+            $features = "$features,cuda"
           }
+          cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov --no-default-features --features $features
 
           $binaryPath = "./target/x86_64-pc-windows-msvc/release/markov.exe"
           if (-not (Test-Path $binaryPath)) {

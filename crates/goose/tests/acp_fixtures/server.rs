@@ -287,7 +287,7 @@ impl Connection for AcpServerConnection {
                                 .unwrap();
                             assert_eq!(
                                 resp.agent_info.as_ref().map(|info| info.name.as_str()),
-                                Some("goose"),
+                                Some("markov"),
                                 "initialize response must identify the agent"
                             );
 

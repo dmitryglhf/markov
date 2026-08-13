@@ -128,12 +128,14 @@ jobs:
           source ./bin/activate-hermit
           export TARGET="x86_64-unknown-linux-gnu"
           rustup target add "${TARGET}"
-          FEATURE_ARGS=()
+          # Explicit list rather than the upstream default, which enables telemetry.
+          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update"
           if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            FEATURE_ARGS=(--features vulkan)
+            FEATURES="${FEATURES},vulkan"
           fi
 
-          cargo build --release --target ${TARGET} -p goose-cli --bin markov "${FEATURE_ARGS[@]}"
+          cargo build --release --target ${TARGET} -p goose-cli --bin markov \
+            --no-default-features --features "${FEATURES}"
 
       - name: Copy backend binary into Electron folder
         run: |

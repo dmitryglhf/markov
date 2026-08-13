@@ -124,17 +124,19 @@ jobs:
           echo "Rust toolchain info:"
           rustup show
 
-          FEATURE_ARGS=()
+          # Explicit lists rather than default/portable-default, which enable telemetry.
+          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update"
           if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            FEATURE_ARGS=(--features vulkan)
+            FEATURES="${FEATURES},vulkan"
           fi
 
           if [ "${{ matrix.variant }}" = "musl" ]; then
             cargo build --release --target ${TARGET} -p goose-cli --bin markov \
               --no-default-features \
-              --features portable-default
+              --features rustls-tls,aws-providers,otel,tui
           else
-            cargo build --release --target ${TARGET} -p goose-cli --bin markov "${FEATURE_ARGS[@]}"
+            cargo build --release --target ${TARGET} -p goose-cli --bin markov \
+              --no-default-features --features "${FEATURES}"
           fi
 
       - name: Build CLI (manylinux container)
@@ -156,7 +158,10 @@ jobs:
           rustup toolchain install "$RUST_CHANNEL" --profile minimal \
             --component rustc,cargo --target "$TARGET"
           rustup show
-          cargo build --release --target "$TARGET" -p goose-cli --bin markov
+          # Explicit list rather than the upstream default, which enables telemetry.
+          cargo build --release --target "$TARGET" -p goose-cli --bin markov \
+            --no-default-features \
+            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update
 
       - name: Package CLI
         run: |

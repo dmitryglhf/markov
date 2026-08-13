@@ -134,7 +134,10 @@ jobs:
         run: |
           source ./bin/activate-hermit
           rustup target add "$TARGET"
-          cargo build --release -p goose-cli --bin markov --target "$TARGET"
+          # Explicit list rather than the upstream default, which enables telemetry.
+          cargo build --release -p goose-cli --bin markov --target "$TARGET" \
+            --no-default-features \
+            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update
 
       - name: Prepare binary artifact
         env:
