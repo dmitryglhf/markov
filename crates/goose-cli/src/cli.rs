@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Shell as ClapShell};
+use clap_complete::{Shell as ClapShell, generate};
 use clap_complete_nushell::Nushell as ClapNushell;
 use goose::agents::GoosePlatform;
 use goose::builtin_extension::register_builtin_extensions;
@@ -9,20 +9,20 @@ use goose::config::{Config, GooseMode};
 use goose::posthog::get_telemetry_choice;
 use goose::recipe::Recipe;
 use goose::source_roots::SourceRoot;
-use goose_mcp::mcp_server_runner::{serve, McpCommand};
+use goose_mcp::mcp_server_runner::{McpCommand, serve};
 use goose_mcp::{AutoVisualiserRouter, ComputerControllerServer, MemoryServer, TutorialServer};
 
 #[cfg(feature = "telemetry")]
 use crate::commands::configure::configure_telemetry_consent_dialog;
 use crate::commands::configure::handle_configure;
 use crate::commands::ide::manager::ide_dialog;
-use crate::commands::ide::{handle_ide_remove, handle_ide_setup, SetupOptions, TargetSelector};
+use crate::commands::ide::{SetupOptions, TargetSelector, handle_ide_remove, handle_ide_setup};
 use crate::commands::info::handle_info;
 use crate::commands::plugin::{handle_plugin_install, handle_plugin_update};
 use crate::commands::project::{handle_project_default, handle_projects_interactive};
 use crate::commands::recipe::{handle_deeplink, handle_list, handle_open, handle_validate};
 use crate::commands::term::{
-    handle_term_info, handle_term_init, handle_term_log, handle_term_run, Shell,
+    Shell, handle_term_info, handle_term_init, handle_term_log, handle_term_run,
 };
 
 use crate::commands::schedule::{
@@ -30,14 +30,14 @@ use crate::commands::schedule::{
     handle_schedule_run_now, handle_schedule_services_status, handle_schedule_services_stop,
     handle_schedule_sessions,
 };
-use crate::commands::session::{handle_session_list, handle_session_remove, SessionPick};
+use crate::commands::session::{SessionPick, handle_session_list, handle_session_remove};
 use crate::commands::skills::handle_skills_list;
 use crate::recipes::extract_from_cli::extract_recipe_info_from_cli;
 use crate::recipes::recipe::{explain_recipe, render_recipe_as_yaml};
-use crate::session::{build_session, SessionBuilderConfig};
+use crate::session::{SessionBuilderConfig, build_session};
 use goose::agents::Container;
-use goose::session::session_manager::SessionType;
 use goose::session::SessionManager;
+use goose::session::session_manager::SessionType;
 use std::io::{IsTerminal, Read};
 use std::path::PathBuf;
 use tracing::warn;
@@ -961,10 +961,11 @@ enum Command {
         )]
         edit: bool,
 
-        /// Show message history when resuming
+        /// Replay message history when resuming
         #[arg(
-            long,
-            help = "Show previous messages when resuming a session",
+            long = "no-history",
+            action = clap::ArgAction::SetFalse,
+            help = "Skip reprinting previous messages when resuming a session",
             requires = "resume"
         )]
         history: bool,
@@ -1000,7 +1001,11 @@ enum Command {
         )]
         edit: bool,
 
-        #[arg(long, help = "Show previous messages when resuming")]
+        #[arg(
+            long = "no-history",
+            action = clap::ArgAction::SetFalse,
+            help = "Skip reprinting previous messages when resuming"
+        )]
         history: bool,
 
         #[command(flatten)]
@@ -2584,7 +2589,7 @@ pub async fn cli() -> anyhow::Result<()> {
             summary_only,
             severity,
         }) => {
-            use crate::commands::review::{handle_review, ReviewOptions};
+            use crate::commands::review::{ReviewOptions, handle_review};
             handle_review(ReviewOptions {
                 range,
                 prompt_file: prompt,
@@ -2656,7 +2661,7 @@ mod tests {
     /// is the command, so requiring the flag it no longer has would reject this.
     #[test]
     fn resume_takes_the_flags_that_used_to_need_the_resume_flag() {
-        let cli = Cli::try_parse_from(["markov", "resume", "project-x", "--fork", "--history"])
+        let cli = Cli::try_parse_from(["markov", "resume", "project-x", "--fork", "--no-history"])
             .expect("parse");
         let Some(Command::Resume {
             session,
@@ -2671,8 +2676,33 @@ mod tests {
 
         assert_eq!(session.as_deref(), Some("project-x"));
         assert!(fork);
-        assert!(history);
+        assert!(!history);
         assert!(!edit);
+    }
+
+    /// Resuming replays the conversation unasked; the flag is there to stop it.
+    #[test]
+    fn resuming_replays_the_conversation_by_default() {
+        let cli = Cli::try_parse_from(["markov", "resume"]).expect("parse");
+        let Some(Command::Resume { history, .. }) = cli.command else {
+            panic!("expected resume");
+        };
+        assert!(history);
+
+        let cli = Cli::try_parse_from(["markov", "session", "--resume"]).expect("parse");
+        let Some(Command::Session { history, .. }) = cli.command else {
+            panic!("expected session");
+        };
+        assert!(history);
+    }
+
+    /// `--no-history` asks for something only resuming can do, but the default
+    /// it carries must not make every plain session look like it asked.
+    #[test]
+    fn a_new_session_is_not_taken_for_one_refusing_history() {
+        Cli::try_parse_from(["markov", "session"]).expect("parse");
+        Cli::try_parse_from(["markov", "session", "--no-history"])
+            .expect_err("--no-history without --resume");
     }
 
     #[test]
