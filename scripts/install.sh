@@ -8,11 +8,11 @@ set -euo pipefail
 #   curl -fsSL <same url> | bash -s -- --cli-only
 #   curl -fsSL <same url> | bash -s -- --uninstall
 #
-# macOS gets the desktop app in ~/Applications plus a `markov` symlink into the
-# bundle, which keeps the CLI and the app on one version. Linux and Windows get
-# the CLI on its own; on Windows install.ps1 is the supported route and the one
-# that installs the app. Everything is checked against SHA256SUMS before it is
-# unpacked.
+# macOS gets the desktop app in ~/Applications and Linux in ~/.local/share, both
+# with a `markov` symlink into the bundle, which keeps the CLI and the app on one
+# version. Windows gets the CLI on its own; there install.ps1 is the supported
+# route and the one that installs the app. Everything is checked against
+# SHA256SUMS before it is unpacked.
 #
 # Installs into the user's own home, so no administrator rights are needed.
 #
@@ -21,7 +21,7 @@ set -euo pipefail
 #   MARKOV_CHANNEL          stable|canary (default: stable)
 #   MARKOV_REPO             GitHub repository releases are read from
 #   MARKOV_BASE_URL         full release asset base, overrides the two above
-#   MARKOV_APP_DIR          where Markov.app goes (default: ~/Applications)
+#   MARKOV_APP_DIR          where the app goes (default: ~/Applications, ~/.local/share on Linux)
 #   MARKOV_INSTALL_DIR      where the CLI goes (default: ~/.local/bin)
 #   MARKOV_OS               darwin|linux|windows, overrides detection
 #   MARKOV_LINUX_VARIANT    standard|vulkan|musl (musl is detected)
@@ -31,7 +31,6 @@ set -euo pipefail
 VERSION="${MARKOV_VERSION:-}"
 CHANNEL="${MARKOV_CHANNEL:-stable}"
 REPO="${MARKOV_REPO:-dmitryglhf/markov}"
-APP_DIR="${MARKOV_APP_DIR:-$HOME/Applications}"
 
 CLI_ONLY=false
 UNINSTALL=false
@@ -44,7 +43,7 @@ for arg in "$@"; do
       cat <<'USAGE'
 Markov installer.
 
-  install.sh              macOS: desktop app + CLI; Linux/Windows: CLI
+  install.sh              macOS and Linux: desktop app + CLI; Windows: CLI
   install.sh --cli-only   CLI only, no desktop app
   install.sh --uninstall  remove the app and the CLI, keep settings
 
@@ -104,10 +103,22 @@ else
   INSTALL_DIR="${MARKOV_INSTALL_DIR:-$HOME/.local/bin}"
 fi
 
-APP_NAME="Markov.app"
-APP_PATH="$APP_DIR/$APP_NAME"
+if [ "$OS" = "darwin" ]; then
+  APP_DIR="${MARKOV_APP_DIR:-$HOME/Applications}"
+  APP_NAME="Markov.app"
+  APP_PATH="$APP_DIR/$APP_NAME"
+  BUNDLED_BINARY="$APP_PATH/Contents/Resources/bin/markov"
+  APP_EXECUTABLE="$APP_PATH/Contents/MacOS/Markov"
+else
+  APP_DIR="${MARKOV_APP_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}}"
+  APP_NAME="markov-desktop"
+  APP_PATH="$APP_DIR/$APP_NAME"
+  BUNDLED_BINARY="$APP_PATH/resources/bin/markov"
+  APP_EXECUTABLE="$APP_PATH/Markov"
+fi
+
+DESKTOP_ENTRY="${XDG_DATA_HOME:-$HOME/.local/share}/applications/markov.desktop"
 LINK_PATH="$INSTALL_DIR/$CLI_NAME"
-BUNDLED_BINARY="$APP_PATH/Contents/Resources/bin/markov"
 
 ##############################################################################
 # Uninstall
@@ -127,17 +138,21 @@ remove_cli() {
 }
 
 running_instance() {
-  [ "$OS" = "darwin" ] && pgrep -f "$APP_PATH/Contents/MacOS/Markov" >/dev/null 2>&1
+  [ "$OS" != "windows" ] && pgrep -f "$APP_EXECUTABLE" >/dev/null 2>&1
 }
 
 if $UNINSTALL; then
   running_instance && die "Markov is running — quit it first"
   remove_cli
-  # The app exists only on macOS; on any other system $APP_PATH is a path that
-  # was never installed and may well belong to something else.
-  if [ "$OS" = "darwin" ] && [ -d "$APP_PATH" ]; then
+  # There is no app on Windows, where $APP_PATH is a path that was never
+  # installed and may well belong to something else.
+  if [ "$OS" != "windows" ] && [ -d "$APP_PATH" ]; then
     rm -rf "$APP_PATH"
     echo "removed $APP_PATH"
+  fi
+  if [ "$OS" = "linux" ] && [ -f "$DESKTOP_ENTRY" ]; then
+    rm -f "$DESKTOP_ENTRY"
+    echo "removed $DESKTOP_ENTRY"
   fi
   echo
   echo "Settings and sessions were left alone:"
@@ -174,7 +189,14 @@ case "$OS" in
       *) die "unsupported MARKOV_LINUX_VARIANT '$VARIANT' (standard|vulkan|musl)" ;;
     esac
     CLI_ARCHIVE="markov-cli-$TARGET.tar.gz"
-    CLI_ONLY=true
+    APP_ARCHIVE="markov-desktop-$TARGET.zip"
+    # The desktop app is built for glibc on x86_64 only.
+    if [ "$ARCH" != "x86_64" ] || [ "$VARIANT" = "musl" ]; then
+      if ! $CLI_ONLY; then
+        echo "no desktop build for $TARGET — installing the CLI only" >&2
+      fi
+      CLI_ONLY=true
+    fi
     ;;
   windows)
     [ "$ARCH" = "x86_64" ] || die "Windows builds are x86_64 only"
@@ -291,6 +313,56 @@ if $CLI_ONLY; then
   echo
   echo "Markov installed."
   echo "  cli: $LINK_PATH"
+elif [ "$OS" = "linux" ]; then
+  command -v unzip >/dev/null 2>&1 || die "'unzip' is required"
+  unzip -q -o "$WORK_DIR/$APP_ARCHIVE" -d "$WORK_DIR/unpacked"
+
+  BUILT="$(find "$WORK_DIR/unpacked" -maxdepth 2 -type f -name Markov | head -1)"
+  [ -n "$BUILT" ] || die "$APP_ARCHIVE does not contain the Markov executable"
+
+  mkdir -p "$APP_DIR"
+  rm -rf "$APP_PATH"
+  mv "$(dirname "$BUILT")" "$APP_PATH"
+  chmod +x "$APP_EXECUTABLE" "$BUNDLED_BINARY"
+  ln -sfn "$BUNDLED_BINARY" "$LINK_PATH"
+
+  # Chromium sandboxes renderers with user namespaces and only falls back to the
+  # setuid helper, which we cannot install without root. Where namespaces are
+  # withheld from unconfined binaries the app would abort on start instead.
+  SANDBOX_FLAG=""
+  if { [ -r /proc/sys/user/max_user_namespaces ] &&
+       [ "$(cat /proc/sys/user/max_user_namespaces)" = "0" ]; } ||
+     { [ -r /proc/sys/kernel/unprivileged_userns_clone ] &&
+       [ "$(cat /proc/sys/kernel/unprivileged_userns_clone)" = "0" ]; } ||
+     { [ -r /proc/sys/kernel/apparmor_restrict_unprivileged_userns ] &&
+       [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = "1" ]; }; then
+    SANDBOX_FLAG=" --no-sandbox"
+  fi
+
+  mkdir -p "$(dirname "$DESKTOP_ENTRY")"
+  cat >"$DESKTOP_ENTRY" <<ENTRY
+[Desktop Entry]
+Type=Application
+Name=Markov
+Comment=AI agent
+Exec=$APP_EXECUTABLE$SANDBOX_FLAG %U
+Icon=$APP_PATH/resources/images/icon.png
+Categories=Development;
+Terminal=false
+StartupWMClass=Markov
+ENTRY
+
+  echo
+  echo "Markov $LABEL installed."
+  echo "  app: $APP_PATH"
+  echo "  cli: $LINK_PATH -> $BUNDLED_BINARY"
+  echo "  menu entry: $DESKTOP_ENTRY"
+  if [ -n "$SANDBOX_FLAG" ]; then
+    echo
+    echo "This kernel withholds user namespaces from unconfined programs, so the"
+    echo "menu entry starts the app with --no-sandbox. Installing the .deb or .rpm"
+    echo "instead keeps the Chromium sandbox on."
+  fi
 else
   command -v ditto >/dev/null 2>&1 || die "'ditto' is required"
   ditto -x -k "$WORK_DIR/$APP_ARCHIVE" "$WORK_DIR/unpacked"

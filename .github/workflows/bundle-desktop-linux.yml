@@ -202,6 +202,29 @@ jobs:
           ls -la out/
           find out/ -name "*.deb" -o -name "*.rpm" -o -name "*.flatpak" | head -10
 
+      - name: Package desktop archive
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          # The distro packages need a package manager and root; this archive is
+          # what install.sh unpacks into the user's home.
+          TARGET="x86_64-unknown-linux-gnu"
+          if [ "$VARIANT" = "vulkan" ]; then
+            TARGET="${TARGET}-vulkan"
+          fi
+          PACKAGED="$(find ui/desktop/out -maxdepth 1 -type d -name 'Markov-linux-*' | head -1)"
+          [ -n "$PACKAGED" ] || { echo "::error::no packaged app directory in ui/desktop/out"; exit 1; }
+          (cd "$(dirname "$PACKAGED")" &&
+            zip -qry "${GITHUB_WORKSPACE}/markov-desktop-${TARGET}.zip" "$(basename "$PACKAGED")")
+          ls -lh "${GITHUB_WORKSPACE}/markov-desktop-${TARGET}.zip"
+
+      - name: Upload desktop archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: markov-desktop-linux-x64${{ matrix.variant == 'vulkan' && '-vulkan' || '' }}
+          path: markov-desktop-*.zip
+          if-no-files-found: error
+
       - name: List generated files
         run: |
           echo "=== All files in out/ directory ==="
