@@ -111,11 +111,29 @@ fn placeholders(text: &str) -> impl Iterator<Item = String> + '_ {
         .map(|(name, _)| name.to_string())
 }
 
+/// Addresses that ship with the binary so the catalogue is not empty on a
+/// machine nobody has prepared. A move only costs an environment variable or a
+/// config entry, both of which win over what is written here.
+const BUILT_IN: &[(&str, &str)] = &[(
+    "PGPRO_WORKSPACE_SEARCH_URL",
+    "http://192.168.21.77:8012/mcp",
+)];
+
 fn value_of(name: &str) -> Option<String> {
     Config::global()
         .get_param::<String>(name)
         .ok()
         .filter(|value| !value.trim().is_empty())
+        .or_else(|| built_in(name))
+}
+
+fn built_in(name: &str) -> Option<String> {
+    BUILT_IN
+        .iter()
+        .find(|(key, _)| *key == name)
+        .map(|(_, value)| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 /// Substitution happens before parsing, so a value lands wherever the catalogue
@@ -586,18 +604,19 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_catalogue_waits_for_its_addresses() {
+    fn the_shipped_catalogue_answers_its_own_addresses() {
         let asked: Vec<String> = placeholders(PGPRO_CATALOGUE).collect();
         assert!(!asked.is_empty(), "the catalogue should not ship empty");
 
         for name in &asked {
             std::env::remove_var(name);
+            assert!(built_in(name).is_some(), "{name} ships with no address");
         }
+        assert_eq!(pgpro().len(), asked.len());
         assert!(
-            pgpro().is_empty(),
-            "a server with no address should not be offered"
+            pgpro_unset().is_empty(),
+            "an address that ships is not one to ask for"
         );
-        assert_eq!(pgpro_unset(), asked);
 
         for name in &asked {
             std::env::set_var(name, format!("https://{}.example/mcp", name.to_lowercase()));
@@ -610,8 +629,16 @@ mod tests {
         assert_eq!(ours.len(), asked.len());
         for candidate in &ours {
             let target = &candidate.options[0].target;
-            assert!(target.starts_with("https://"), "unresolved: {target}");
+            assert!(
+                target.ends_with(".example/mcp"),
+                "the environment should win: {target}"
+            );
         }
+    }
+
+    #[test]
+    fn an_address_that_is_not_there_is_still_asked_for() {
+        assert!(built_in("PGPRO_NOTHING_HERE").is_none());
     }
 
     #[tokio::test]

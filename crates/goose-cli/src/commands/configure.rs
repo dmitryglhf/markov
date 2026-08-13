@@ -1,7 +1,7 @@
 use crate::recipes::github_recipe::GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
 use cliclack::spinner;
 use console::style;
-use goose::agents::extension::{ToolInfo, PLATFORM_EXTENSIONS};
+use goose::agents::extension::ToolInfo;
 use goose::agents::extension_manager::get_parameter_names;
 use goose::agents::Agent;
 use goose::agents::ExtensionConfig;
@@ -151,7 +151,10 @@ pub async fn handle_configure() -> anyhow::Result<()> {
     let _cursor_restore = CursorRestoreGuard;
     let config = Config::global();
 
-    if !config.exists() {
+    // The config file appears as soon as anything is stored — a telemetry
+    // answer, an extension toggled on — so the provider, not the file, is what
+    // says whether this is a first run.
+    if config.get_goose_provider().is_err() {
         handle_first_time_setup(config).await
     } else {
         handle_existing_config().await
@@ -221,6 +224,9 @@ pub fn configure_telemetry_consent_dialog() -> anyhow::Result<bool> {
 }
 
 async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
+    // Anything already stored — extensions, plugins, a telemetry answer — is
+    // not ours to throw away when the provider fails to configure.
+    let ours_to_discard = !config.exists();
     println!();
     println!(
         "{}",
@@ -257,10 +263,12 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
         .interact()?;
 
     match setup_method {
-        "pgpro" => handle_manual_provider_setup(config, Some("pgpro")).await,
+        "pgpro" => handle_manual_provider_setup(config, Some("pgpro"), ours_to_discard).await,
         "openrouter" => {
             if let Err(e) = handle_openrouter_auth().await {
-                let _ = config.clear();
+                if ours_to_discard {
+                    let _ = config.clear();
+                }
                 println!(
                     "\n  {} OpenRouter authentication failed: {} \n  Please try again or use manual configuration",
                     style("Error").red().italic(),
@@ -268,13 +276,26 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
                 );
             }
         }
-        "manual" => handle_manual_provider_setup(config, None).await,
+        "manual" => handle_manual_provider_setup(config, None, ours_to_discard).await,
         _ => unreachable!(),
     }
     Ok(())
 }
 
-async fn handle_manual_provider_setup(config: &Config, provider_name: Option<&str>) {
+/// `ours_to_discard` says whether the config file was absent when setup began.
+/// Clearing throws the whole file away — extensions, plugins and all — and
+/// setup now also runs for a config that exists but names no provider.
+async fn handle_manual_provider_setup(
+    config: &Config,
+    provider_name: Option<&str>,
+    ours_to_discard: bool,
+) {
+    let discard = || {
+        if ours_to_discard {
+            let _ = config.clear();
+        }
+    };
+
     let outcome = match provider_name {
         Some(name) => configure_selected_provider(name).await,
         None => configure_provider_dialog().await,
@@ -293,7 +314,7 @@ async fn handle_manual_provider_setup(config: &Config, provider_name: Option<&st
             });
         }
         Ok(false) => {
-            let _ = config.clear();
+            discard();
             println!(
                 "\n  {}: We did not save your config, inspect your credentials\n   and run '{}' again to ensure markov can connect",
                 style("Warning").yellow().italic(),
@@ -301,7 +322,7 @@ async fn handle_manual_provider_setup(config: &Config, provider_name: Option<&st
             );
         }
         Err(e) => {
-            let _ = config.clear();
+            discard();
             print_manual_config_error(&e);
         }
     }
@@ -418,11 +439,6 @@ async fn handle_existing_config() -> anyhow::Result<()> {
             "Add custom provider with compatible API",
         )
         .item(
-            "add",
-            "Add Built-in Extension",
-            "Turn on an extension that ships inside markov (servers are /mcp)",
-        )
-        .item(
             "settings",
             "markov settings",
             "Set the markov mode, Tool Output, Tool Permissions, Experiment, markov recipe github repo and more",
@@ -431,7 +447,6 @@ async fn handle_existing_config() -> anyhow::Result<()> {
 
     match action {
         "provider" => super::models::handle_model_command().await,
-        "add" => configure_extensions_dialog(),
         "settings" => configure_settings_dialog().await,
         "custom_providers" => configure_custom_provider_dialog().await,
         _ => unreachable!(),
@@ -1031,97 +1046,6 @@ pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<
             Ok(false)
         }
     }
-}
-
-fn prompt_extension_timeout() -> anyhow::Result<u64> {
-    Ok(
-        cliclack::input("Please set the timeout for this tool (in secs):")
-            .placeholder(&goose::config::DEFAULT_EXTENSION_TIMEOUT.to_string())
-            .validate(|input: &String| match input.parse::<u64>() {
-                Ok(_) => Ok(()),
-                Err(_) => Err("Please enter a valid timeout"),
-            })
-            .interact()?,
-    )
-}
-
-fn configure_builtin_extension() -> anyhow::Result<()> {
-    // `developer` used to be on this list and no longer is: it is a platform
-    // extension, so the migration writes it into the config file for everyone and
-    // `/extensions` already carries a row for it. What is left is exactly the set
-    // that nothing seeds — pick one and it gains a row of its own.
-    let extensions = vec![
-        (
-            "autovisualiser",
-            "Auto Visualiser",
-            "Data visualisation and UI generation tools",
-        ),
-        (
-            "computercontroller",
-            "Computer Controller",
-            "controls for webscraping, file caching, and automations",
-        ),
-        (
-            "memory",
-            "Memory",
-            "Tools to save and retrieve durable memories",
-        ),
-        (
-            "tutorial",
-            "Tutorial",
-            "Access interactive tutorials and guides",
-        ),
-    ];
-
-    let mut select = cliclack::select("Which built-in extension would you like to enable?");
-    for (id, name, desc) in &extensions {
-        select = select.item(id, name, desc);
-    }
-    let extension = select.interact()?.to_string();
-    let (display_name, description) = extensions
-        .iter()
-        .find(|(id, _, _)| id == &extension)
-        .map(|(_, name, desc)| (name.to_string(), desc.to_string()))
-        .unwrap_or_else(|| (extension.clone(), extension.clone()));
-
-    // The list above is all `Builtin` today, but the check stays: a platform name
-    // written down as a builtin gets a timeout it has no use for and a variant
-    // that spawns a pipe to a server that does not exist.
-    let config = if PLATFORM_EXTENSIONS.contains_key(extension.as_str()) {
-        ExtensionConfig::Platform {
-            name: extension.clone(),
-            description,
-            display_name: Some(display_name),
-            bundled: Some(true),
-            available_tools: Vec::new(),
-        }
-    } else {
-        let timeout = prompt_extension_timeout()?;
-        ExtensionConfig::Builtin {
-            name: extension.clone(),
-            display_name: Some(display_name),
-            timeout: Some(timeout),
-            bundled: Some(true),
-            description,
-            available_tools: Vec::new(),
-        }
-    };
-
-    set_extension(ExtensionEntry {
-        enabled: true,
-        config,
-    });
-
-    cliclack::outro(format!("Enabled {} extension", style(extension).green()))?;
-    Ok(())
-}
-
-/// The one kind of extension that has nowhere else to be added. Servers are
-/// `/mcp`, and everything already written into the config file is `/extensions`;
-/// what remains are the extensions compiled into the binary that no migration
-/// seeds, so without this list they cannot be reached at all.
-pub fn configure_extensions_dialog() -> anyhow::Result<()> {
-    configure_builtin_extension()
 }
 
 pub async fn configure_settings_dialog() -> anyhow::Result<()> {

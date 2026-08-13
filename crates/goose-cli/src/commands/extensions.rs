@@ -21,8 +21,9 @@ use anyhow::Result;
 use console::style;
 use goose::agents::extension_manager::is_hidden_extension;
 use goose::agents::ExtensionConfig;
-use goose::config::extensions::{get_all_extensions, set_extension_enabled};
-use goose::config::ExtensionEntry;
+use goose::config::extensions::{get_all_extensions, set_extension, set_extension_enabled};
+use goose::config::{ExtensionEntry, DEFAULT_EXTENSION_TIMEOUT};
+use goose_mcp::mcp_server_runner::McpCommand;
 
 use super::ui::{
     cancellable, multiselect, pad_to_display_width, require_terminal, terminal_width,
@@ -90,6 +91,7 @@ fn visible() -> Vec<ExtensionEntry> {
         .into_iter()
         .filter(|entry| !is_hidden_extension(&entry.config.name()))
         .collect();
+    entries.extend(unseeded_bundled(&entries));
     entries.sort_by_key(|entry| {
         (
             entry.config.kind().display_rank(),
@@ -97,6 +99,53 @@ fn visible() -> Vec<ExtensionEntry> {
         )
     });
     entries
+}
+
+/// Servers compiled into the binary that no migration writes down. Without a
+/// row here they could not be reached at all: they take no address and no
+/// credentials, so `/mcp` has nothing to ask them, and an entry appears in the
+/// config file only once someone switches one on.
+fn unseeded_bundled(present: &[ExtensionEntry]) -> Vec<ExtensionEntry> {
+    McpCommand::ALL
+        .iter()
+        .filter(|command| {
+            !present
+                .iter()
+                .any(|entry| entry.config.name() == command.name())
+        })
+        .map(|command| ExtensionEntry {
+            enabled: false,
+            config: ExtensionConfig::Builtin {
+                name: command.name().to_string(),
+                description: command.description().to_string(),
+                display_name: Some(command.title().to_string()),
+                timeout: Some(DEFAULT_EXTENSION_TIMEOUT),
+                bundled: Some(true),
+                available_tools: Vec::new(),
+            },
+        })
+        .collect()
+}
+
+/// Said in `/mcp`, where "no servers configured" is true and still misleading:
+/// several ship inside the binary and only want switching on. Once they are all
+/// on there is nothing left to point at.
+pub fn bundled_servers_line() -> Option<String> {
+    // A bundled server that someone switched off keeps its entry, and offering
+    // it again as if it had never been seen would be wrong.
+    let waiting = unseeded_bundled(&get_all_extensions());
+    match waiting.is_empty() {
+        true => None,
+        false => Some(format!(
+            "{} bundled with markov, switched on in /extensions: {}",
+            waiting.len(),
+            waiting
+                .iter()
+                .map(|entry| entry.config.name())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }
 }
 
 /// `None` means the form was left by Escape, which is not the same as saving a
@@ -130,7 +179,14 @@ fn toggle(entries: &[ExtensionEntry]) -> Result<Option<Vec<ExtensionChange>>> {
             continue;
         }
 
-        set_extension_enabled(&key, wanted);
+        // A bundled server has no entry to flip until the first time it is
+        // switched on, so an unknown key is written rather than ignored.
+        if !set_extension_enabled(&key, wanted) {
+            set_extension(ExtensionEntry {
+                enabled: wanted,
+                config: entry.config.clone(),
+            });
+        }
         changes.push(match wanted {
             true => ExtensionChange::Enabled(entry.config.clone()),
             false => ExtensionChange::Disabled(entry.config.name()),
@@ -409,5 +465,31 @@ mod tests {
         let rendered = label(&row, 10);
         assert!(rendered.chars().count() < 500);
         assert!(rendered.ends_with("..."));
+    }
+
+    #[test]
+    fn every_bundled_server_is_offered_until_it_is_written_down() {
+        let offered = unseeded_bundled(&[]);
+        assert_eq!(offered.len(), McpCommand::ALL.len());
+        for row in &offered {
+            assert!(!row.enabled, "a bundled server starts off");
+            assert_eq!(row.config.kind(), ExtensionKind::Builtin);
+            assert!(
+                !row.config.description().is_empty(),
+                "{} ships without a description",
+                row.config.name()
+            );
+        }
+    }
+
+    #[test]
+    fn a_bundled_server_already_in_the_config_is_not_offered_twice() {
+        let present = [entry(bundled(McpCommand::Memory.name()), false)];
+        let offered = unseeded_bundled(&present);
+
+        assert_eq!(offered.len(), McpCommand::ALL.len() - 1);
+        assert!(offered
+            .iter()
+            .all(|row| row.config.name() != McpCommand::Memory.name()));
     }
 }

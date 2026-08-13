@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::configure::try_store_secret;
-use super::extensions::{plugin_extensions_line, ExtensionChange};
+use super::extensions::{bundled_servers_line, plugin_extensions_line, ExtensionChange};
 use super::mcp_registry::{self, Candidate, Install};
 use super::ui::{cancellable, multiselect, require_terminal, select};
 
@@ -112,6 +112,10 @@ pub async fn mcp_dialog() -> Result<Vec<ExtensionChange>> {
         }
 
         if let Some(line) = plugin_extensions_line() {
+            cliclack::log::info(line)?;
+        }
+
+        if let Some(line) = bundled_servers_line() {
             cliclack::log::info(line)?;
         }
 
