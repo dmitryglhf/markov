@@ -45,6 +45,14 @@ jobs:
         with:
           name: install.ps1
           path: scripts/install.ps1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: deinstall.sh
+          path: scripts/deinstall.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: deinstall.ps1
+          path: scripts/deinstall.ps1
 
   # ------------------------------------------------------------
   # 3) Bundle CLI and Desktop (macOS ARM64)
@@ -157,6 +165,8 @@ jobs:
             *.flatpak
             install.sh
             install.ps1
+            deinstall.sh
+            deinstall.ps1
             SHA256SUMS
 
       # Create/update the versioned release
@@ -173,6 +183,8 @@ jobs:
             *.flatpak
             install.sh
             install.ps1
+            deinstall.sh
+            deinstall.ps1
             SHA256SUMS
           allowUpdates: true
           omitBody: true
@@ -194,6 +206,8 @@ jobs:
             *.flatpak
             install.sh
             install.ps1
+            deinstall.sh
+            deinstall.ps1
             SHA256SUMS
           allowUpdates: true
           omitBody: true

@@ -2701,8 +2701,10 @@ mod tests {
     #[test]
     fn a_new_session_is_not_taken_for_one_refusing_history() {
         Cli::try_parse_from(["markov", "session"]).expect("parse");
-        Cli::try_parse_from(["markov", "session", "--no-history"])
-            .expect_err("--no-history without --resume");
+        assert!(
+            Cli::try_parse_from(["markov", "session", "--no-history"]).is_err(),
+            "--no-history without --resume"
+        );
     }
 
     #[test]

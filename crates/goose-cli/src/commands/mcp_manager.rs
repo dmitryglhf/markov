@@ -27,7 +27,10 @@ use super::ui::{cancellable, multiselect, require_terminal, select};
 /// Only passed through to the server's `list_tools`, no session is created.
 const PROBE_SESSION: &str = "mcp-connection-check";
 
-const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+/// A first `npx` or `uvx` start downloads the package before it can answer, and
+/// the timeout kills that download, so a retry begins as cold as the attempt it
+/// follows. The wait has to cover an install, not a handshake.
+const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 
 /// Only reads the opening of a stream, so it does not need the probe's patience.
 const SSE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
