@@ -88,6 +88,8 @@ default = [
     "otel",
     "rustls-tls",
     "update",
+    # Keeps the subcommand, drops the self-update: it downloads from upstream.
+    "disable-update",
 ]
 code-mode = ["goose/code-mode"]
 local-inference = ["goose/local-inference"]

@@ -137,7 +137,7 @@ jobs:
           # Explicit list rather than the upstream default, which enables telemetry.
           cargo build --release -p goose-cli --bin markov --target "$TARGET" \
             --no-default-features \
-            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update
+            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update
 
       - name: Prepare binary artifact
         env:

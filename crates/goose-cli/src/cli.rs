@@ -1091,21 +1091,29 @@ enum Command {
         command: GatewayCommand,
     },
 
-    /// Update the goose CLI version
+    /// Say how to update markov
     #[cfg(feature = "update")]
-    #[command(about = "Update the goose CLI version")]
+    #[command(about = "Say how to update markov")]
     Update {
         /// Update to canary version
+        // Nothing acts on these while the update itself is stubbed out, so they
+        // are still accepted but no longer advertised.
         #[arg(
             short,
             long,
             help = "Update to canary version",
-            long_help = "Update to the latest canary version of the goose CLI, otherwise updates to the latest stable version."
+            long_help = "Update to the latest canary version of the goose CLI, otherwise updates to the latest stable version.",
+            hide = cfg!(feature = "disable-update")
         )]
         canary: bool,
 
         /// Enforce to re-configure goose during update
-        #[arg(short, long, help = "Enforce to re-configure goose during update")]
+        #[arg(
+            short,
+            long,
+            help = "Enforce to re-configure goose during update",
+            hide = cfg!(feature = "disable-update")
+        )]
         reconfigure: bool,
     },
 

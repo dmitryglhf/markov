@@ -125,7 +125,7 @@ jobs:
           rustup show
 
           # Explicit lists rather than default/portable-default, which enable telemetry.
-          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update"
+          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update"
           if [ "${{ matrix.variant }}" = "vulkan" ]; then
             FEATURES="${FEATURES},vulkan"
           fi
@@ -161,7 +161,7 @@ jobs:
           # Explicit list rather than the upstream default, which enables telemetry.
           cargo build --release --target "$TARGET" -p goose-cli --bin markov \
             --no-default-features \
-            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update
+            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update
 
       - name: Package CLI
         run: |

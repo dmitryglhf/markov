@@ -123,7 +123,7 @@ jobs:
           $isCuda = "${{ inputs.windows_variant }}" -eq "cuda"
 
           # Explicit list rather than the upstream default, which enables telemetry.
-          $features = "code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update"
+          $features = "code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update"
           if ($isCuda) {
             $features = "$features,cuda"
           }

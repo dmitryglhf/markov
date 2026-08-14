@@ -129,7 +129,7 @@ jobs:
           export TARGET="x86_64-unknown-linux-gnu"
           rustup target add "${TARGET}"
           # Explicit list rather than the upstream default, which enables telemetry.
-          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update"
+          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update"
           if [ "${{ matrix.variant }}" = "vulkan" ]; then
             FEATURES="${FEATURES},vulkan"
           fi
