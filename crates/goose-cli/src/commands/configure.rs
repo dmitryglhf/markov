@@ -446,7 +446,7 @@ async fn handle_existing_config() -> anyhow::Result<()> {
         .interact()?;
 
     match action {
-        "provider" => super::models::handle_model_command().await,
+        "provider" => crate::markov::hooks::hooks().handle_model_command().await,
         "settings" => configure_settings_dialog().await,
         "custom_providers" => configure_custom_provider_dialog().await,
         _ => unreachable!(),
@@ -594,7 +594,7 @@ fn interactive_model_search(
 /// Asks the provider what it serves and lets the user pick from the answer. A
 /// provider that refuses to answer is an error for the caller to render: mid-form
 /// that is a line in the log, on the way in it closes the walk.
-pub(crate) async fn fetch_and_select_model(
+pub async fn fetch_and_select_model(
     provider: &std::sync::Arc<dyn goose::providers::base::Provider>,
     provider_meta: &goose::providers::base::ProviderMetadata,
 ) -> anyhow::Result<String> {
@@ -713,7 +713,7 @@ fn prompt_unlisted_model(
     Ok(model.trim().to_string())
 }
 
-pub(crate) fn try_store_secret(
+pub fn try_store_secret(
     config: &Config,
     key_name: &str,
     value: String,
@@ -935,7 +935,7 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
 /// Walks the provider's config keys, asking for each one. Every key is offered
 /// even when it already has a value, so call this only when the credentials are
 /// the point — the model manager asks for them only for a provider that has none.
-pub(crate) async fn ensure_credentials(provider_name: &str) -> anyhow::Result<bool> {
+pub async fn ensure_credentials(provider_name: &str) -> anyhow::Result<bool> {
     let config = Config::global();
 
     let available_providers = providers().await;

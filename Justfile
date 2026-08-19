@@ -27,13 +27,13 @@ check-everything:
 # Default release command
 release-binary:
     @echo "Building release version..."
-    cargo build --release -p goose-cli --bin markov --no-default-features --features {{FEATURES}}
+    cargo build --release -p markov-cli --bin markov --no-default-features --features {{FEATURES}}
     @just copy-binary
 
 # Debug build of the CLI, same features as the release
 debug-binary:
     @echo "Building debug version..."
-    cargo build -p goose-cli --bin markov --no-default-features --features {{FEATURES}}
+    cargo build -p markov-cli --bin markov --no-default-features --features {{FEATURES}}
     @echo "Built ./target/debug/markov"
 
 # Build the release binary and put it on PATH as `markov`
@@ -88,12 +88,12 @@ release-windows:
 
 [windows]
 release-windows:
-    @powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'rustup target add x86_64-pc-windows-msvc; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov --no-default-features --features {{FEATURES}}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Write-Host "Windows executable created at ./target/x86_64-pc-windows-msvc/release/markov.exe"'
+    @powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'rustup target add x86_64-pc-windows-msvc; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cargo build --release --target x86_64-pc-windows-msvc -p markov-cli --bin markov --no-default-features --features {{FEATURES}}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Write-Host "Windows executable created at ./target/x86_64-pc-windows-msvc/release/markov.exe"'
 
 # Build for Intel Mac
 release-intel:
     @echo "Building release version for Intel Mac..."
-    cargo build --release --target x86_64-apple-darwin -p goose-cli --bin markov --no-default-features --features {{FEATURES}}
+    cargo build --release --target x86_64-apple-darwin -p markov-cli --bin markov --no-default-features --features {{FEATURES}}
     @just copy-binary-intel
 
 copy-binary BUILD_MODE="release":
@@ -203,7 +203,7 @@ run-docs:
 # Run server
 run-server:
     @echo "Running external ACP backend..."
-    GOOSE_SERVER__SECRET_KEY="${GOOSE_SERVER__SECRET_KEY:-test}" cargo run -p goose-cli --bin markov --no-default-features --features {{FEATURES}} -- serve --platform desktop --enable-scheduler --host 127.0.0.1 --port 3000
+    GOOSE_SERVER__SECRET_KEY="${GOOSE_SERVER__SECRET_KEY:-test}" cargo run -p markov-cli --bin markov --no-default-features --features {{FEATURES}} -- serve --platform desktop --enable-scheduler --host 127.0.0.1 --port 3000
 
 # Check if generated ACP schema and TypeScript types are up-to-date
 check-acp-schema: generate-acp-types

@@ -1,4 +1,4 @@
-use crate::commands::ui::{
+use crate::markov::ui::{
     cancellable, multiselect, pad_to_display_width, require_terminal, select, terminal_width,
     truncate_to_display_width,
 };

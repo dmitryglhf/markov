@@ -1,7 +1,7 @@
 use anstream::println;
 use bat::WrappingMode;
-use console::{measure_text_width, style, Color, StyledObject, Term};
-use goose::config::Config;
+use console::{Color, StyledObject, Term, measure_text_width, style};
+use goose::config::{Config, GooseMode};
 use goose::conversation::message::{
     ActionRequiredData, Message, MessageContent, SystemNotificationContent, SystemNotificationType,
     ToolNameParts, ToolRequest, ToolResponse,
@@ -12,14 +12,16 @@ use goose::subprocess::SubprocessExt;
 use goose::utils::safe_truncate;
 use goose_providers::conversation::token_usage::Usage;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use rmcp::model::{CallToolRequestParams, JsonObject, PromptArgument};
+use rmcp::model::{Annotations, CallToolRequestParams, JsonObject, PromptArgument, Role};
 use serde_json::Value;
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::io::{Error, IsTerminal, Write};
 use std::path::Path;
+use std::str::FromStr;
 use std::time::Duration;
+use strum::{EnumMessage, VariantNames};
 
 use super::streaming_buffer::MarkdownBuffer;
 
@@ -29,10 +31,6 @@ pub const DEFAULT_CLI_DARK_THEME: &str = "zenburn";
 
 fn accent<T: Display>(value: T) -> StyledObject<T> {
     style(value).cyan()
-}
-
-fn success<T: Display>(value: T) -> StyledObject<T> {
-    style(value).green()
 }
 
 fn warning<T: Display>(value: T) -> StyledObject<T> {
@@ -180,6 +178,106 @@ pub struct PromptInfo {
 // Global thinking indicator
 thread_local! {
     static THINKING: RefCell<ThinkingIndicator> = RefCell::new(ThinkingIndicator::default());
+    static NEXT_MARKER: RefCell<Option<String>> = const { RefCell::new(None) };
+    static SUBAGENT_RUN: RefCell<SubagentRun> = RefCell::new(SubagentRun::default());
+    static TOOL_RUN: Cell<bool> = const { Cell::new(false) };
+    static OUTPUT_HINT_SHOWN: Cell<bool> = const { Cell::new(false) };
+    static FULL_RESULT_IDS: RefCell<VecDeque<String>> = const { RefCell::new(VecDeque::new()) };
+}
+
+/// How many lines of output are short enough to be worth printing whole. Below
+/// this a summary costs as much room as the thing it summarizes.
+const COMPACT_OUTPUT_LINES: usize = 3;
+
+/// How many calls back the results that must not be summarized are remembered.
+/// Only the answer of a delegate is on that list, and one turn holds few of
+/// those.
+const FULL_RESULT_MEMORY: usize = 32;
+
+/// How wide the label of a subagent is allowed to be. The core sends what the
+/// task was asked to do, which is a sentence; on the line of a tool call there
+/// is only room for the beginning of it.
+const SUBAGENT_LABEL_BUDGET: usize = 24;
+
+/// Tracks the delegates of one session that have spoken already, so that each
+/// is named the same way every time it does.
+#[derive(Default)]
+struct SubagentRun {
+    seen: Vec<String>,
+}
+
+impl SubagentRun {
+    fn name(&mut self, subagent_id: &str, label: Option<&str>) -> String {
+        let known = self.seen.iter().position(|id| id == subagent_id);
+        let index = known.unwrap_or_else(|| {
+            self.seen.push(subagent_id.to_string());
+            self.seen.len() - 1
+        });
+
+        // a task that says what it is names itself; otherwise the delegates of
+        // this session are numbered in the order they first speak, which is
+        // still enough to tell two parallel streams apart
+        let name = match label.map(str::trim).filter(|label| !label.is_empty()) {
+            Some(label) => safe_truncate(label, SUBAGENT_LABEL_BUDGET),
+            None => (index + 1).to_string(),
+        };
+
+        // the session id is spelled out once, so that the session a delegate
+        // ran in can still be opened after the fact
+        match known {
+            Some(_) => format!("[{name}]"),
+            None => format!("[{name}] {subagent_id}"),
+        }
+    }
+}
+
+/// Every block of output is separated from the one above by a single empty
+/// line. A run of tool calls is one block however many calls it holds, whoever
+/// makes them, so anything else that is printed ends the run.
+fn open_block() {
+    end_tool_run();
+    println!();
+}
+
+fn end_tool_run() {
+    TOOL_RUN.with(|open| open.set(false));
+}
+
+/// Opens the block a tool call belongs to, and says whether it had to be
+/// opened. A call that joins a run already going adds no empty line of its own.
+fn open_tool_run() -> bool {
+    let opens = !TOOL_RUN.with(|open| open.replace(true));
+    if opens {
+        println!();
+    }
+    opens
+}
+
+fn subagent_label(subagent_id: &str, label: Option<&str>) -> String {
+    SUBAGENT_RUN.with(|run| run.borrow_mut().name(subagent_id, label))
+}
+
+/// Columns a reply is moved in by, so that it lines up with the rest of the
+/// output and leaves room for the marker of whoever is speaking.
+const REPLY_INDENT: &str = "  ";
+
+/// Marks the next block of markdown as the answer of the model.
+pub fn begin_answer() {
+    set_marker(style("●").dim().to_string());
+}
+
+/// Marks the next block of markdown as a message of the human, matching the
+/// prompt they typed it at.
+pub fn begin_user_message() {
+    set_marker(style(">").green().to_string());
+}
+
+fn set_marker(marker: String) {
+    NEXT_MARKER.with(|m| *m.borrow_mut() = Some(marker));
+}
+
+fn take_marker() -> Option<String> {
+    NEXT_MARKER.with(|m| m.borrow_mut().take())
 }
 
 pub fn show_thinking() {
@@ -258,7 +356,12 @@ pub fn render_message(message: &Message, debug: bool) {
             },
             MessageContent::Text(text) => print_markdown(&text.text, theme),
             MessageContent::ToolRequest(req) => render_tool_request(req, theme, debug),
-            MessageContent::ToolResponse(resp) => render_tool_response(resp, debug),
+            MessageContent::ToolResponse(resp) => {
+                render_tool_response(resp, debug);
+                // whatever the model says next is it speaking again, not a
+                // continuation of the tool it just called
+                begin_answer();
+            }
             MessageContent::Image(image) => {
                 println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
             }
@@ -327,6 +430,7 @@ pub fn render_message_streaming(
             MessageContent::ToolResponse(resp) => {
                 flush_markdown_buffer(buffer, theme);
                 render_tool_response(resp, debug);
+                begin_answer();
             }
             MessageContent::ActionRequired(action) => {
                 flush_markdown_buffer(buffer, theme);
@@ -444,8 +548,9 @@ pub fn render_text_no_newlines(text: &str, color: Option<Color>, dim: bool) {
 }
 
 pub fn render_enter_plan_mode() {
+    open_block();
     println!(
-        "\n{} {}\n",
+        "{} {}",
         accent("Entering plan mode.").bold(),
         style("You can provide instructions to create a plan and then act on it. To exit early, type /endplan")
             .dim()
@@ -453,14 +558,40 @@ pub fn render_enter_plan_mode() {
 }
 
 pub fn render_act_on_plan() {
+    open_block();
     println!(
-        "\n{}\n",
+        "{}",
         accent("Exiting plan mode and acting on the above plan").bold(),
     );
 }
 
 pub fn render_exit_plan_mode() {
-    println!("\n{}\n", accent("Exiting plan mode.").bold());
+    open_block();
+    println!("{}", accent("Exiting plan mode.").bold());
+}
+
+pub fn render_interrupted() {
+    open_block();
+    println!(
+        "{}",
+        style("Interrupted — the request above was dropped").dim()
+    );
+}
+
+pub fn render_plan_interrupted() {
+    open_block();
+    println!(
+        "{}",
+        style("Plan request interrupted - still in plan mode, /endplan to exit").dim()
+    );
+}
+
+pub fn render_plan_kept() {
+    open_block();
+    println!(
+        "{}",
+        style("Plan kept in the conversation - still in plan mode, /endplan to exit").dim()
+    );
 }
 
 pub fn goose_mode_message(text: &str) {
@@ -476,8 +607,14 @@ fn should_show_thinking() -> bool {
 
 fn render_thinking(text: &str, theme: Theme) {
     if should_show_thinking() {
-        println!("\n{}", style("Thinking:").dim().italic());
+        // the marker belongs to the answer, not to the reasoning before it
+        let marker = take_marker();
+        open_block();
+        println!("{}", style("Thinking:").dim().italic());
         print_markdown(text, theme);
+        if let Some(marker) = marker {
+            set_marker(marker);
+        }
     }
 }
 
@@ -490,7 +627,8 @@ fn render_thinking_streaming(
     if should_show_thinking() {
         flush_markdown_buffer(buffer, theme);
         if !*header_shown {
-            println!("\n{}", style("Thinking:").dim().italic());
+            open_block();
+            println!("{}", style("Thinking:").dim().italic());
             *header_shown = true;
         }
         print!("{}", style(text).dim());
@@ -500,18 +638,126 @@ fn render_thinking_streaming(
 
 fn render_tool_request(req: &ToolRequest, theme: Theme, debug: bool) {
     match &req.tool_call {
-        Ok(call) => match call.name.to_string().as_str() {
-            name if is_shell_tool_name(name) => render_shell_request(call, debug),
-            name if is_file_tool_name(name) => render_text_editor_request(call, debug),
-            "execute_typescript" | "execute_code" => render_execute_code_request(call, debug),
-            "delegate" => render_delegate_request(call, debug),
-            "subagent" => render_delegate_request(call, debug),
-            "todo__write" => render_todo_request(call, debug),
-            "load" => {}
-            _ => render_default_request(call, debug),
-        },
+        Ok(call) => {
+            if answers_the_turn(&call.name) {
+                remember_full_result(&req.id);
+            }
+
+            // a turn makes a dozen calls and is read to see what the agent is up
+            // to, so by default a call takes one line and its output a second
+            // one; /r brings back the whole of both
+            let name_is_title = req.was_executed_externally();
+            if !debug && !get_show_full_tool_output() {
+                return render_tool_call_line(call, name_is_title, debug);
+            }
+
+            render_verbose_tool_request(call, name_is_title, debug)
+        }
         Err(e) => print_markdown(&e.to_string(), theme),
     }
+}
+
+/// Whether the result of a call is the answer the turn was after, rather than a
+/// step towards it. What a delegate reports back is the whole point of running
+/// it, so it is never traded for a line saying how long it was.
+fn answers_the_turn(tool_name: &str) -> bool {
+    ToolNameParts::from(tool_name).tool_name == "load"
+}
+
+fn remember_full_result(id: &str) {
+    FULL_RESULT_IDS.with(|ids| {
+        let mut ids = ids.borrow_mut();
+        ids.push_back(id.to_string());
+        while ids.len() > FULL_RESULT_MEMORY {
+            ids.pop_front();
+        }
+    });
+}
+
+fn result_is_the_answer(id: &str) -> bool {
+    FULL_RESULT_IDS.with(|ids| ids.borrow().iter().any(|known| known == id))
+}
+
+/// A call the way `/r` shows it: a header, then every parameter on a line of its
+/// own.
+fn render_verbose_tool_request(call: &CallToolRequestParams, name_is_title: bool, debug: bool) {
+    match call.name.to_string().as_str() {
+        name if is_shell_tool_name(name) => render_shell_request(call, debug),
+        name if is_file_tool_name(name) => render_text_editor_request(call, debug),
+        "execute_typescript" | "execute_code" => render_execute_code_request(call, debug),
+        "delegate" => render_delegate_request(call, debug),
+        "subagent" => render_delegate_request(call, debug),
+        "todo__write" => render_todo_request(call, debug),
+        _ => render_default_request(call, name_is_title, debug),
+    }
+}
+
+/// A call the way it is shown by default: what was called and with what, on one
+/// line. The list of calls a code-mode run plans out keeps its own shape, being
+/// a list of calls rather than one of them.
+fn render_tool_call_line(call: &CallToolRequestParams, name_is_title: bool, debug: bool) {
+    if matches!(
+        call.name.to_string().as_str(),
+        "execute_typescript" | "execute_code"
+    ) {
+        return render_execute_code_request(call, debug);
+    }
+
+    open_tool_run();
+    let head = tool_call_head(display_parts(&call.name, name_is_title));
+    let room = terminal_width().saturating_sub(measure_text_width(&head) + 2);
+    match summarize_params(call.arguments.as_ref(), room, debug) {
+        Some(summary) => println!("{}  {}", head, style(summary).dim()),
+        None => println!("{}", head),
+    }
+}
+
+/// How a call is named on screen. A name an agent ran for us is its own title,
+/// so a command like `ls src/__pycache__` keeps its dunders instead of reading
+/// as an `extension__tool` pair.
+fn display_parts(tool_name: &str, name_is_title: bool) -> ToolNameParts<'_> {
+    match name_is_title {
+        true => ToolNameParts {
+            extension_name: None,
+            tool_name,
+        },
+        false => ToolNameParts::from(tool_name),
+    }
+}
+
+fn tool_call_head(parts: ToolNameParts<'_>) -> String {
+    match parts.extension_name {
+        Some(extension_name) => format!(
+            "  {} {} {}",
+            style("▸").dim(),
+            style(parts.tool_name).dim(),
+            style(extension_display_name(extension_name))
+                .magenta()
+                .dim(),
+        ),
+        None => format!("  {} {}", style("▸").dim(), style(parts.tool_name).dim()),
+    }
+}
+
+fn is_visible_to_user(
+    annotations: Option<&Annotations>,
+    min_priority: f32,
+    is_error: bool,
+) -> bool {
+    if let Some(audience) = annotations.and_then(|a| a.audience.as_ref()) {
+        if !audience.contains(&Role::User) {
+            return false;
+        }
+    }
+
+    if is_error {
+        return true;
+    }
+
+    annotations
+        .and_then(|a| a.priority)
+        .unwrap_or(DEFAULT_MIN_PRIORITY)
+        >= min_priority
 }
 
 fn render_tool_response(resp: &ToolResponse, debug: bool) {
@@ -519,6 +765,12 @@ fn render_tool_response(resp: &ToolResponse, debug: bool) {
 
     match &resp.tool_result {
         Ok(result) => {
+            let min_priority = config
+                .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
+                .ok()
+                .unwrap_or(DEFAULT_MIN_PRIORITY);
+            let is_error = result.is_error.unwrap_or(false);
+
             for content in &result.content {
                 let annotations = match content {
                     rmcp::model::ContentBlock::Text(t) => t.annotations.as_ref(),
@@ -528,38 +780,25 @@ fn render_tool_response(resp: &ToolResponse, debug: bool) {
                     rmcp::model::ContentBlock::ResourceLink(r) => r.annotations.as_ref(),
                     _ => None,
                 };
-                if let Some(audience) = annotations.and_then(|a| a.audience.as_ref()) {
-                    if !audience.contains(&rmcp::model::Role::User) {
-                        continue;
-                    }
-                }
-
-                let min_priority = config
-                    .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
-                    .ok()
-                    .unwrap_or(DEFAULT_MIN_PRIORITY);
-
-                let priority = annotations.and_then(|a| a.priority);
-                if priority.is_some_and(|priority| priority < min_priority)
-                    || (priority.is_none() && !debug)
-                {
+                if !is_visible_to_user(annotations, min_priority, is_error) {
                     continue;
                 }
 
                 if debug {
                     println!("{:#?}", content);
                 } else if let Some(text) = content.as_text() {
-                    print_tool_output(&text.text);
+                    print_tool_output(&text.text, is_error, result_is_the_answer(&resp.id));
                 }
             }
         }
         Err(e) => {
-            println!("    {}", style(e.to_string()).red().dim());
+            open_tool_run();
+            println!("    {}", style(e.to_string()).red());
         }
     }
 }
 
-fn print_tool_output(text: &str) {
+fn print_tool_output(text: &str, is_error: bool, is_the_answer: bool) {
     if text.is_empty() {
         return;
     }
@@ -567,34 +806,66 @@ fn print_tool_output(text: &str) {
         print!("{}", text);
         return;
     }
-    let max_lines = if get_show_full_tool_output() {
-        usize::MAX
+
+    // the output belongs to the call above it, so in the compact view it joins
+    // the run that call opened instead of starting a block of its own
+    let compact = !get_show_full_tool_output();
+    if compact {
+        open_tool_run();
     } else {
-        20
-    };
+        open_block();
+    }
+
     let lines: Vec<&str> = text.lines().collect();
+    // an error is what the output is read for, and an answer is what the turn
+    // was after; neither is ever traded for a line about its length
+    if compact && !is_error && !is_the_answer && lines.len() > COMPACT_OUTPUT_LINES {
+        println!("    {}", style(collapsed_output_note(lines.len())).dim());
+        return;
+    }
+
+    let max_lines = if compact && !is_the_answer && is_error {
+        20
+    } else {
+        usize::MAX
+    };
+    let paint = |line: &str| {
+        let styled = style(line.to_string());
+        if is_error { styled.red() } else { styled.dim() }
+    };
     if lines.len() <= max_lines {
         for line in &lines {
-            println!("    {}", style(line).dim());
+            println!("    {}", paint(line));
         }
     } else {
         let head = max_lines / 2;
         let tail = max_lines - head;
         for line in &lines[..head] {
-            println!("    {}", style(line).dim());
+            println!("    {}", paint(line));
         }
         println!(
             "    {}",
             style(format!(
-                "... ({} lines hidden, /toggle to show all)",
+                "... ({} lines hidden, /r to show all)",
                 lines.len() - head - tail
             ))
             .dim()
             .italic()
         );
         for line in &lines[lines.len() - tail..] {
-            println!("    {}", style(line).dim());
+            println!("    {}", paint(line));
         }
+    }
+}
+
+/// What stands in for output that was folded away. The way to unfold it is
+/// spelled out once a session, since after that it is the count that carries
+/// the news and the advice would just be noise.
+fn collapsed_output_note(lines: usize) -> String {
+    let told = OUTPUT_HINT_SHOWN.with(|shown| shown.replace(true));
+    match told {
+        true => format!("{lines} lines"),
+        false => format!("{lines} lines · /r shows full output"),
     }
 }
 
@@ -608,6 +879,11 @@ fn is_file_tool_name(name: &str) -> bool {
 
 pub fn render_error(message: &str) {
     println!("\n  {} {}\n", danger("error:").bold(), message);
+}
+
+/// Something changed under the session rather than went wrong.
+pub fn render_note(message: &str) {
+    println!("\n  {} {}\n", warning("note:").bold(), message);
 }
 
 pub fn render_prompts(prompts: &HashMap<String, Vec<String>>) {
@@ -655,39 +931,24 @@ fn render_arguments(info: &PromptInfo) {
     }
 }
 
-pub fn render_extension_success(name: &str) {
+pub fn render_mode_usage(current: GooseMode) {
     println!();
-    println!("  {} extension `{}`", success("added"), accent(name),);
+    println!("  {} {}", accent("mode:"), current);
+    for &name in GooseMode::VARIANTS {
+        let description = GooseMode::from_str(name)
+            .ok()
+            .and_then(|mode| mode.get_message())
+            .unwrap_or_default();
+        println!("    {:<14} {}", name, style(description).dim());
+    }
+    println!();
+    println!("{}", style("  usage: /mode <name>").dim());
     println!();
 }
 
 pub fn render_extension_error(name: &str, error: &str) {
     println!();
     println!("  {} to add extension {}", danger("failed"), danger(name));
-    println!();
-    println!("{}", style(error).dim());
-    println!();
-}
-
-pub fn render_builtin_success(names: &str) {
-    println!();
-    println!(
-        "  {} builtin{}: {}",
-        success("added"),
-        if names.contains(',') { "s" } else { "" },
-        accent(names)
-    );
-    println!();
-}
-
-pub fn render_builtin_error(names: &str, error: &str) {
-    println!();
-    println!(
-        "  {} to add builtin{}: {}",
-        danger("failed"),
-        if names.contains(',') { "s" } else { "" },
-        danger(names)
-    );
     println!();
     println!("{}", style(error).dim());
     println!();
@@ -717,13 +978,11 @@ fn render_text_editor_request(call: &CallToolRequestParams, debug: bool) {
             }
         }
     }
-    println!();
 }
 
 fn render_shell_request(call: &CallToolRequestParams, debug: bool) {
     print_tool_header(call);
     print_params(&call.arguments, 1, debug);
-    println!();
 }
 
 fn render_execute_code_request(call: &CallToolRequestParams, debug: bool) {
@@ -735,7 +994,7 @@ fn render_execute_code_request(call: &CallToolRequestParams, debug: bool) {
         .filter(|arr| !arr.is_empty());
 
     let Some(tool_graph) = tool_graph else {
-        return render_default_request(call, debug);
+        return render_default_request(call, false, debug);
     };
 
     let count = tool_graph.len();
@@ -789,8 +1048,6 @@ fn render_execute_code_request(call: &CallToolRequestParams, debug: bool) {
     if code.is_some_and(|_| debug) {
         println!("{}", code.unwrap_or_default());
     }
-
-    println!();
 }
 
 fn render_delegate_request(call: &CallToolRequestParams, debug: bool) {
@@ -830,8 +1087,6 @@ fn render_delegate_request(call: &CallToolRequestParams, debug: bool) {
             print_params(&Some(other_args), 1, debug);
         }
     }
-
-    println!();
 }
 
 fn render_todo_request(call: &CallToolRequestParams, _debug: bool) {
@@ -842,13 +1097,11 @@ fn render_todo_request(call: &CallToolRequestParams, _debug: bool) {
             println!("    {} {}", style("content").dim(), style(content).dim());
         }
     }
-    println!();
 }
 
-fn render_default_request(call: &CallToolRequestParams, debug: bool) {
-    print_tool_header(call);
+fn render_default_request(call: &CallToolRequestParams, name_is_title: bool, debug: bool) {
+    print_tool_header_parts(display_parts(&call.name, name_is_title));
     print_params(&call.arguments, 1, debug);
-    println!();
 }
 
 fn extension_display_name(name: &str) -> &str {
@@ -858,23 +1111,29 @@ fn extension_display_name(name: &str) -> &str {
     }
 }
 
-pub fn format_subagent_tool_call_message(subagent_id: &str, tool_name: &str) -> String {
-    let short_id = subagent_id.rsplit('_').next().unwrap_or(subagent_id);
+/// The tool of a subagent call, without the extension a plain call would not
+/// name either.
+fn subagent_tool_name(tool_name: &str) -> String {
     let parts = ToolNameParts::from(tool_name);
 
     match parts.extension_name {
         Some(extension_name) => format!(
-            "[subagent:{}] {} | {}",
-            short_id,
+            "{} | {}",
             parts.tool_name,
             extension_display_name(extension_name)
         ),
-        None => format!("[subagent:{}] {}", short_id, parts.tool_name),
+        None => parts.tool_name.to_string(),
     }
+}
+
+pub fn format_subagent_tool_call_message(subagent_id: &str, tool_name: &str) -> String {
+    let short_id = subagent_id.rsplit('_').next().unwrap_or(subagent_id);
+    format!("[subagent:{}] {}", short_id, subagent_tool_name(tool_name))
 }
 
 pub fn render_subagent_tool_call(
     subagent_id: &str,
+    label: Option<&str>,
     tool_name: &str,
     arguments: Option<&JsonObject>,
     debug: bool,
@@ -885,29 +1144,69 @@ pub fn render_subagent_tool_call(
             .and_then(Value::as_array)
             .filter(|arr| !arr.is_empty());
         if let Some(tool_graph) = tool_graph {
-            return render_subagent_tool_graph(subagent_id, tool_graph);
+            return render_subagent_tool_graph(subagent_id, label, tool_graph);
         }
     }
-    let tool_header = format!(
-        "  {} {}",
+
+    let name = subagent_label(subagent_id, label);
+    open_tool_run();
+
+    let head = format!(
+        "  {} {} {}",
         style("▸").dim(),
-        style(format_subagent_tool_call_message(subagent_id, tool_name)).dim(),
+        style(&name).dim(),
+        style(subagent_tool_name(tool_name)).dim(),
     );
-    println!();
-    println!("{}", tool_header);
-    print_params(&arguments.cloned(), 1, debug);
-    println!();
+
+    // a delegate calls tools by the dozen, and the stream is read to see what it
+    // is up to rather than with what exactly, so a call takes one line
+    let room = terminal_width().saturating_sub(measure_text_width(&head) + 2);
+    match summarize_params(arguments, room, debug) {
+        Some(summary) => println!("{}  {}", head, style(summary).dim()),
+        None => println!("{}", head),
+    }
 }
 
-fn render_subagent_tool_graph(subagent_id: &str, tool_graph: &[Value]) {
-    let short_id = subagent_id.rsplit('_').next().unwrap_or(subagent_id);
+/// Folds the parameters of a call onto its line, keeping to the room left over.
+fn summarize_params(arguments: Option<&JsonObject>, room: usize, debug: bool) -> Option<String> {
+    let arguments = arguments?;
+
+    let mut parts = Vec::new();
+    for (key, value) in arguments {
+        let text = match value {
+            Value::Null => continue,
+            // a path is the one parameter that is routinely longer than the line
+            // it goes on, and its beginning is the part that says nothing
+            Value::String(text) if key == "path" => shorten_path(text, debug),
+            Value::String(text) => fold_lines(text),
+            other => other.to_string(),
+        };
+        if text.is_empty() {
+            continue;
+        }
+        parts.push(format!("{key} {text}"));
+    }
+
+    if parts.is_empty() {
+        return None;
+    }
+
+    let summary = parts.join("  ");
+    if debug || summary.chars().count() <= room {
+        return Some(summary);
+    }
+    Some(safe_truncate(&summary, room))
+}
+
+fn render_subagent_tool_graph(subagent_id: &str, label: Option<&str>, tool_graph: &[Value]) {
+    let name = subagent_label(subagent_id, label);
     let count = tool_graph.len();
     let plural = if count == 1 { "" } else { "s" };
-    println!();
+    open_tool_run();
     println!(
         "  {} {} {} {} tool call{}",
         style("▸").dim(),
-        style(format!("[subagent:{}]", short_id)).dim(),
+        style(&name).dim(),
         style("execute_typescript").dim(),
         style(count).dim(),
         plural,
@@ -943,13 +1242,15 @@ fn render_subagent_tool_graph(subagent_id: &str, tool_graph: &[Value]) {
             style(deps_str).dim()
         );
     }
-    println!();
 }
 
 // Helper functions
 
 fn print_tool_header(call: &CallToolRequestParams) {
-    let parts = ToolNameParts::from(call.name.as_ref());
+    print_tool_header_parts(ToolNameParts::from(call.name.as_ref()));
+}
+
+fn print_tool_header_parts(parts: ToolNameParts<'_>) {
     let tool_header = match parts.extension_name {
         Some(extension_name) => format!(
             "  {} {} {}",
@@ -961,7 +1262,7 @@ fn print_tool_header(call: &CallToolRequestParams) {
         ),
         None => format!("  {} {}", style("▸").dim(), style(parts.tool_name).dim()),
     };
-    println!();
+    open_block();
     println!("  {}", style("─".repeat(40)).dim());
     println!("{}", tool_header);
 }
@@ -992,14 +1293,127 @@ fn print_markdown(content: &str, theme: Theme) {
 
 /// Renders markdown content using bat (no table processing)
 fn print_markdown_raw(content: &str, theme: Theme) {
+    let marker = take_marker();
+
+    // models like to open with a blank line or two, which would add to the
+    // spacing the session lays out; only the block that opens a turn is trimmed,
+    // because later chunks carry the paragraph breaks of the answer itself
+    let content = match marker {
+        Some(_) => content.trim_start_matches('\n'),
+        None => content,
+    };
+
+    if content.trim().is_empty() {
+        // nothing to mark yet, so the marker waits for the chunk that has text
+        if let Some(marker) = marker {
+            set_marker(marker);
+        }
+        return;
+    }
+
+    // a marked block carries its own empty line, so the run of tool calls above
+    // it ends without one being printed here
+    end_tool_run();
+
+    let width = terminal_width().saturating_sub(REPLY_INDENT.len());
+    let wrapped = wrap_markdown_source(content, width);
+
+    // bat only wraps character by character, so the text arrives already broken
+    // into lines and is caught here instead of going to stdout, which is what
+    // lets every line of it be moved in by the same amount
+    let mut rendered = String::new();
     bat::PrettyPrinter::new()
-        .input(bat::Input::from_bytes(content.as_bytes()))
+        .input(bat::Input::from_bytes(wrapped.as_bytes()))
         .theme(theme.as_str())
         .colored_output(env_no_color())
         .language("Markdown")
         .wrapping_mode(WrappingMode::NoWrapping(true))
-        .print()
+        .term_width(width)
+        .print_with_writer(Some(&mut rendered))
         .unwrap();
+
+    if rendered.is_empty() {
+        return;
+    }
+
+    print!("{}", indent_block(&rendered, marker.as_deref()));
+}
+
+/// Breaks prose at the given width so that the rendered block can be moved in
+/// as a whole. Fenced code and table rows are left alone: they are meant to be
+/// read as written, and the terminal still wraps them if they do not fit.
+fn wrap_markdown_source(content: &str, width: usize) -> String {
+    if width == 0 {
+        return content.to_string();
+    }
+
+    let mut out = String::with_capacity(content.len());
+    let mut in_fence = false;
+
+    for line in content.split_inclusive('\n') {
+        let (text, ending) = match line.strip_suffix('\n') {
+            Some(text) => (text, "\n"),
+            None => (line, ""),
+        };
+        let trimmed = text.trim_start();
+        let is_fence = trimmed.starts_with("```") || trimmed.starts_with("~~~");
+
+        if is_fence {
+            in_fence = !in_fence;
+        }
+
+        let untouched = in_fence
+            || is_fence
+            || trimmed.starts_with('|')
+            || text.starts_with("    ")
+            || text.chars().count() <= width;
+
+        if untouched {
+            out.push_str(text);
+            out.push_str(ending);
+            continue;
+        }
+
+        let indent: String = text.chars().take_while(|c| c.is_whitespace()).collect();
+        let room = width.saturating_sub(indent.chars().count()).max(1);
+        for (index, part) in wrap_words(trimmed, room).iter().enumerate() {
+            if index > 0 {
+                out.push('\n');
+            }
+            out.push_str(&indent);
+            out.push_str(part);
+        }
+        out.push_str(ending);
+    }
+
+    out
+}
+
+/// Puts a rendered block behind the reply indent, with the marker of the
+/// speaker in the columns the indent frees up.
+fn indent_block(rendered: &str, marker: Option<&str>) -> String {
+    let mut out = String::with_capacity(rendered.len());
+    let mut first = true;
+
+    // a marked block opens a turn or resumes one after a tool call, and every
+    // block in the session is separated from the one above by a single line
+    if marker.is_some() {
+        out.push('\n');
+    }
+
+    for line in rendered.split_inclusive('\n') {
+        let bare = line.strip_suffix('\n').unwrap_or(line);
+        if !bare.is_empty() {
+            match marker.filter(|_| first) {
+                Some(marker) => out.push_str(&format!("{marker} ")),
+                None => out.push_str(REPLY_INDENT),
+            }
+            first = false;
+        }
+        out.push_str(line);
+    }
+
+    out
 }
 
 fn extract_markdown_table(content: &str) -> Option<(String, Vec<&str>, &str)> {
@@ -1083,11 +1497,59 @@ fn extract_markdown_table(content: &str) -> Option<(String, Vec<&str>, &str)> {
     Some((before, table, after))
 }
 
+/// Width of the terminal, or a conservative default when it cannot be read.
+/// comfy-table is built without its `tty` feature and never measures it itself.
+pub fn terminal_width() -> usize {
+    Term::stdout()
+        .size_checked()
+        .map(|(_height, width)| width as usize)
+        .unwrap_or(80)
+}
+
+fn wrap_words(text: &str, width: usize) -> Vec<String> {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut lines = Vec::new();
+    let mut start = 0;
+
+    while start < words.len() {
+        let mut end = start;
+        let mut taken = 0;
+
+        while end < words.len() {
+            let extra = words[end].chars().count() + usize::from(end > start);
+            if end > start && taken + extra > width {
+                break;
+            }
+            taken += extra;
+            end += 1;
+        }
+
+        // a break must not hand the next line to markdown punctuation, or the
+        // tail of a paragraph is read as a list, a heading or a quote
+        while end > start + 1 && end < words.len() && starts_like_markdown(words[end]) {
+            end -= 1;
+        }
+
+        lines.push(words[start..end].join(" "));
+        start = end;
+    }
+
+    lines
+}
+
+fn starts_like_markdown(word: &str) -> bool {
+    if matches!(word, "-" | "*" | "+" | "1.") || word.starts_with('>') {
+        return true;
+    }
+    !word.is_empty() && word.chars().all(|c| c == '#') && word.chars().count() <= 6
+}
+
 fn print_table(table_lines: &[&str], theme: Theme) {
-    use comfy_table::{presets, Cell, CellAlignment, ContentArrangement, Table};
+    use comfy_table::{Cell, CellAlignment, ContentArrangement, Table, presets};
 
     let mut table = Table::new();
     table.set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_width(terminal_width() as u16);
 
     table.load_preset(presets::ASCII_MARKDOWN);
 
@@ -1169,6 +1631,41 @@ fn print_table(table_lines: &[&str], theme: Theme) {
 
 const INDENT: &str = "    ";
 
+/// A parameter takes one line, so a value carrying newlines of its own would
+/// break out of the indent everything else is printed at. Folded into a line
+/// when the value is only being previewed, and moved to the column it starts at
+/// when the whole of it was asked for.
+fn fit_value(
+    text: &str,
+    max_width: Option<usize>,
+    reserve_width: usize,
+    show_full: bool,
+) -> String {
+    if show_full {
+        return text.replace('\n', &format!("\n{}", " ".repeat(reserve_width)));
+    }
+
+    let folded = fold_lines(text);
+    match max_width {
+        Some(width) if folded.chars().count() > width => safe_truncate(&folded, width),
+        _ => folded,
+    }
+}
+
+/// Puts a value on one line. Whitespace collapses only around the line breaks
+/// that are removed, so a command keeps the spacing it was written with.
+fn fold_lines(text: &str) -> String {
+    if !text.contains('\n') {
+        return text.to_string();
+    }
+
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn print_value_with_prefix(prefix: &String, value: &Value, debug: bool) {
     let prefix_width = measure_text_width(prefix.as_str());
     print!("{}", prefix);
@@ -1181,11 +1678,9 @@ fn print_value(value: &Value, debug: bool, reserve_width: usize) {
         .map(|(_h, w)| (w as usize).saturating_sub(reserve_width));
     let show_full = get_show_full_tool_output();
     let formatted = match value {
-        Value::String(s) => match (max_width, debug || show_full) {
-            (Some(w), false) if s.len() > w => style(safe_truncate(s, w)),
-            _ => style(s.to_string()),
+        Value::String(s) => {
+            style(fit_value(s, max_width, reserve_width, debug || show_full)).green()
         }
-        .green(),
         Value::Number(n) => style(n.to_string()).yellow(),
         Value::Bool(b) => style(b.to_string()).yellow(),
         Value::Null => style("null".to_string()).dim(),
@@ -1328,38 +1823,48 @@ pub fn display_session_info(
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    // ASCII art goose with session info on the right
+    let mode = Config::global().get_goose_mode().unwrap_or_default();
+
+    // ASCII art with session info on the right
     println!();
     println!(
-        "  {}  {} {} {} {} {}",
-        style("  __( O)>").white(),
+        "  {}  {} {} {} {} {} {} {}",
+        style(r" (\(\ ").white(),
         style("●").green(),
         style(status).dim(),
         style("·").dim(),
         style(provider).dim(),
         style(&model_display).cyan(),
+        style("·").dim(),
+        style(mode.to_string()).dim(),
     );
 
     if let Some(id) = session_id {
         println!(
-            "  {}  {} {} {}",
-            style(r" \____)").white(),
-            style(" ").dim(),
+            "  {}  {} {}",
+            style(r" (._.)").white(),
             style(id).dim(),
             style(format!("· {}", cwd_display)).dim(),
         );
     } else {
         println!(
-            "  {}  {} {}",
-            style(r" \____)").white(),
-            style(" ").dim(),
-            style(format!("  {}", cwd_display)).dim(),
+            "  {}  {}",
+            style(r" (._.)").white(),
+            style(&cwd_display).dim(),
         );
     }
+    let mode_note = if mode == GooseMode::Auto {
+        style(" · tools run without asking · /mode to change")
+            .dim()
+            .to_string()
+    } else {
+        String::new()
+    };
     println!(
-        "  {}  {}",
-        style("   L L").white(),
-        style("   goose is ready").white()
+        "  {}  {}{}",
+        style(r"c(___)").white(),
+        style("markov is ready").white(),
+        mode_note,
     );
 }
 
@@ -1378,15 +1883,16 @@ fn set_terminal_title() {
     let _ = std::io::stdout().flush();
 }
 
-pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
+/// The context gauge, as text. It is not printed: shown once per turn it would
+/// leave a stale copy of itself glued to every past answer, so it belongs to
+/// the input line, which the terminal clears on its own.
+pub fn format_context_usage(total_tokens: usize, context_limit: usize) -> String {
     use console::style;
 
     if context_limit == 0 {
-        println!(
-            "  {}",
-            style("context usage unavailable (context limit is 0)").dim()
-        );
-        return;
+        return style("context usage unavailable (context limit is 0)")
+            .dim()
+            .to_string();
     }
 
     let percentage =
@@ -1415,8 +1921,8 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
         }
     }
 
-    println!(
-        "  {} {} {}",
+    format!(
+        "{} {} {}",
         colored_bar,
         style(format!("{}%", percentage)).dim(),
         style(format!(
@@ -1425,7 +1931,7 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
             format_tokens(context_limit)
         ))
         .dim(),
-    );
+    )
 }
 
 fn estimate_cost_usd(provider: &str, model: &str, usage: &Usage) -> Option<f64> {
@@ -1525,10 +2031,278 @@ impl McpSpinners {
 }
 
 #[cfg(test)]
+mod reply_layout_tests {
+    use super::*;
+
+    #[test]
+    fn prose_is_wrapped_to_the_given_width() {
+        let wrapped = wrap_markdown_source("one two three four five six", 9);
+        assert_eq!(wrapped, "one two\nthree\nfour five\nsix");
+    }
+
+    #[test]
+    fn a_fenced_block_is_left_as_written() {
+        let source = "```\nlet the line of code run past the width\n```\n";
+        assert_eq!(wrap_markdown_source(source, 10), source);
+    }
+
+    #[test]
+    fn a_table_row_is_left_as_written() {
+        let source = "| a long header | another long header |\n";
+        assert_eq!(wrap_markdown_source(source, 10), source);
+    }
+
+    #[test]
+    fn a_wrap_does_not_start_a_line_with_a_bullet() {
+        // without the guard the break would fall as "alpha beta" / "- gamma"
+        let wrapped = wrap_markdown_source("alpha beta - gamma", 11);
+        assert_eq!(wrapped, "alpha\nbeta -\ngamma");
+    }
+
+    #[test]
+    fn a_wrap_does_not_start_a_line_with_a_heading() {
+        let wrapped = wrap_markdown_source("alpha beta ## gamma", 11);
+        assert_eq!(wrapped, "alpha\nbeta ##\ngamma");
+    }
+
+    #[test]
+    fn the_indent_of_a_wrapped_line_is_kept() {
+        let wrapped = wrap_markdown_source("  one two three", 7);
+        assert_eq!(wrapped, "  one\n  two\n  three");
+    }
+
+    #[test]
+    fn the_marker_goes_on_the_first_line_and_the_indent_on_the_rest() {
+        let block = indent_block("first\nsecond\n", Some("●"));
+        assert_eq!(block, "\n● first\n  second\n");
+    }
+
+    #[test]
+    fn a_blank_line_inside_a_block_stays_blank() {
+        let block = indent_block("first\n\nsecond\n", Some("●"));
+        assert_eq!(block, "\n● first\n\n  second\n");
+    }
+
+    #[test]
+    fn only_a_marked_block_opens_with_an_empty_line() {
+        assert!(indent_block("first\n", Some("●")).starts_with('\n'));
+        assert!(!indent_block("first\n", None).starts_with('\n'));
+    }
+
+    #[test]
+    fn a_block_without_a_marker_is_only_moved_in() {
+        assert_eq!(indent_block("only\n", None), "  only\n");
+    }
+
+    #[test]
+    fn the_context_gauge_is_returned_rather_than_printed() {
+        let gauge = format_context_usage(7_000, 210_000);
+        assert!(gauge.contains("3%"), "{gauge}");
+        assert!(gauge.contains("7k/210k"), "{gauge}");
+        assert!(!gauge.ends_with('\n'), "{gauge}");
+    }
+}
+
+#[cfg(test)]
+mod subagent_stream_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn the_first_call_of_a_subagent_spells_out_its_session_id() {
+        let mut run = SubagentRun::default();
+        assert_eq!(run.name("20260804_14", None), "[1] 20260804_14");
+        assert_eq!(run.name("20260804_14", None), "[1]");
+    }
+
+    #[test]
+    fn subagents_are_numbered_in_the_order_they_first_speak() {
+        let mut run = SubagentRun::default();
+        run.name("20260804_14", None);
+        assert_eq!(run.name("20260804_16", None), "[2] 20260804_16");
+        assert_eq!(run.name("20260804_14", None), "[1]");
+    }
+
+    #[test]
+    fn a_task_that_says_what_it_is_is_named_by_it() {
+        let mut run = SubagentRun::default();
+        let name = run.name("20260804_14", Some("разобрать цикл reply"));
+        assert_eq!(name, "[разобрать цикл reply] 20260804_14");
+    }
+
+    #[test]
+    fn a_label_longer_than_the_budget_is_cut() {
+        let mut run = SubagentRun::default();
+        let long = "a".repeat(SUBAGENT_LABEL_BUDGET + 10);
+        let name = run.name("20260804_14", Some(&long));
+        let cut = safe_truncate(&long, SUBAGENT_LABEL_BUDGET);
+        assert_eq!(name, format!("[{cut}] 20260804_14"));
+    }
+
+    #[test]
+    fn an_empty_label_falls_back_to_the_number() {
+        let mut run = SubagentRun::default();
+        assert_eq!(run.name("20260804_14", Some("  ")), "[1] 20260804_14");
+    }
+
+    #[test]
+    fn only_the_first_call_of_a_run_opens_a_block() {
+        assert!(open_tool_run());
+        assert!(!open_tool_run());
+
+        end_tool_run();
+        assert!(open_tool_run());
+    }
+
+    #[test]
+    fn the_parameters_of_a_call_are_folded_onto_one_line() {
+        // the order is the one the model wrote them in, which puts what the
+        // call is about first
+        let args = json!({"path": "src/main.rs", "limit": 20});
+        let summary = summarize_params(args.as_object(), 80, false);
+        assert_eq!(summary.as_deref(), Some("path src/main.rs  limit 20"));
+    }
+
+    #[test]
+    fn a_parameter_of_several_lines_stays_on_one() {
+        let args = json!({"content": "первая строка\n\nвторая строка"});
+        let summary = summarize_params(args.as_object(), 80, false);
+        assert_eq!(
+            summary.as_deref(),
+            Some("content первая строка вторая строка")
+        );
+    }
+
+    #[test]
+    fn a_summary_is_cut_to_the_room_it_has() {
+        let args = json!({"command": "cargo tree -p goose --depth 1"});
+        let summary = summarize_params(args.as_object(), 12, false).expect("expected a summary");
+        assert_eq!(summary.chars().count(), 12);
+    }
+
+    #[test]
+    fn a_call_without_parameters_has_nothing_to_show() {
+        assert_eq!(summarize_params(None, 80, false), None);
+        assert_eq!(summarize_params(json!({}).as_object(), 80, false), None);
+        assert_eq!(
+            summarize_params(json!({"source": null}).as_object(), 80, false),
+            None
+        );
+    }
+
+    #[test]
+    fn a_long_path_is_shortened_before_it_is_measured() {
+        let home = etcetera::home_dir().expect("expected a home dir");
+        let path = home
+            .join("dev/markov/crates/goose-cli/src/session/output.rs")
+            .display()
+            .to_string();
+        let args = json!({ "path": path });
+        let summary = summarize_params(args.as_object(), 200, false).expect("expected a summary");
+        assert!(summary.ends_with("session/output.rs"), "{summary}");
+        assert!(summary.chars().count() < path.chars().count(), "{summary}");
+    }
+}
+
+#[cfg(test)]
+mod tool_output_tests {
+    use super::*;
+
+    #[test]
+    fn the_way_to_unfold_output_is_told_once() {
+        assert_eq!(
+            collapsed_output_note(312),
+            "312 lines · /r shows full output"
+        );
+        assert_eq!(collapsed_output_note(7), "7 lines");
+    }
+
+    #[test]
+    fn a_name_that_is_a_title_keeps_its_dunders() {
+        let parts = display_parts("ls src/__pycache__", true);
+        assert_eq!(parts.extension_name, None);
+        assert_eq!(parts.tool_name, "ls src/__pycache__");
+
+        let parts = display_parts("developer__shell", false);
+        assert_eq!(parts.extension_name, Some("developer"));
+        assert_eq!(parts.tool_name, "shell");
+    }
+
+    #[test]
+    fn the_report_of_a_delegate_is_the_answer_of_the_turn() {
+        assert!(answers_the_turn("load"));
+        assert!(answers_the_turn("summon__load"));
+        assert!(!answers_the_turn("shell"));
+        assert!(!answers_the_turn("developer__download_file"));
+    }
+
+    #[test]
+    fn the_calls_whose_result_is_the_answer_are_remembered_by_id() {
+        remember_full_result("call_1");
+        assert!(result_is_the_answer("call_1"));
+        assert!(!result_is_the_answer("call_2"));
+
+        for i in 0..FULL_RESULT_MEMORY {
+            remember_full_result(&format!("later_{i}"));
+        }
+        assert!(!result_is_the_answer("call_1"));
+    }
+}
+
+#[cfg(test)]
+mod tool_parameter_tests {
+    use super::*;
+
+    #[test]
+    fn a_value_of_several_lines_is_folded_when_previewed() {
+        let folded = fit_value("первая\nвторая", Some(80), 4, false);
+        assert_eq!(folded, "первая вторая");
+    }
+
+    #[test]
+    fn a_value_shown_in_full_keeps_its_lines_behind_the_indent() {
+        let shown = fit_value("первая\nвторая", Some(80), 4, true);
+        assert_eq!(shown, "первая\n    вторая");
+    }
+
+    #[test]
+    fn a_value_of_one_line_keeps_the_spacing_it_was_written_with() {
+        assert_eq!(fit_value("rg  -n  foo", Some(80), 4, false), "rg  -n  foo");
+    }
+
+    #[test]
+    fn a_value_is_cut_by_columns_and_not_by_bytes() {
+        // eight letters of two bytes each fit a width of eight
+        let cut = fit_value("привет!!", Some(8), 0, false);
+        assert_eq!(cut, "привет!!");
+    }
+}
+
+#[cfg(test)]
+mod wrap_tests {
+    use super::*;
+
+    #[test]
+    fn words_are_kept_whole_when_wrapping() {
+        assert_eq!(
+            wrap_words("one two three four", 9),
+            vec!["one two", "three", "four"]
+        );
+    }
+
+    #[test]
+    fn a_word_longer_than_the_width_gets_its_own_line() {
+        assert_eq!(
+            wrap_words("a loooooooooong tail", 4),
+            vec!["a", "loooooooooong", "tail"]
+        );
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::env;
 
     #[test]
     fn formats_subagent_tool_call_names() {
@@ -1567,11 +2341,7 @@ mod tests {
 
     #[test]
     fn test_home_directory_conversion() {
-        // Save the current home dir
-        let original_home = env::var("HOME").ok();
-
-        // Set a test home directory
-        env::set_var("HOME", "/Users/testuser");
+        let _env = env_lock::lock_env([("HOME", Some("/Users/testuser"))]);
 
         assert_eq!(
             shorten_path("/Users/testuser/documents/file.txt", false),
@@ -1583,13 +2353,6 @@ mod tests {
             shorten_path("/Users/testuser2/documents/file.txt", false),
             "/Users/testuser2/documents/file.txt"
         );
-
-        // Restore the original home dir
-        if let Some(home) = original_home {
-            env::set_var("HOME", home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
@@ -1627,6 +2390,52 @@ mod tests {
             get_credits_top_up_url(&message).as_deref(),
             Some("https://router.tetrate.ai/billing")
         );
+    }
+
+    #[test]
+    fn content_without_priority_is_visible_by_default() {
+        assert!(is_visible_to_user(None, DEFAULT_MIN_PRIORITY, false));
+    }
+
+    #[test]
+    fn content_without_priority_respects_a_raised_threshold() {
+        assert!(!is_visible_to_user(None, 0.5, false));
+    }
+
+    #[test]
+    fn annotated_priority_at_the_threshold_is_visible() {
+        let annotations = Annotations::default().with_priority(0.0);
+        assert!(is_visible_to_user(
+            Some(&annotations),
+            DEFAULT_MIN_PRIORITY,
+            false
+        ));
+    }
+
+    #[test]
+    fn assistant_only_content_is_hidden() {
+        let annotations = Annotations::default().with_audience(vec![Role::Assistant]);
+        assert!(!is_visible_to_user(
+            Some(&annotations),
+            DEFAULT_MIN_PRIORITY,
+            false
+        ));
+    }
+
+    #[test]
+    fn errors_ignore_the_priority_threshold() {
+        let annotations = Annotations::default().with_priority(0.1);
+        assert!(is_visible_to_user(Some(&annotations), 0.5, true));
+    }
+
+    #[test]
+    fn errors_still_respect_the_audience() {
+        let annotations = Annotations::default().with_audience(vec![Role::Assistant]);
+        assert!(!is_visible_to_user(
+            Some(&annotations),
+            DEFAULT_MIN_PRIORITY,
+            true
+        ));
     }
 
     #[test]

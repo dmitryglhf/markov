@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use cliclack::{MultiSelect, Select};
-use console::{measure_text_width, Term};
+use console::{Term, measure_text_width};
 use std::fmt::Display;
 use std::io::IsTerminal;
 

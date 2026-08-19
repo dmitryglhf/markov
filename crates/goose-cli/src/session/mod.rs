@@ -1,9 +1,12 @@
 mod builder;
+#[path = "../markov/repl/completion.rs"]
 mod completion;
 pub mod editor;
 mod elicitation;
 mod export;
+#[path = "../markov/repl/input.rs"]
 mod input;
+#[path = "../markov/repl/output.rs"]
 mod output;
 mod paste;
 pub mod streaming_buffer;
@@ -21,7 +24,8 @@ use tokio::signal::ctrl_c;
 use tokio_util::task::AbortOnDropHandle;
 
 pub use self::export::{message_to_markdown, user_projected_message_to_markdown};
-use crate::commands::extensions::ExtensionChange;
+use crate::markov::hooks::hooks;
+use crate::markov::types::{Current, ExtensionChange};
 pub use builder::{SessionBuilderConfig, build_session};
 use console::Color;
 use goose::agents::AgentEvent;
@@ -468,14 +472,14 @@ impl CliSession {
     }
 
     async fn handle_mcp(&mut self) {
-        match crate::commands::mcp_manager::mcp_dialog().await {
+        match hooks().mcp_dialog().await {
             Ok(changes) => self.apply_extension_changes(&changes).await,
             Err(e) => output::render_error(&e.to_string()),
         }
     }
 
     async fn handle_extensions(&mut self) {
-        match crate::commands::extensions::extensions_dialog() {
+        match hooks().extensions_dialog() {
             Ok(changes) => self.apply_extension_changes(&changes).await,
             Err(e) => output::render_error(&e.to_string()),
         }
@@ -1004,7 +1008,7 @@ impl CliSession {
             .model_config_for_session(&self.session_id)
             .await?;
 
-        let choice = crate::commands::models::models_dialog(crate::commands::models::Current {
+        let choice = hooks().models_dialog(Current {
             provider: provider.get_name().to_string(),
             model: model_config.model_name.clone(),
             in_session: true,

@@ -1,0 +1,59 @@
+[package]
+name = "markov-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "markov"
+path = "src/main.rs"
+
+[dependencies]
+goose-cli = { path = "../goose-cli", default-features = false }
+goose = { path = "../goose", default-features = false }
+goose-mcp = { path = "../goose-mcp", default-features = false }
+goose-providers = { path = "../goose-providers", default-features = false }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+cliclack = { version = "0.5", default-features = false }
+console = { version = "0.16", default-features = false, features = ["std"] }
+etcetera = { workspace = true }
+futures = { workspace = true }
+jsonc-parser = { version = "0.27.1", features = ["cst", "serde"] }
+serde = { workspace = true }
+tokio = { workspace = true }
+serde_json.workspace = true
+tempfile.workspace = true
+url.workspace = true
+reqwest = { workspace = true, features = ["blocking", "stream"] }
+
+[features]
+# Forwarded to goose-cli: this crate owns the binary, so the build flags land here.
+default = ["goose-cli/default"]
+code-mode = ["goose-cli/code-mode"]
+local-inference = ["goose-cli/local-inference"]
+aws-providers = ["goose-cli/aws-providers"]
+cuda = ["goose-cli/cuda"]
+vulkan = ["goose-cli/vulkan"]
+mlx = ["goose-cli/mlx"]
+telemetry = ["goose-cli/telemetry"]
+nostr = ["goose-cli/nostr"]
+otel = ["goose-cli/otel"]
+system-keyring = ["goose-cli/system-keyring"]
+tui = ["goose-cli/tui"]
+update = ["goose-cli/update"]
+disable-update = ["goose-cli/disable-update"]
+portable-default = ["goose-cli/portable-default"]
+rustls-tls = ["goose-cli/rustls-tls"]
+native-tls = ["goose-cli/native-tls"]
+
+[dev-dependencies]
+tempfile = { workspace = true }

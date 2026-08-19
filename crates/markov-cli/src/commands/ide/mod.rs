@@ -4,7 +4,7 @@ pub mod paths;
 pub mod targets;
 pub mod vscode;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use console::style;
 use jsonc::Document;
 use paths::{BaseDirs, Os};

@@ -11,30 +11,16 @@
 
 use anyhow::Result;
 use console::style;
-use goose::config::{get_default_provider, get_provider_entry, set_active_provider, Config};
+use goose::config::{Config, get_default_provider, get_provider_entry, set_active_provider};
 use goose::providers::base::{ModelInfo, ProviderMetadata};
 use goose::providers::inventory::{ProviderInventoryEntry, ProviderInventoryService};
 use goose::providers::{create, providers};
 use goose::session::SessionManager;
 use goose_providers::thinking::ThinkingEffort;
 
-use super::configure::{ensure_credentials, fetch_and_select_model};
-use super::ui::{cancellable, is_cancel, require_terminal, select};
-
-/// What answers right now, whoever decided it.
-pub struct Current {
-    pub provider: String,
-    pub model: String,
-    /// A live session applies a pick to itself and leaves the file alone unless
-    /// asked; standalone has nowhere to put a pick but the file.
-    pub in_session: bool,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct Choice {
-    pub provider: String,
-    pub model: String,
-}
+use goose_cli::commands::configure::{ensure_credentials, fetch_and_select_model};
+use goose_cli::markov::types::{Choice, Current};
+use goose_cli::markov::ui::{cancellable, is_cancel, require_terminal, select};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Action {
@@ -156,15 +142,6 @@ pub async fn handle_model_command() -> Result<()> {
     })
     .await
     .map(|_| ())
-}
-
-impl From<&Current> for Choice {
-    fn from(current: &Current) -> Self {
-        Choice {
-            provider: current.provider.clone(),
-            model: current.model.clone(),
-        }
-    }
 }
 
 /// Everything the form knows about providers before it talks to any of them.

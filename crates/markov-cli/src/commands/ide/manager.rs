@@ -1,12 +1,12 @@
 use super::paths::{BaseDirs, Os};
 use super::targets::{Target, TargetId, TargetSelector};
 use super::{
-    apply, blocking_sandbox, ensure_extension, handle_ide_status, inspect, remove, resolve_command,
-    vscode, Change, Configured, SetupOptions,
+    Change, Configured, SetupOptions, apply, blocking_sandbox, ensure_extension, handle_ide_status,
+    inspect, remove, resolve_command, vscode,
 };
-use crate::commands::ui::{cancellable, multiselect, pad_to_display_width};
 use anyhow::Result;
 use console::style;
+use goose_cli::markov::ui::{cancellable, multiselect, pad_to_display_width};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 

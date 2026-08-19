@@ -5,7 +5,7 @@
 //! here reduces one entry to the same command-or-URL string the connect form
 //! already accepts, so nothing downstream needs to know a registry exists.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use goose::config::Config;
 use serde::Deserialize;
 use std::time::Duration;
@@ -520,20 +520,24 @@ mod tests {
 
     #[test]
     fn a_server_reachable_only_over_the_retired_transport_is_not_offered() {
-        assert!(candidates(&page(
-            r#"{"server": {"name": "a/b", "remotes":
+        assert!(
+            candidates(&page(
+                r#"{"server": {"name": "a/b", "remotes":
                 [{"type": "sse", "url": "https://host/sse"}]}}"#,
-        ))
-        .is_empty());
+            ))
+            .is_empty()
+        );
     }
 
     #[test]
     fn a_bundle_we_cannot_launch_is_not_offered() {
-        assert!(candidates(&page(
-            r#"{"server": {"name": "a/b", "packages":
+        assert!(
+            candidates(&page(
+                r#"{"server": {"name": "a/b", "packages":
                 [{"registryType": "mcpb", "identifier": "https://host/x.mcpb"}]}}"#,
-        ))
-        .is_empty());
+            ))
+            .is_empty()
+        );
     }
 
     #[test]

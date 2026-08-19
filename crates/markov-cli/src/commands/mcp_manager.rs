@@ -15,14 +15,15 @@ use goose::config::extensions::{
     set_extension_enabled,
 };
 use goose::config::paths::Paths;
-use goose::config::{Config, ExtensionEntry, PermissionManager, DEFAULT_EXTENSION_TIMEOUT};
+use goose::config::{Config, DEFAULT_EXTENSION_TIMEOUT, ExtensionEntry, PermissionManager};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::configure::try_store_secret;
-use super::extensions::{bundled_servers_line, plugin_extensions_line, ExtensionChange};
-use super::mcp_registry::{self, Candidate, Install};
-use super::ui::{cancellable, multiselect, require_terminal, select};
+use crate::commands::extensions::{bundled_servers_line, plugin_extensions_line};
+use crate::commands::mcp_registry::{self, Candidate, Install};
+use goose_cli::commands::configure::try_store_secret;
+use goose_cli::markov::types::ExtensionChange;
+use goose_cli::markov::ui::{cancellable, multiselect, require_terminal, select};
 
 /// Only passed through to the server's `list_tools`, no session is created.
 const PROBE_SESSION: &str = "mcp-connection-check";
@@ -35,8 +36,7 @@ const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 /// Only reads the opening of a stream, so it does not need the probe's patience.
 const SSE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-const LEGACY_SSE_MESSAGE: &str =
-    "the server speaks the retired HTTP+SSE protocol, which markov does not support. \
+const LEGACY_SSE_MESSAGE: &str = "the server speaks the retired HTTP+SSE protocol, which markov does not support. \
      Ask whoever runs it for a streamable_http endpoint";
 
 enum ProbeOutcome {

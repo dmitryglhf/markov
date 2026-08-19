@@ -6695,6 +6695,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "markov-cli"
+version = "1.45.0-pgpro"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "cliclack",
+ "console",
+ "etcetera 0.11.0",
+ "futures",
+ "goose",
+ "goose-cli",
+ "goose-mcp",
+ "goose-providers",
+ "jsonc-parser",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "matchers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

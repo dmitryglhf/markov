@@ -1,10 +1,12 @@
 use super::completion::GooseCompleter;
 use super::paste::{
-    read_paste_aware_input, PasteAwareEnterHandler, PasteCaptureHandler, PasteState,
+    PasteAwareEnterHandler, PasteCaptureHandler, PasteState, read_paste_aware_input,
 };
 use super::{CompletionCache, HintStatus};
 use anyhow::Result;
 use goose::config::{Config, GooseMode};
+use goose::slash_commands::slash_command;
+use goose::slash_commands::types::SlashCommandEntry;
 use rustyline::Editor;
 use shlex;
 use std::collections::HashMap;
@@ -15,8 +17,8 @@ use strum::VariantNames;
 pub enum InputResult {
     Message(String),
     Exit,
-    AddExtension(String),
-    AddBuiltin(String),
+    Mcp,
+    Extensions,
     ToggleTheme,
     SelectTheme(String),
     Retry,
@@ -31,7 +33,7 @@ pub enum InputResult {
     Compact,
     ToggleFullToolOutput,
     Edit(Option<String>),
-    ListSkills,
+    Skills,
     LoadSkills(Vec<String>),
 }
 
@@ -220,8 +222,95 @@ pub fn get_input(
     // Handle slash commands
     match handle_slash_command(&input) {
         Some(result) => Ok(result),
-        None => Ok(InputResult::Message(input.trim().to_string())),
+        None => {
+            let known = known_command_names();
+            match unknown_command_name(input.trim(), &known) {
+                Some(name) => {
+                    println!("{}", unknown_command_report(name, &known));
+                    Ok(InputResult::Retry)
+                }
+                None => Ok(InputResult::Message(input.trim().to_string())),
+            }
+        }
     }
+}
+
+/// The name of a command nobody answers to. What the REPL did not take may
+/// still belong to the agent, which owns its builtins, recipes and skills, so
+/// only a name missing from both sides is a misspelling.
+fn unknown_command_name<'a>(input: &'a str, known: &[String]) -> Option<&'a str> {
+    let name = command_attempt(input)?;
+    known
+        .iter()
+        .all(|command| !command.eq_ignore_ascii_case(name))
+        .then_some(name)
+}
+
+/// The name a line is trying to call, if the line even looks like an attempt at
+/// one. A line beginning with a slash is just as often a path being talked
+/// about, so only a single bare word counts, and a line starting with a space
+/// never reaches here at all.
+fn command_attempt(input: &str) -> Option<&str> {
+    let name = input.split_whitespace().next()?.strip_prefix('/')?;
+    let shaped = name.starts_with(|c: char| c.is_ascii_alphabetic())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
+    shaped.then_some(name)
+}
+
+/// Names the REPL answers to, plus the ones the agent answers to: builtins,
+/// recipes and skills. Read on the spot rather than from the completion cache,
+/// which fills in asynchronously and would deny a real command right after
+/// startup.
+fn known_command_names() -> Vec<String> {
+    REPL_COMMANDS
+        .iter()
+        .filter_map(|command| command.name.strip_prefix('/').map(String::from))
+        .chain(agent_slash_commands().into_iter().map(|entry| entry.name))
+        .collect()
+}
+
+fn unknown_command_report(name: &str, known: &[String]) -> String {
+    let suggestions = nearest_command_names(name, known);
+    let did_you_mean = match suggestions.len() {
+        0 => String::new(),
+        _ => format!(" — did you mean {}?", suggestions.join(" or ")),
+    };
+
+    format!(
+        "{}\n{}",
+        console::style(format!("Unknown command /{name}{did_you_mean}")).yellow(),
+        console::style(
+            "/help lists commands; start the line with a space to send it as a message."
+        )
+        .dim()
+    )
+}
+
+/// Commands close enough to be worth offering: those the typed name begins,
+/// then the ones that merely look alike.
+fn nearest_command_names(name: &str, known: &[String]) -> Vec<String> {
+    let typed = name.to_lowercase();
+    let mut scored: Vec<(f64, &String)> = known
+        .iter()
+        .filter_map(|candidate| {
+            let lowered = candidate.to_lowercase();
+            let score = if lowered.starts_with(&typed) {
+                2.0
+            } else {
+                strsim::jaro_winkler(&lowered, &typed)
+            };
+            (score > 0.8).then_some((score, candidate))
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| a.1.cmp(b.1)));
+    scored
+        .into_iter()
+        .take(3)
+        .map(|(_, name)| format!("/{name}"))
+        .collect()
 }
 
 fn handle_slash_command(input: &str) -> Option<InputResult> {
@@ -231,8 +320,6 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
     const CMD_PROMPTS: &str = "/prompts ";
     const CMD_PROMPT: &str = "/prompt";
     const CMD_PROMPT_WITH_SPACE: &str = "/prompt ";
-    const CMD_EXTENSION: &str = "/extension ";
-    const CMD_BUILTIN: &str = "/builtin ";
     const CMD_MODE: &str = "/mode ";
     const CMD_MODEL: &str = "/model";
     const CMD_MODEL_WITH_SPACE: &str = "/model ";
@@ -292,12 +379,9 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
                 None
             }
         }
-        s if s.starts_with(CMD_EXTENSION) => Some(InputResult::AddExtension(
-            s.get(CMD_EXTENSION.len()..).unwrap_or("").to_string(),
-        )),
-        s if s.starts_with(CMD_BUILTIN) => Some(InputResult::AddBuiltin(
-            s.get(CMD_BUILTIN.len()..).unwrap_or("").to_string(),
-        )),
+        "/mcp" => Some(InputResult::Mcp),
+        "/extensions" => Some(InputResult::Extensions),
+        "/mode" => Some(InputResult::GooseMode(String::new())),
         s if s.starts_with(CMD_MODE) => Some(InputResult::GooseMode(
             s.get(CMD_MODE.len()..).unwrap_or("").to_string(),
         )),
@@ -341,7 +425,7 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
         s if s == CMD_SKILLS || s.starts_with(&format!("{CMD_SKILLS} ")) => {
             let args = s.get(CMD_SKILLS.len()..).unwrap_or("").trim();
             if args.is_empty() {
-                Some(InputResult::ListSkills)
+                Some(InputResult::Skills)
             } else {
                 let names: Vec<String> = args.split_whitespace().map(String::from).collect();
                 Some(InputResult::LoadSkills(names))
@@ -454,6 +538,81 @@ fn parse_plan_command(input: String) -> Option<InputResult> {
     Some(InputResult::Plan(options))
 }
 
+/// Slash commands the REPL handles itself. Everything else reaches the agent,
+/// which owns its own list of builtins, recipes and skills.
+pub(super) struct ReplCommand {
+    pub name: &'static str,
+    pub description: &'static str,
+}
+
+pub(super) const REPL_COMMANDS: &[ReplCommand] = &[
+    ReplCommand {
+        name: "/?",
+        description: "Display the help message",
+    },
+    ReplCommand {
+        name: "/edit",
+        description: "Compose a message in your editor",
+    },
+    ReplCommand {
+        name: "/endplan",
+        description: "Leave plan mode",
+    },
+    ReplCommand {
+        name: "/exit",
+        description: "Exit the session",
+    },
+    ReplCommand {
+        name: "/help",
+        description: "Display the help message",
+    },
+    ReplCommand {
+        name: "/extensions",
+        description: "Turn any extension on or off, whatever kind it is",
+    },
+    ReplCommand {
+        name: "/mcp",
+        description: "Connect, disable or remove MCP servers",
+    },
+    ReplCommand {
+        name: "/mode",
+        description: "Set the mode to use",
+    },
+    ReplCommand {
+        name: "/model",
+        description: "Choose a model or provider, or switch by name",
+    },
+    ReplCommand {
+        name: "/plan",
+        description: "Enter plan mode, optionally with a message",
+    },
+    ReplCommand {
+        name: "/quit",
+        description: "Exit the session",
+    },
+    ReplCommand {
+        name: "/r",
+        description: "Toggle full tool output",
+    },
+    ReplCommand {
+        name: "/recipe",
+        description: "Save this conversation as a recipe",
+    },
+    ReplCommand {
+        name: "/skills",
+        description: "Browse, create, edit or remove skills",
+    },
+    ReplCommand {
+        name: "/t",
+        description: "Toggle or set the theme (light, dark, ansi)",
+    },
+];
+
+pub(super) fn agent_slash_commands() -> Vec<SlashCommandEntry> {
+    let working_dir = std::env::current_dir().ok();
+    slash_command::list_acp_commands(working_dir.as_deref())
+}
+
 fn help_text() -> String {
     let modes = GooseMode::VARIANTS.join(", ");
     let newline_key = get_newline_key().to_ascii_uppercase();
@@ -470,12 +629,13 @@ fn help_text() -> String {
 /t - Toggle Light/Dark/Ansi theme
 /t <name> - Set theme directly (light, dark, ansi)
 /r - Toggle full tool output display (show complete tool parameters without truncation)
-/extension <command> - Add a stdio extension (format: ENV1=val1 command args...)
-/builtin <names> - Add builtin extensions by name (comma-separated)
+/extensions - Turn any extension on or off, servers and built-in ones alike (kept across sessions)
+/mcp - Connect an MCP server, or turn configured ones on and off (kept across sessions)
 /prompts [--extension <name>] - List all available prompts, optionally filtered by extension
 /prompt <n> [--info] [key=value...] - Get prompt info or execute a prompt
 /mode <name> - Set the goose mode to use ({modes})
-/model [name] - Show the current model, or switch models for this session while keeping the same provider
+/model - Choose a provider and model, see where the current one comes from, and set the default
+/model <name> - Switch model for this session while keeping the same provider
 /model --provider <name> [model] - Switch to a different provider (optionally specifying a model)
 /plan <message_text> -  Enters 'plan' mode with optional message. Create a plan based on the current messages and asks user if they want to act on it.
                         If user acts on the plan, goose mode is set to 'auto' and returns to 'normal' goose mode.
@@ -489,7 +649,7 @@ fn help_text() -> String {
 {additional_builtin_help}/status - Show session status: model, provider, mode, and token usage.
 /edit [text] - Open your prompt editor to compose a message. Optionally pre-fill with text.
                Uses $GOOSE_PROMPT_EDITOR, $VISUAL, or $EDITOR (in that order).
-/skills - List available skills or enable skills by name (usage: /skills [<name>...])
+/skills - Browse, create, edit or remove skills. With names, loads them (usage: /skills [<name>...])
 /? or /help - Display this help message
 /clear - Clears the current chat history
 
@@ -505,9 +665,9 @@ fn additional_builtin_help() -> String {
     const DOCUMENTED_BUILTINS: &[&str] =
         &["prompts", "prompt", "compact", "clear", "skills", "status"];
 
-    goose::agents::execute_commands::list_commands()
+    agent_slash_commands()
         .iter()
-        .filter(|command| !DOCUMENTED_BUILTINS.contains(&command.name))
+        .filter(|command| !DOCUMENTED_BUILTINS.contains(&command.name.as_str()))
         .map(|command| format!("/{} - {}", command.name, command.description))
         .collect::<Vec<_>>()
         .join("\n")
@@ -535,10 +695,10 @@ fn print_editor_help() {
   /edit opens your configured editor for composing prompts.
   Use '/edit some text' to pre-fill the editor with initial text.
   Previous conversation is included as markdown headings for context.
-  Configure editor: goose configure set goose_prompt_editor \"vim\"
+  Configure editor: markov configure set goose_prompt_editor \"vim\"
   Falls back to $VISUAL or $EDITOR if goose_prompt_editor is not set.
   When goose_prompt_editor is set, the editor is used for every prompt by default.
-  To use inline prompts with on-demand /edit: goose configure set goose_prompt_editor_always false"
+  To use inline prompts with on-demand /edit: markov configure set goose_prompt_editor_always false"
     );
 }
 
@@ -579,20 +739,6 @@ mod tests {
             handle_slash_command("/r"),
             Some(InputResult::ToggleFullToolOutput)
         ));
-
-        // Test extension command
-        if let Some(InputResult::AddExtension(cmd)) = handle_slash_command("/extension foo bar") {
-            assert_eq!(cmd, "foo bar");
-        } else {
-            panic!("Expected AddExtension");
-        }
-
-        // Test builtin command
-        if let Some(InputResult::AddBuiltin(names)) = handle_slash_command("/builtin dev,git") {
-            assert_eq!(names, "dev,git");
-        } else {
-            panic!("Expected AddBuiltin");
-        }
 
         // Test model command
         assert!(matches!(
@@ -668,6 +814,105 @@ mod tests {
     }
 
     #[test]
+    fn bare_commands_do_not_fall_through_to_the_model() {
+        for input in ["/mode", "/mode "] {
+            assert!(
+                handle_slash_command(input).is_some(),
+                "{input} should be handled, not sent to the model"
+            );
+        }
+    }
+
+    #[test]
+    fn a_misspelled_command_is_not_sent_to_the_model() {
+        let known = known_command_names();
+
+        for input in ["/mo", "/exirt", "/promptxyz"] {
+            assert!(
+                handle_slash_command(input).is_none(),
+                "{input} is not a command the repl takes"
+            );
+            assert!(
+                unknown_command_name(input, &known).is_some(),
+                "{input} should be caught before it reaches the model"
+            );
+        }
+    }
+
+    #[test]
+    fn the_retired_extension_command_is_answered_not_forwarded() {
+        let known = known_command_names();
+
+        for input in ["/extension", "/extension npx -y server"] {
+            assert!(handle_slash_command(input).is_none());
+            assert_eq!(unknown_command_name(input, &known), Some("extension"));
+        }
+
+        // The singular is not quietly aliased to the manager: it used to take a
+        // command line, and answering one spelling while refusing the same
+        // spelling with arguments reads as a bug rather than a rename.
+        assert!(nearest_command_names("extension", &known).contains(&"/extensions".to_string()));
+    }
+
+    /// `/builtin` was the only in-session door to the extensions compiled into
+    /// the binary, and it was write-only: no list, no completion, no way back
+    /// off. It is gone now that `/extensions` turns those rows on and off, but the
+    /// name is in muscle memory, so it has to be answered rather than typed at
+    /// the model as if it were a sentence.
+    #[test]
+    fn the_retired_builtin_command_is_answered_not_forwarded() {
+        let known = known_command_names();
+
+        for input in ["/builtin", "/builtin memory,tutorial"] {
+            assert!(handle_slash_command(input).is_none());
+            assert_eq!(unknown_command_name(input, &known), Some("builtin"));
+        }
+    }
+
+    #[test]
+    fn a_line_that_only_begins_with_a_slash_still_reaches_the_model() {
+        let known = known_command_names();
+
+        for input in [
+            "/etc/nixos/configuration.nix посмотри",
+            "/usr/bin/env",
+            "/",
+            "/2fa",
+        ] {
+            assert!(
+                unknown_command_name(input, &known).is_none(),
+                "{input} is not an attempt at a command"
+            );
+        }
+    }
+
+    #[test]
+    fn commands_the_agent_owns_reach_it() {
+        let known = known_command_names();
+
+        for command in goose::agents::execute_commands::list_commands() {
+            let input = format!("/{}", command.name);
+            assert!(
+                unknown_command_name(&input, &known).is_none(),
+                "/{} is handled by the agent and must not be rejected",
+                command.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_misspelling_is_reported_with_the_commands_it_resembles() {
+        let known = known_command_names();
+
+        let report = unknown_command_report("mo", &known);
+        assert!(report.contains("Unknown command /mo"));
+        assert!(report.contains("/mode"));
+        assert!(report.contains("/model"));
+
+        assert_eq!(nearest_command_names("qqqq", &known), Vec::<String>::new());
+    }
+
+    #[test]
     fn help_lists_builtin_agent_commands() {
         let help = help_text();
 
@@ -729,19 +974,11 @@ mod tests {
     // Test whitespace handling
     #[test]
     fn test_whitespace_handling() {
-        // Leading/trailing whitespace in extension command
-        if let Some(InputResult::AddExtension(cmd)) = handle_slash_command("  /extension foo bar  ")
-        {
-            assert_eq!(cmd, "foo bar");
+        // Leading/trailing whitespace around a command that takes an argument
+        if let Some(InputResult::GooseMode(mode)) = handle_slash_command("  /mode auto  ") {
+            assert_eq!(mode, "auto");
         } else {
-            panic!("Expected AddExtension");
-        }
-
-        // Leading/trailing whitespace in builtin command
-        if let Some(InputResult::AddBuiltin(names)) = handle_slash_command("  /builtin dev,git  ") {
-            assert_eq!(names, "dev,git");
-        } else {
-            panic!("Expected AddBuiltin");
+            panic!("Expected GooseMode");
         }
     }
 
@@ -951,16 +1188,16 @@ mod tests {
         };
         assert_eq!(names, vec!["my-skill"]);
 
-        // Test with no name: ListSkills
+        // Test with no name: the manager
         assert!(matches!(
             handle_slash_command("/skills"),
-            Some(InputResult::ListSkills)
+            Some(InputResult::Skills)
         ));
 
-        // Test with only whitespace after /skills: ListSkills
+        // Test with only whitespace after /skills: the manager
         assert!(matches!(
             handle_slash_command("/skills   "),
-            Some(InputResult::ListSkills)
+            Some(InputResult::Skills)
         ));
     }
 }

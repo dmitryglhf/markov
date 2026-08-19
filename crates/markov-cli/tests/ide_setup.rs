@@ -1,8 +1,8 @@
-use goose_cli::commands::ide::jsonc::{backup_path, Document};
-use goose_cli::commands::ide::manager::{annotation, decide, verdict, Decision, Tally};
-use goose_cli::commands::ide::paths::{BaseDirs, Os};
-use goose_cli::commands::ide::targets::{JETBRAINS, VSCODE, ZED};
-use goose_cli::commands::ide::{apply, inspect, remove, snippet, Change, Configured, SetupOptions};
+use markov_cli::commands::ide::jsonc::{backup_path, Document};
+use markov_cli::commands::ide::manager::{annotation, decide, verdict, Decision, Tally};
+use markov_cli::commands::ide::paths::{BaseDirs, Os};
+use markov_cli::commands::ide::targets::{JETBRAINS, VSCODE, ZED};
+use markov_cli::commands::ide::{apply, inspect, remove, snippet, Change, Configured, SetupOptions};
 use std::fs;
 use std::path::{Path, PathBuf};
 

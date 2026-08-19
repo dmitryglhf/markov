@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Context, Result};
-use jsonc_parser::cst::{CstInputValue, CstNode, CstObject, CstObjectProp, CstRootNode};
+use anyhow::{Context, Result, anyhow};
 use jsonc_parser::ParseOptions;
+use jsonc_parser::cst::{CstInputValue, CstNode, CstObject, CstObjectProp, CstRootNode};
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;
@@ -37,7 +37,7 @@ impl Document {
             Ok(text) => (text, true),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => (String::new(), false),
             Err(err) => {
-                return Err(err).with_context(|| format!("could not read {}", path.display()))
+                return Err(err).with_context(|| format!("could not read {}", path.display()));
             }
         };
 

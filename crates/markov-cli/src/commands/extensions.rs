@@ -19,13 +19,14 @@
 
 use anyhow::Result;
 use console::style;
-use goose::agents::extension_manager::is_hidden_extension;
 use goose::agents::ExtensionConfig;
+use goose::agents::extension_manager::is_hidden_extension;
 use goose::config::extensions::{get_all_extensions, set_extension, set_extension_enabled};
-use goose::config::{ExtensionEntry, DEFAULT_EXTENSION_TIMEOUT};
+use goose::config::{DEFAULT_EXTENSION_TIMEOUT, ExtensionEntry};
+use goose_cli::markov::types::ExtensionChange;
 use goose_mcp::mcp_server_runner::McpCommand;
 
-use super::ui::{
+use goose_cli::markov::ui::{
     cancellable, multiselect, pad_to_display_width, require_terminal, terminal_width,
     truncate_to_display_width,
 };
@@ -39,15 +40,6 @@ const NAME_BUDGET: usize = 24;
 
 /// Room for the widest word `ExtensionKind::label` can return.
 const KIND_WIDTH: usize = 7;
-
-/// What the dialog changed, so a caller with a live agent can follow along.
-#[derive(Debug, Clone)]
-pub enum ExtensionChange {
-    Connected(ExtensionConfig),
-    Enabled(ExtensionConfig),
-    Disabled(String),
-    Removed(String),
-}
 
 pub fn extensions_dialog() -> Result<Vec<ExtensionChange>> {
     require_terminal("markov extensions")?;
@@ -335,8 +327,8 @@ pub fn plugin_extensions_line() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use goose::agents::extension::Envs;
     use goose::agents::ExtensionKind;
+    use goose::agents::extension::Envs;
 
     fn entry(config: ExtensionConfig, enabled: bool) -> ExtensionEntry {
         ExtensionEntry { enabled, config }
@@ -488,8 +480,10 @@ mod tests {
         let offered = unseeded_bundled(&present);
 
         assert_eq!(offered.len(), McpCommand::ALL.len() - 1);
-        assert!(offered
-            .iter()
-            .all(|row| row.config.name() != McpCommand::Memory.name()));
+        assert!(
+            offered
+                .iter()
+                .all(|row| row.config.name() != McpCommand::Memory.name())
+        );
     }
 }
