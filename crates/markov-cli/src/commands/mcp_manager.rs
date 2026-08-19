@@ -21,9 +21,9 @@ use std::sync::Arc;
 
 use crate::commands::extensions::{bundled_servers_line, plugin_extensions_line};
 use crate::commands::mcp_registry::{self, Candidate, Install};
+use crate::ui::{cancellable, multiselect, require_terminal, select};
 use goose_cli::commands::configure::try_store_secret;
 use goose_cli::markov::types::ExtensionChange;
-use goose_cli::markov::ui::{cancellable, multiselect, require_terminal, select};
 
 /// Only passed through to the server's `list_tools`, no session is created.
 const PROBE_SESSION: &str = "mcp-connection-check";

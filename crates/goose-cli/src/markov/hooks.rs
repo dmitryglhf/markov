@@ -28,6 +28,10 @@ pub trait MarkovHooks: Send + Sync {
     async fn handle_model_command(&self) -> Result<()> {
         Ok(())
     }
+
+    async fn skills_dialog(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Stands in when nothing was installed, so a vanilla build of this crate runs

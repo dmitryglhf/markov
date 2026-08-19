@@ -24,6 +24,10 @@ impl MarkovHooks for Markov {
     async fn handle_model_command(&self) -> Result<()> {
         crate::commands::models::handle_model_command().await
     }
+
+    async fn skills_dialog(&self) -> Result<()> {
+        crate::commands::skills::skills_dialog().await
+    }
 }
 
 pub static MARKOV: Markov = Markov;

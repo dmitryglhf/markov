@@ -18,9 +18,9 @@ use goose::providers::{create, providers};
 use goose::session::SessionManager;
 use goose_providers::thinking::ThinkingEffort;
 
+use crate::ui::{cancellable, is_cancel, require_terminal, select};
 use goose_cli::commands::configure::{ensure_credentials, fetch_and_select_model};
 use goose_cli::markov::types::{Choice, Current};
-use goose_cli::markov::ui::{cancellable, is_cancel, require_terminal, select};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Action {

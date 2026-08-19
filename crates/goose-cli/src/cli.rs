@@ -2474,7 +2474,7 @@ pub async fn run_matches(matches: &clap::ArgMatches) -> anyhow::Result<()> {
         Some(Command::Recipe { command }) => handle_recipe_subcommand(command),
         Some(Command::Skills { command }) => match command {
             Some(command) => handle_skills_subcommand(command).await,
-            None => crate::commands::skills::skills_dialog().await,
+            None => crate::markov::hooks::hooks().skills_dialog().await,
         },
         Some(Command::Plugin { command }) => handle_plugin_subcommand(command),
         Some(Command::Term { command }) => handle_term_subcommand(command).await,

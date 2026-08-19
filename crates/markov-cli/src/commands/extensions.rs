@@ -26,7 +26,7 @@ use goose::config::{DEFAULT_EXTENSION_TIMEOUT, ExtensionEntry};
 use goose_cli::markov::types::ExtensionChange;
 use goose_mcp::mcp_server_runner::McpCommand;
 
-use goose_cli::markov::ui::{
+use crate::ui::{
     cancellable, multiselect, pad_to_display_width, require_terminal, terminal_width,
     truncate_to_display_width,
 };

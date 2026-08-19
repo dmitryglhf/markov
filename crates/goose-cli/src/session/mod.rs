@@ -1285,7 +1285,7 @@ impl CliSession {
     /// Skills are read from disk on every turn, so the manager needs no help
     /// from the live agent: whatever it wrote is picked up by itself.
     async fn handle_skills(&mut self) {
-        if let Err(e) = crate::commands::skills::skills_dialog().await {
+        if let Err(e) = crate::markov::hooks::hooks().skills_dialog().await {
             output::render_error(&e.to_string());
         }
     }

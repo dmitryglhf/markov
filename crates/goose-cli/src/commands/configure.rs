@@ -1,15 +1,16 @@
 use crate::recipes::github_recipe::GOOSE_RECIPE_GITHUB_REPO_CONFIG_KEY;
 use cliclack::spinner;
 use console::style;
-use goose::agents::extension::ToolInfo;
+use goose::agents::extension::{ToolInfo, PLATFORM_EXTENSIONS};
 use goose::agents::extension_manager::get_parameter_names;
 use goose::agents::Agent;
-use goose::agents::ExtensionConfig;
+use goose::agents::{extension::Envs, ExtensionConfig};
 use goose::config::declarative_providers::{
     create_custom_provider, remove_custom_provider, CreateCustomProviderParams,
 };
 use goose::config::extensions::{
-    get_all_extensions, get_enabled_extensions, get_extension_by_name, set_extension,
+    get_all_extension_names, get_all_extensions, get_enabled_extensions, get_extension_by_name,
+    name_to_key, remove_extension, set_extension, set_extension_enabled,
 };
 use goose::config::paths::Paths;
 use goose::config::permission::PermissionLevel;
@@ -26,6 +27,7 @@ use goose::providers::{create, providers, retry_operation, RetryConfig};
 use goose::session::SessionType;
 use goose_providers::thinking::ThinkingEffort;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::io::{IsTerminal, Write};
 
 // useful for light themes where there is no discernible colour contrast between
@@ -1046,6 +1048,420 @@ pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<
             Ok(false)
         }
     }
+}
+
+/// Configure extensions that can be used with goose
+/// Dialog for toggling which extensions are enabled/disabled
+pub fn toggle_extensions_dialog() -> anyhow::Result<()> {
+    for warning in goose::config::get_warnings() {
+        eprintln!("{}", style(format!("Warning: {}", warning)).yellow());
+    }
+
+    let extensions = get_all_extensions();
+
+    if extensions.is_empty() {
+        cliclack::outro(
+            "No extensions configured yet. Run configure and add some extensions first.",
+        )?;
+        return Ok(());
+    }
+
+    // Create a list of extension names and their enabled status
+    let mut extension_status: Vec<(String, bool)> = extensions
+        .iter()
+        .map(|entry| (entry.config.name().to_string(), entry.enabled))
+        .collect();
+
+    // Sort extensions alphabetically by name
+    extension_status.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Get currently enabled extensions for the selection
+    let enabled_extensions: Vec<&String> = extension_status
+        .iter()
+        .filter(|(_, enabled)| *enabled)
+        .map(|(name, _)| name)
+        .collect();
+
+    // Let user toggle extensions
+    let selected = cliclack::multiselect(
+        "enable extensions: (use \"space\" to toggle and \"enter\" to submit)",
+    )
+    .required(false)
+    .items(
+        &extension_status
+            .iter()
+            .map(|(name, _)| (name, name.as_str(), MULTISELECT_VISIBILITY_HINT))
+            .collect::<Vec<_>>(),
+    )
+    .initial_values(enabled_extensions)
+    .filter_mode()
+    .interact()?;
+
+    // Update enabled status for each extension
+    for name in extension_status.iter().map(|(name, _)| name) {
+        set_extension_enabled(
+            &name_to_key(name),
+            selected.iter().any(|s| s.as_str() == name),
+        );
+    }
+
+    let config = Config::global();
+    cliclack::outro(format!(
+        "Extension settings saved successfully to {}",
+        config.path()
+    ))?;
+    Ok(())
+}
+
+fn prompt_extension_timeout() -> anyhow::Result<u64> {
+    Ok(
+        cliclack::input("Please set the timeout for this tool (in secs):")
+            .placeholder(&goose::config::DEFAULT_EXTENSION_TIMEOUT.to_string())
+            .validate(|input: &String| match input.parse::<u64>() {
+                Ok(_) => Ok(()),
+                Err(_) => Err("Please enter a valid timeout"),
+            })
+            .interact()?,
+    )
+}
+
+fn prompt_extension_description() -> anyhow::Result<String> {
+    Ok(cliclack::input("Enter a description for this extension:")
+        .placeholder("Description")
+        .validate(|input: &String| {
+            if input.trim().is_empty() {
+                Err("Please enter a valid description")
+            } else {
+                Ok(())
+            }
+        })
+        .interact()?)
+}
+
+fn prompt_extension_name(placeholder: &str) -> anyhow::Result<String> {
+    let extensions = get_all_extension_names();
+    Ok(
+        cliclack::input("What would you like to call this extension?")
+            .placeholder(placeholder)
+            .validate(move |input: &String| {
+                if input.is_empty() {
+                    Err("Please enter a name")
+                } else if extensions.contains(input) {
+                    Err("An extension with this name already exists")
+                } else {
+                    Ok(())
+                }
+            })
+            .interact()?,
+    )
+}
+
+fn collect_env_vars() -> anyhow::Result<(HashMap<String, String>, Vec<String>)> {
+    let envs = HashMap::new();
+    let mut env_keys = Vec::new();
+    let config = Config::global();
+
+    if !cliclack::confirm("Would you like to add environment variables?").interact()? {
+        return Ok((envs, env_keys));
+    }
+
+    loop {
+        let key: String = cliclack::input("Environment variable name:")
+            .placeholder("API_KEY")
+            .interact()?;
+
+        let value: String = cliclack::password("Environment variable value:")
+            .mask('▪')
+            .interact()?;
+
+        if !try_store_secret(config, &key, value)? {
+            return Err(anyhow::anyhow!("Failed to store secret"));
+        }
+        env_keys.push(key);
+
+        if !cliclack::confirm("Add another environment variable?").interact()? {
+            break;
+        }
+    }
+
+    Ok((envs, env_keys))
+}
+
+fn collect_headers() -> anyhow::Result<HashMap<String, String>> {
+    let mut headers = HashMap::new();
+
+    if !cliclack::confirm("Would you like to add custom headers?").interact()? {
+        return Ok(headers);
+    }
+
+    loop {
+        let key: String = cliclack::input("Header name:")
+            .placeholder("Authorization")
+            .interact()?;
+
+        let value: String = cliclack::input("Header value:")
+            .placeholder("Bearer token123")
+            .interact()?;
+
+        headers.insert(key, value);
+
+        if !cliclack::confirm("Add another header?").interact()? {
+            break;
+        }
+    }
+
+    Ok(headers)
+}
+
+fn configure_builtin_extension() -> anyhow::Result<()> {
+    let extensions = vec![
+        (
+            "autovisualiser",
+            "Auto Visualiser",
+            "Data visualisation and UI generation tools",
+        ),
+        (
+            "computercontroller",
+            "Computer Controller",
+            "controls for webscraping, file caching, and automations",
+        ),
+        (
+            "developer",
+            "Developer Tools",
+            "Code editing and shell access",
+        ),
+        (
+            "memory",
+            "Memory",
+            "Tools to save and retrieve durable memories",
+        ),
+        (
+            "tutorial",
+            "Tutorial",
+            "Access interactive tutorials and guides",
+        ),
+    ];
+
+    let mut select = cliclack::select("Which built-in extension would you like to enable?");
+    for (id, name, desc) in &extensions {
+        select = select.item(id, name, desc);
+    }
+    let extension = select.interact()?.to_string();
+    let (display_name, description) = extensions
+        .iter()
+        .find(|(id, _, _)| id == &extension)
+        .map(|(_, name, desc)| (name.to_string(), desc.to_string()))
+        .unwrap_or_else(|| (extension.clone(), extension.clone()));
+
+    let config = if PLATFORM_EXTENSIONS.contains_key(extension.as_str()) {
+        ExtensionConfig::Platform {
+            name: extension.clone(),
+            description,
+            display_name: Some(display_name),
+            bundled: Some(true),
+            available_tools: Vec::new(),
+        }
+    } else {
+        let timeout = prompt_extension_timeout()?;
+        ExtensionConfig::Builtin {
+            name: extension.clone(),
+            display_name: Some(display_name),
+            timeout: Some(timeout),
+            bundled: Some(true),
+            description,
+            available_tools: Vec::new(),
+        }
+    };
+
+    set_extension(ExtensionEntry {
+        enabled: true,
+        config,
+    });
+
+    cliclack::outro(format!("Enabled {} extension", style(extension).green()))?;
+    Ok(())
+}
+
+fn configure_stdio_extension() -> anyhow::Result<()> {
+    let name = prompt_extension_name("my-extension")?;
+
+    let command_str: String = cliclack::input("What command should be run?")
+        .placeholder("npx -y @block/gdrive")
+        .validate(|input: &String| {
+            if input.is_empty() {
+                Err("Please enter a command")
+            } else {
+                Ok(())
+            }
+        })
+        .interact()?;
+
+    let timeout = prompt_extension_timeout()?;
+
+    let mut parts = goose::utils::split_command_args(&command_str)?;
+    let cmd = if parts.is_empty() {
+        String::new()
+    } else {
+        parts.remove(0)
+    };
+    let args = parts;
+
+    let description = prompt_extension_description()?;
+    let (envs, env_keys) = collect_env_vars()?;
+
+    set_extension(ExtensionEntry {
+        enabled: true,
+        config: ExtensionConfig::Stdio {
+            name: name.clone(),
+            cmd,
+            args,
+            envs: Envs::new(envs),
+            env_keys,
+            description,
+            timeout: Some(timeout),
+            cwd: None,
+            bundled: None,
+            available_tools: Vec::new(),
+        },
+    });
+
+    cliclack::outro(format!("Added {} extension", style(name).green()))?;
+    Ok(())
+}
+
+fn configure_streamable_http_extension() -> anyhow::Result<()> {
+    let name = prompt_extension_name("my-remote-extension")?;
+
+    let uri: String = cliclack::input("What is the Streaming HTTP endpoint URI?")
+        .placeholder("http://localhost:8000/messages")
+        .validate(|input: &String| {
+            if input.is_empty() {
+                Err("Please enter a URI")
+            } else if !(input.starts_with("http://") || input.starts_with("https://")) {
+                Err("URI should start with http:// or https://")
+            } else {
+                Ok(())
+            }
+        })
+        .interact()?;
+
+    let timeout = prompt_extension_timeout()?;
+    let description = prompt_extension_description()?;
+    let headers = collect_headers()?;
+
+    // Original behavior: no env var collection for Streamable HTTP
+    let envs = HashMap::new();
+    let env_keys = Vec::new();
+
+    set_extension(ExtensionEntry {
+        enabled: true,
+        config: ExtensionConfig::StreamableHttp {
+            name: name.clone(),
+            uri,
+            envs: Envs::new(envs),
+            env_keys,
+            headers,
+            description,
+            timeout: Some(timeout),
+            socket: None,
+            bundled: None,
+            available_tools: Vec::new(),
+        },
+    });
+
+    cliclack::outro(format!("Added {} extension", style(name).green()))?;
+    Ok(())
+}
+
+pub fn configure_extensions_dialog() -> anyhow::Result<()> {
+    let extension_type = cliclack::select("What type of extension would you like to add?")
+        .item(
+            "built-in",
+            "Built-in Extension",
+            "Use an extension that comes with goose",
+        )
+        .item(
+            "stdio",
+            "Command-line Extension",
+            "Run a local command or script",
+        )
+        .item(
+            "streamable_http",
+            "Remote Extension (Streamable HTTP)",
+            "Connect to a remote extension via MCP Streamable HTTP",
+        )
+        .interact()?;
+
+    match extension_type {
+        "built-in" => configure_builtin_extension()?,
+        "stdio" => configure_stdio_extension()?,
+        "streamable_http" => configure_streamable_http_extension()?,
+        _ => unreachable!(),
+    };
+
+    print_config_file_saved()?;
+    Ok(())
+}
+
+pub fn remove_extension_dialog() -> anyhow::Result<()> {
+    for warning in goose::config::get_warnings() {
+        eprintln!("{}", style(format!("Warning: {}", warning)).yellow());
+    }
+
+    let extensions = get_all_extensions();
+
+    // Create a list of extension names and their enabled status
+    let mut extension_status: Vec<(String, bool)> = extensions
+        .iter()
+        .map(|entry| (entry.config.name().to_string(), entry.enabled))
+        .collect();
+
+    // Sort extensions alphabetically by name
+    extension_status.sort_by(|a, b| a.0.cmp(&b.0));
+
+    if extensions.is_empty() {
+        cliclack::outro(
+            "No extensions configured yet. Run configure and add some extensions first.",
+        )?;
+        return Ok(());
+    }
+
+    // Check if all extensions are enabled
+    if extension_status.iter().all(|(_, enabled)| *enabled) {
+        cliclack::outro(
+            "All extensions are currently enabled. You must first disable extensions before removing them.",
+        )?;
+        return Ok(());
+    }
+
+    // Filter out only disabled extensions
+    let disabled_extensions: Vec<_> = extensions
+        .iter()
+        .filter(|entry| !entry.enabled)
+        .map(|entry| (entry.config.name().to_string(), entry.enabled))
+        .collect();
+
+    let selected = cliclack::multiselect("Select extensions to remove (note: you can only remove disabled extensions - use \"space\" to toggle and \"enter\" to submit)")
+        .required(false)
+        .items(
+            &disabled_extensions
+                .iter()
+                .filter(|(_, enabled)| !enabled)
+                .map(|(name, _)| (name, name.as_str(), MULTISELECT_VISIBILITY_HINT))
+                .collect::<Vec<_>>(),
+        )
+        .filter_mode()
+        .interact()?;
+
+    for name in selected {
+        remove_extension(&name_to_key(name));
+        PermissionManager::instance().remove_extension(&name_to_key(name));
+        cliclack::outro(format!("Removed {} extension", style(name).green()))?;
+    }
+
+    print_config_file_saved()?;
+
+    Ok(())
 }
 
 pub async fn configure_settings_dialog() -> anyhow::Result<()> {
