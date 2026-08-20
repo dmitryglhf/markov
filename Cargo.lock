@@ -5078,7 +5078,6 @@ dependencies = [
  "goose-mcp",
  "goose-providers",
  "indicatif",
- "jsonc-parser",
  "open",
  "rand 0.10.2",
  "regex",

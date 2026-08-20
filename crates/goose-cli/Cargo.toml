@@ -50,7 +50,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 regex = { workspace = true }
 tar = { version = "0.4.46", default-features = false }
-reqwest = { workspace = true, features = ["blocking", "stream"] }
+reqwest = { workspace = true, features = ["blocking"] }
 zip = { workspace = true }
 bzip2 = { version = "0.6", default-features = false, features = ["default"] }
 webbrowser = { workspace = true }
@@ -67,7 +67,6 @@ sigstore-verify = { version = "0.10", default-features = false, optional = true 
 axum.workspace = true
 axum-server = { version = "0.8", default-features = false, optional = true }
 clap_complete_nushell = { version = "4", default-features = false }
-jsonc-parser = { version = "0.27.1", features = ["cst", "serde"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 anstream = { version = "1", default-features = false, features = ["wincon"] }

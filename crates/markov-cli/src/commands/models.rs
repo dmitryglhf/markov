@@ -47,7 +47,7 @@ const EFFORTS: [(ThinkingEffort, &str); 5] = [
 ];
 
 pub async fn models_dialog(current: Current) -> Result<Option<Choice>> {
-    require_terminal("markov model")?;
+    require_terminal("markov model", None)?;
     cliclack::intro(style(" markov-model ").on_cyan().black())?;
 
     let mut catalogue = Catalogue::load().await;

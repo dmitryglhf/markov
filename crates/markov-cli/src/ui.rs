@@ -70,9 +70,17 @@ pub fn is_cancel(error: &anyhow::Error) -> bool {
         .is_some_and(|e| e.kind() == std::io::ErrorKind::Interrupted)
 }
 
-pub fn require_terminal(command: &str) -> Result<()> {
+/// Refuses a dialog there is no one to answer. `scriptable` names the command
+/// that does the same job without asking, and stays `None` when there is none —
+/// pointing at another dialog would only walk into the same refusal.
+pub fn require_terminal(command: &str, scriptable: Option<&str>) -> Result<()> {
     if !std::io::stdin().is_terminal() {
-        anyhow::bail!("`{command}` needs a terminal. Use `markov configure` from scripts.");
+        match scriptable {
+            Some(alternative) => {
+                anyhow::bail!("`{command}` needs a terminal. Use `{alternative}` from scripts.")
+            }
+            None => anyhow::bail!("`{command}` needs a terminal."),
+        }
     }
     Ok(())
 }

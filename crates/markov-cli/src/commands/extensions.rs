@@ -42,7 +42,7 @@ const NAME_BUDGET: usize = 24;
 const KIND_WIDTH: usize = 7;
 
 pub fn extensions_dialog() -> Result<Vec<ExtensionChange>> {
-    require_terminal("markov extensions")?;
+    require_terminal("markov extensions", None)?;
 
     cliclack::intro(style(" markov-extensions ").on_cyan().black())?;
 

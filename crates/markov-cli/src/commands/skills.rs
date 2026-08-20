@@ -64,7 +64,7 @@ impl Found {
 }
 
 pub async fn skills_dialog() -> Result<()> {
-    require_terminal("markov skills")?;
+    require_terminal("markov skills", Some("markov skills list"))?;
     cliclack::intro(style(" markov-skills ").on_cyan().black())?;
 
     let counter = create_token_counter().await.map_err(anyhow::Error::msg)?;

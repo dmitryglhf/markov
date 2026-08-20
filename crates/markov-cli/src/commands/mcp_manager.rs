@@ -96,7 +96,7 @@ enum FailedProbe {
 }
 
 pub async fn mcp_dialog() -> Result<Vec<ExtensionChange>> {
-    require_terminal("markov mcp")?;
+    require_terminal("markov mcp", None)?;
 
     cliclack::intro(style(" markov-mcp ").on_cyan().black())?;
 
