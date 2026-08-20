@@ -526,7 +526,7 @@ impl CliSession {
             println!(
                 "\n  {} {}",
                 console::style("●").red(),
-                console::style(format!("session closed · {}", self.session_id)).dim()
+                console::style(format!("session closed · {}", &self.session_id)).dim()
             );
             if let Some(command) = self.resume_command().await {
                 println!("    {}", console::style(command).dim());

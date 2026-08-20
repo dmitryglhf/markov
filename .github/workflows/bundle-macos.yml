@@ -135,7 +135,7 @@ jobs:
           source ./bin/activate-hermit
           rustup target add "$TARGET"
           # Explicit list rather than the upstream default, which enables telemetry.
-          cargo build --release -p goose-cli --bin markov --target "$TARGET" \
+          cargo build --release -p markov-cli --bin markov --target "$TARGET" \
             --no-default-features \
             --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update
 

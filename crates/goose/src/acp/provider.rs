@@ -463,13 +463,13 @@ impl Provider for AcpProvider {
         PermissionRouting::ActionRequired
     }
 
-    fn manages_own_context(&self) -> bool {
-        true
-    }
-
     /// `claim_handoff_context` puts the earlier turns into the first prompt, so
     /// the adapter starts knowing what was said before it existed.
     fn accepts_conversation_handoff(&self) -> bool {
+        true
+    }
+
+    fn manages_own_context(&self) -> bool {
         true
     }
 

@@ -253,6 +253,8 @@ pub struct Agent {
     pub tool_confirmation_router: ToolConfirmationRouter,
     pub(super) tool_result_tx: mpsc::Sender<(String, ToolResult<CallToolResult>)>,
     pub(super) tool_result_rx: ToolResultReceiver,
+    /// Ours, kept away from the fields upstream keeps rewriting.
+    pending_session_name: Mutex<Option<JoinHandle<()>>>,
 
     pub(super) retry_manager: RetryManager,
     pub(super) tool_inspection_manager: ToolInspectionManager,
@@ -263,7 +265,6 @@ pub struct Agent {
     goal: Mutex<Option<String>>,
     grind: Mutex<Option<String>>,
     pending_steers: Mutex<HashMap<String, VecDeque<Message>>>,
-    pending_session_name: Mutex<Option<JoinHandle<()>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -319,6 +320,11 @@ fn previous_turn_was_abandoned(conversation: &Conversation) -> bool {
         }),
         _ => false,
     })
+}
+
+/// Waits for a task, giving up once the limit is out.
+async fn join_within(handle: JoinHandle<()>, limit: Duration) -> bool {
+    matches!(tokio::time::timeout(limit, handle).await, Ok(Ok(())))
 }
 
 fn push_message_with_id(messages: &mut Conversation, message: Message) -> Message {
@@ -428,10 +434,6 @@ where
     })
 }
 
-async fn join_within(handle: JoinHandle<()>, limit: Duration) -> bool {
-    matches!(tokio::time::timeout(limit, handle).await, Ok(Ok(())))
-}
-
 impl Agent {
     pub fn new() -> Self {
         let config = Config::global();
@@ -491,6 +493,7 @@ impl Agent {
             tool_confirmation_router: ToolConfirmationRouter::new(),
             tool_result_tx: tool_tx,
             tool_result_rx: Arc::new(Mutex::new(tool_rx)),
+            pending_session_name: Mutex::new(None),
             retry_manager: RetryManager::new(),
             tool_inspection_manager: Self::create_tool_inspection_manager(
                 permission_manager,
@@ -507,17 +510,6 @@ impl Agent {
             goal: Mutex::new(None),
             grind: Mutex::new(None),
             pending_steers: Mutex::new(HashMap::new()),
-            pending_session_name: Mutex::new(None),
-        }
-    }
-
-    /// Waits out a session-naming request that is still in flight, so a short
-    /// session does not exit with the placeholder name on it.
-    pub async fn wait_for_pending_session_name(&self, limit: Duration) -> bool {
-        let handle = self.pending_session_name.lock().await.take();
-        match handle {
-            Some(handle) => join_within(handle, limit).await,
-            None => true,
         }
     }
 
@@ -601,6 +593,16 @@ impl Agent {
             .entry(session_id.to_string())
             .or_default()
             .push_back(message);
+    }
+
+    /// Waits out a session-naming request that is still in flight, so a short
+    /// session does not exit with the placeholder name on it.
+    pub async fn wait_for_pending_session_name(&self, limit: Duration) -> bool {
+        let handle = self.pending_session_name.lock().await.take();
+        match handle {
+            Some(handle) => join_within(handle, limit).await,
+            None => true,
+        }
     }
 
     pub async fn discard_pending_steers(&self, session_id: &str) {

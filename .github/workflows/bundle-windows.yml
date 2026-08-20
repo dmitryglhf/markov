@@ -127,7 +127,7 @@ jobs:
           if ($isCuda) {
             $features = "$features,cuda"
           }
-          cargo build --release --target x86_64-pc-windows-msvc -p goose-cli --bin markov --no-default-features --features $features
+          cargo build --release --target x86_64-pc-windows-msvc -p markov-cli --bin markov --no-default-features --features $features
 
           $binaryPath = "./target/x86_64-pc-windows-msvc/release/markov.exe"
           if (-not (Test-Path $binaryPath)) {

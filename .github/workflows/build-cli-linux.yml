@@ -131,11 +131,11 @@ jobs:
           fi
 
           if [ "${{ matrix.variant }}" = "musl" ]; then
-            cargo build --release --target ${TARGET} -p goose-cli --bin markov \
+            cargo build --release --target ${TARGET} -p markov-cli --bin markov \
               --no-default-features \
               --features rustls-tls,aws-providers,otel,tui
           else
-            cargo build --release --target ${TARGET} -p goose-cli --bin markov \
+            cargo build --release --target ${TARGET} -p markov-cli --bin markov \
               --no-default-features --features "${FEATURES}"
           fi
 
@@ -159,7 +159,7 @@ jobs:
             --component rustc,cargo --target "$TARGET"
           rustup show
           # Explicit list rather than the upstream default, which enables telemetry.
-          cargo build --release --target "$TARGET" -p goose-cli --bin markov \
+          cargo build --release --target "$TARGET" -p markov-cli --bin markov \
             --no-default-features \
             --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update
 

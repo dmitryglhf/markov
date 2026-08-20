@@ -546,20 +546,20 @@ pub trait Provider: Send + Sync {
         ))
     }
 
-    /// Whether the provider manages its own conversation context (e.g. CLI
-    /// wrappers like Claude Code or Gemini CLI). When true, goose-side
-    /// context management such as tool-pair summarization is skipped because
-    /// the provider's internal state is the source of truth.
-    fn manages_own_context(&self) -> bool {
-        false
-    }
-
     /// Whether a conversation that began elsewhere can be handed to this
     /// provider mid-session. Only meaningful together with
     /// `manages_own_context`: such a provider keeps the history on its own
     /// side, so unless it carries the earlier turns over on its first prompt,
     /// taking over means silently starting from nothing.
     fn accepts_conversation_handoff(&self) -> bool {
+        false
+    }
+
+    /// Whether the provider manages its own conversation context (e.g. CLI
+    /// wrappers like Claude Code or Gemini CLI). When true, goose-side
+    /// context management such as tool-pair summarization is skipped because
+    /// the provider's internal state is the source of truth.
+    fn manages_own_context(&self) -> bool {
         false
     }
 

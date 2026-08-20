@@ -208,7 +208,7 @@ Start or resume interactive chat sessions.
 - **`-r, --resume`**: Resume a previous session
 - **`--edit`**: Open the session's conversation in your editor (`$VISUAL` / `$EDITOR` / `vi`) as YAML. Edit, trim, or rewrite messages, then save and close to continue the session with the edited conversation. Must be used with `--resume`. Can be combined with `--fork` to create a new session from the edited result.
 - **`--fork`**: Create a new duplicate session with copied history. Must be used with `--resume`. Provide `--name` or `--session-id` to fork a specific session. Otherwise, forks the most recent session.
-- **`--no-history`**: Skip reprinting previous messages when resuming a session
+- **`--history`**: Show previous messages when resuming a session
 - **`--container <container_id>`**: Run extensions inside a [Docker container](/docs/tutorials/goose-in-docker#running-extensions-in-docker-containers).
 - **`--debug`**: Enable debug mode to output complete tool responses, detailed parameter values, and full file paths
 - **`--max-tool-repetitions <NUMBER>`**: Set the maximum number of times the same tool can be called consecutively with identical parameters. Helps prevent infinite loops.
@@ -233,14 +233,14 @@ goose session --resume --path ./session.jsonl   # legacy session storage
 # Fork a specific session by name
 goose session --resume --fork --name my-project
 
-# Fork the most recent session without reprinting the conversation
-goose session --resume --fork --no-history
+# Fork the most recent session and show message history
+goose session --resume --fork --history
 
 # Edit a session's conversation in your editor
 goose session --resume --session-id 20251108_2 --edit
 
 # Edit and fork — create a new session from the edited conversation
-goose session --resume --session-id 20251108_2 --fork --edit
+goose session --resume --session-id 20251108_2 --fork --edit --history
 
 # Start with extensions
 goose session --with-extension "npx -y @modelcontextprotocol/server-memory"

@@ -134,7 +134,7 @@ jobs:
             FEATURES="${FEATURES},vulkan"
           fi
 
-          cargo build --release --target ${TARGET} -p goose-cli --bin markov \
+          cargo build --release --target ${TARGET} -p markov-cli --bin markov \
             --no-default-features --features "${FEATURES}"
 
       - name: Copy backend binary into Electron folder

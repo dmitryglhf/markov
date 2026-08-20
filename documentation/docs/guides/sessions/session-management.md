@@ -376,8 +376,8 @@ Create a complete copy of any session to reuse configurations, experiment with v
         # Fork a specific session by ID
         goose session --resume --fork --session-id 20251108_3
 
-        # Fork without reprinting the conversation
-        goose session --resume --fork --no-history
+        # Fork and show message history
+        goose session --resume --fork --history
         ```
 
         The forked session includes:
