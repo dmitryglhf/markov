@@ -14,9 +14,9 @@ mod task_execution_display;
 mod thinking;
 
 use crate::session::task_execution_display::{
-    TASK_EXECUTION_NOTIFICATION_TYPE, format_task_execution_notification,
+    format_task_execution_notification, TASK_EXECUTION_NOTIFICATION_TYPE,
 };
-use goose::conversation::{Conversation, fix_conversation};
+use goose::conversation::{fix_conversation, Conversation};
 use std::env;
 use std::io::Write;
 use std::str::FromStr;
@@ -25,14 +25,17 @@ use tokio_util::task::AbortOnDropHandle;
 
 pub use self::export::{message_to_markdown, user_projected_message_to_markdown};
 use crate::markov::hooks::hooks;
+use crate::markov::turn::{
+    merge_fetched_models, until_interrupted, wait_for_ctrl_c, SESSION_NAME_GRACE,
+};
 use crate::markov::types::{Current, ExtensionChange};
-pub use builder::{SessionBuilderConfig, build_session};
+pub use builder::{build_session, SessionBuilderConfig};
 use console::Color;
 use goose::agents::AgentEvent;
 use goose::agents::SUBAGENT_TOOL_REQUEST_TYPE;
+use goose::permission::permission_confirmation::PrincipalType;
 use goose::permission::Permission;
 use goose::permission::PermissionConfirmation;
-use goose::permission::permission_confirmation::PrincipalType;
 use goose::providers::base::Provider;
 use goose::providers::base::ProviderUsage;
 use goose::utils::safe_truncate;
@@ -41,7 +44,7 @@ use anyhow::{Context, Result};
 use completion::GooseCompleter;
 use goose::agents::extension::{Envs, ExtensionConfig, PLATFORM_EXTENSIONS};
 use goose::agents::types::RetryConfig;
-use goose::agents::{Agent, COMPACT_TRIGGERS, SessionConfig};
+use goose::agents::{Agent, SessionConfig, COMPACT_TRIGGERS};
 use goose::config::extensions::name_to_key;
 use goose::config::{Config, GooseMode};
 use goose::slash_commands::types::SlashCommandEntry;
@@ -69,22 +72,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
 const GOOSE_PLANNER_CONTEXT_LIMIT: &str = "GOOSE_PLANNER_CONTEXT_LIMIT";
-
-/// How long a closing session waits for the name the model is still writing.
-const SESSION_NAME_GRACE: Duration = Duration::from_secs(3);
-
-/// Appends the models the cache does not have yet. What is already there came
-/// from the provider metadata in a deliberate order, so it keeps its place and
-/// only the newcomers are sorted.
-fn merge_fetched_models(known: &mut Vec<String>, fetched: Vec<String>) {
-    let mut fresh: Vec<String> = fetched
-        .into_iter()
-        .filter(|model| !known.contains(model))
-        .collect();
-    fresh.sort();
-    fresh.dedup();
-    known.extend(fresh);
-}
 
 fn planner_provider_messages(plan_messages: &Conversation) -> Conversation {
     let projected_messages = plan_messages.agent_visible_messages();
@@ -298,23 +285,6 @@ pub async fn classify_planner_response(
     } else {
         Ok(PlannerResponseType::ClarifyingQuestions)
     }
-}
-
-/// Runs a call until it finishes or the interrupt future fires first. The
-/// planner has no reply loop watching for Ctrl-C the way a normal turn does,
-/// so its calls to the model are raced against the signal here.
-async fn until_interrupted<T>(
-    call: impl std::future::Future<Output = T>,
-    interrupt: impl std::future::Future<Output = ()>,
-) -> Option<T> {
-    tokio::select! {
-        result = call => Some(result),
-        _ = interrupt => None,
-    }
-}
-
-async fn wait_for_ctrl_c() {
-    let _ = ctrl_c().await;
 }
 
 fn planner_classification_text(response: &Message) -> Result<String> {
@@ -1008,12 +978,13 @@ impl CliSession {
             .model_config_for_session(&self.session_id)
             .await?;
 
-        let choice = hooks().models_dialog(Current {
-            provider: provider.get_name().to_string(),
-            model: model_config.model_name.clone(),
-            in_session: true,
-        })
-        .await;
+        let choice = hooks()
+            .models_dialog(Current {
+                provider: provider.get_name().to_string(),
+                model: model_config.model_name.clone(),
+                in_session: true,
+            })
+            .await;
 
         match choice {
             Ok(Some(choice)) => {
@@ -2581,8 +2552,8 @@ fn handle_agent_error(e: &anyhow::Error, is_stream_json_mode: bool) {
     }
 }
 
-async fn get_reasoner()
--> Result<(Arc<dyn Provider>, goose_providers::model::ModelConfig), anyhow::Error> {
+async fn get_reasoner(
+) -> Result<(Arc<dyn Provider>, goose_providers::model::ModelConfig), anyhow::Error> {
     use goose::providers::create;
 
     let config = Config::global();
@@ -2671,27 +2642,6 @@ mod tests {
     }
 
     #[test]
-    fn fetched_models_are_appended_after_the_known_ones() {
-        let mut known = vec!["curated-2".to_string(), "curated-1".to_string()];
-        merge_fetched_models(&mut known, vec!["b".to_string(), "a".to_string()]);
-        assert_eq!(known, ["curated-2", "curated-1", "a", "b"]);
-    }
-
-    #[test]
-    fn a_model_already_known_is_not_repeated() {
-        let mut known = vec!["shared".to_string()];
-        merge_fetched_models(&mut known, vec!["shared".to_string(), "new".to_string()]);
-        assert_eq!(known, ["shared", "new"]);
-    }
-
-    #[test]
-    fn a_gateway_repeating_itself_yields_one_entry() {
-        let mut known = Vec::new();
-        merge_fetched_models(&mut known, vec!["one".to_string(), "one".to_string()]);
-        assert_eq!(known, ["one"]);
-    }
-
-    #[test]
     fn planner_classification_excludes_user_only_content() {
         use rmcp::model::{Annotations, Role, TextContent};
 
@@ -2707,12 +2657,10 @@ mod tests {
             planner_classification_text(&mixed).unwrap(),
             "agent classification text"
         );
-        assert!(
-            planner_classification_text(
-                &Message::assistant().with_content(MessageContent::Text(user_only))
-            )
-            .is_err()
-        );
+        assert!(planner_classification_text(
+            &Message::assistant().with_content(MessageContent::Text(user_only))
+        )
+        .is_err());
     }
 
     #[test]
@@ -2737,11 +2685,9 @@ mod tests {
             provider_messages[0].as_concat_text(),
             "first request\nsecond request"
         );
-        assert!(
-            !provider_messages[0]
-                .as_concat_text()
-                .contains("hidden separator")
-        );
+        assert!(!provider_messages[0]
+            .as_concat_text()
+            .contains("hidden separator"));
     }
 
     #[test]
@@ -3008,24 +2954,5 @@ mod tests {
             CliSession::parse_streamable_http_extension(url, timeout),
             expected
         );
-    }
-
-    #[tokio::test]
-    async fn a_call_that_finishes_is_returned_whole() {
-        let result = until_interrupted(std::future::ready(7), std::future::pending()).await;
-        assert_eq!(result, Some(7));
-    }
-
-    #[tokio::test]
-    async fn an_interrupt_beats_a_call_that_hangs() {
-        let result = until_interrupted(std::future::pending::<i32>(), std::future::ready(())).await;
-        assert_eq!(result, None);
-    }
-
-    #[tokio::test]
-    async fn a_call_that_fails_reports_its_error_rather_than_an_interrupt() {
-        let call = std::future::ready(Err::<(), _>(anyhow::anyhow!("boom")));
-        let result = until_interrupted(call, std::future::pending()).await;
-        assert!(result.is_some_and(|inner| inner.is_err()));
     }
 }

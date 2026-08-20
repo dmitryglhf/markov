@@ -5,8 +5,9 @@
 //! implementation before dispatching. Every method has a default, so adding a
 //! hook never touches an upstream file twice.
 
-use super::types::{Choice, Current, ExtensionChange};
+use super::types::{Choice, Current, ExtensionChange, SessionPick};
 use anyhow::Result;
+use goose::session::{Session, SessionManager, SessionType};
 use std::sync::OnceLock;
 
 // cliclack's prompt handles are not Send and live across awaits inside the
@@ -31,6 +32,22 @@ pub trait MarkovHooks: Send + Sync {
 
     async fn skills_dialog(&self) -> Result<()> {
         Ok(())
+    }
+
+    /// Defaults delegate to the upstream dialogs, which stay where they are.
+    fn session_removal_picker(&self, sessions: &[Session]) -> Result<Vec<Session>> {
+        crate::commands::session::prompt_interactive_session_removal(sessions)
+    }
+
+    async fn session_picker(
+        &self,
+        session_manager: &SessionManager,
+        _prompt: &str,
+        _types: Option<&[SessionType]>,
+    ) -> Result<SessionPick> {
+        crate::commands::session::prompt_interactive_session_selection(session_manager)
+            .await
+            .map(SessionPick::Chosen)
     }
 }
 

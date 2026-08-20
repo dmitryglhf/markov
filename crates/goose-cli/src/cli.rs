@@ -28,8 +28,9 @@ use crate::commands::schedule::{
     handle_schedule_run_now, handle_schedule_services_status, handle_schedule_services_stop,
     handle_schedule_sessions,
 };
-use crate::commands::session::{handle_session_list, handle_session_remove, SessionPick};
+use crate::commands::session::{handle_session_list, handle_session_remove};
 use crate::commands::skills::handle_skills_list;
+use crate::markov::types::SessionPick;
 use crate::recipes::extract_from_cli::extract_recipe_info_from_cli;
 use crate::recipes::recipe::{explain_recipe, render_recipe_as_yaml};
 use crate::session::{build_session, SessionBuilderConfig};
@@ -1307,7 +1308,6 @@ enum LocalModelsCommand {
     },
 }
 
-
 #[derive(Subcommand)]
 enum TermCommand {
     /// Print shell initialization script
@@ -1635,12 +1635,9 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
             let session_identifier = if let Some(id) = identifier {
                 lookup_session_id(id).await?
             } else {
-                match crate::commands::session::prompt_interactive_session_selection(
-                    &session_manager,
-                    "Select a session to export:",
-                    None,
-                )
-                .await
+                match crate::markov::hooks::hooks()
+                    .session_picker(&session_manager, "Select a session to export:", None)
+                    .await
                 {
                     Ok(SessionPick::Chosen(id)) => id,
                     Ok(SessionPick::Cancelled) => return Ok(()),
@@ -1671,12 +1668,9 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
             let session_id = if let Some(id) = identifier {
                 lookup_session_id(id).await?
             } else {
-                match crate::commands::session::prompt_interactive_session_selection(
-                    &session_manager,
-                    "Select a session to inspect:",
-                    None,
-                )
-                .await
+                match crate::markov::hooks::hooks()
+                    .session_picker(&session_manager, "Select a session to inspect:", None)
+                    .await
                 {
                     Ok(SessionPick::Chosen(id)) => id,
                     Ok(SessionPick::Cancelled) => return Ok(()),
@@ -1738,12 +1732,13 @@ async fn handle_interactive_session(
     }
 
     let identifier = match resume_selection_needed(resume, &identifier) {
-        true => match crate::commands::session::prompt_interactive_session_selection(
-            &SessionManager::instance(),
-            "Resume which session?",
-            Some(&[SessionType::User]),
-        )
-        .await
+        true => match crate::markov::hooks::hooks()
+            .session_picker(
+                &SessionManager::instance(),
+                "Resume which session?",
+                Some(&[SessionType::User]),
+            )
+            .await
         {
             Ok(SessionPick::Chosen(id)) => Some(Identifier {
                 session_id: Some(id),

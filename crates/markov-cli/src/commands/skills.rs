@@ -1,5 +1,5 @@
 use crate::ui::{cancellable, multiselect, require_terminal, select};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
 use goose::custom_requests::{SourceEntry, SourceType};
 use goose::skills::{
@@ -7,7 +7,7 @@ use goose::skills::{
     skill_name_problem,
 };
 use goose::sources::{create_source, delete_source};
-use goose::token_counter::{TokenCounter, create_token_counter};
+use goose::token_counter::{create_token_counter, TokenCounter};
 use goose_cli::session::editor::{launch_editor, resolve_editor_or_default};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

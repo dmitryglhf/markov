@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use strum::VariantNames;
 
-use super::input::{REPL_COMMANDS, ReplCommand};
+use super::input::{ReplCommand, REPL_COMMANDS};
 use super::{CompletionCache, HintStatus};
 
 /// Completer for goose CLI commands

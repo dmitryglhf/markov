@@ -1,5 +1,5 @@
 use super::paths::{BaseDirs, Os};
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

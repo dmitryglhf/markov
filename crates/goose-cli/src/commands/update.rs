@@ -259,7 +259,9 @@ pub async fn update(canary: bool, reconfigure: bool) -> Result<()> {
         println!();
         println!("Run the installer again to move to the latest version:");
         #[cfg(windows)]
-        println!("  irm https://github.com/dmitryglhf/markov/releases/download/stable/install.ps1 | iex");
+        println!(
+            "  irm https://github.com/dmitryglhf/markov/releases/download/stable/install.ps1 | iex"
+        );
         #[cfg(not(windows))]
         println!(
             "  curl -fsSL https://github.com/dmitryglhf/markov/releases/download/stable/install.sh | bash"

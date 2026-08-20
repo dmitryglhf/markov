@@ -4,7 +4,7 @@ use goose_mcp::mcp_server_runner::McpCommand;
 use std::path::PathBuf;
 
 use crate::commands::ide::manager::ide_dialog;
-use crate::commands::ide::{SetupOptions, TargetSelector, handle_ide_remove, handle_ide_setup};
+use crate::commands::ide::{handle_ide_remove, handle_ide_setup, SetupOptions, TargetSelector};
 
 /// Subcommands we keep working but no longer advertise.
 const HIDDEN: &[&str] = &["plugin"];

@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use console::style;
-use goose::config::{Config, get_default_provider, get_provider_entry, set_active_provider};
+use goose::config::{get_default_provider, get_provider_entry, set_active_provider, Config};
 use goose::providers::base::{ModelInfo, ProviderMetadata};
 use goose::providers::inventory::{ProviderInventoryEntry, ProviderInventoryService};
 use goose::providers::{create, providers};

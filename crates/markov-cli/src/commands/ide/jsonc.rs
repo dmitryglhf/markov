@@ -1,6 +1,6 @@
-use anyhow::{Context, Result, anyhow};
-use jsonc_parser::ParseOptions;
+use anyhow::{anyhow, Context, Result};
 use jsonc_parser::cst::{CstInputValue, CstNode, CstObject, CstObjectProp, CstRootNode};
+use jsonc_parser::ParseOptions;
 use std::ffi::OsString;
 use std::fs;
 use std::io::Write;

@@ -34,6 +34,7 @@ serde_json.workspace = true
 tempfile.workspace = true
 url.workspace = true
 reqwest = { workspace = true, features = ["blocking", "stream"] }
+chrono.workspace = true
 
 [features]
 # Forwarded to goose-cli: this crate owns the binary, so the build flags land here.

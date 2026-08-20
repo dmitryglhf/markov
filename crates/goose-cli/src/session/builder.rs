@@ -1,7 +1,7 @@
 use crate::cli::StreamableHttpOptions;
 
-use super::CliSession;
 use super::output;
+use super::CliSession;
 use console::style;
 use goose::agents::{Agent, Container, ExtensionError};
 use goose::config::resolve_extensions_for_new_session;
@@ -9,8 +9,8 @@ use goose::config::{Config, ExtensionConfig, GooseMode};
 use goose::model_config::model_config_from_user_config;
 use goose::providers::create;
 use goose::recipe::Recipe;
-use goose::session::EnabledExtensionsState;
 use goose::session::session_manager::SessionType;
+use goose::session::EnabledExtensionsState;
 use rustyline::EditMode;
 use std::collections::BTreeSet;
 use std::process;

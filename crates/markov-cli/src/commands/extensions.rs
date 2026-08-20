@@ -19,10 +19,10 @@
 
 use anyhow::Result;
 use console::style;
-use goose::agents::ExtensionConfig;
 use goose::agents::extension_manager::is_hidden_extension;
+use goose::agents::ExtensionConfig;
 use goose::config::extensions::{get_all_extensions, set_extension, set_extension_enabled};
-use goose::config::{DEFAULT_EXTENSION_TIMEOUT, ExtensionEntry};
+use goose::config::{ExtensionEntry, DEFAULT_EXTENSION_TIMEOUT};
 use goose_cli::markov::types::ExtensionChange;
 use goose_mcp::mcp_server_runner::McpCommand;
 
@@ -327,8 +327,8 @@ pub fn plugin_extensions_line() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use goose::agents::ExtensionKind;
     use goose::agents::extension::Envs;
+    use goose::agents::ExtensionKind;
 
     fn entry(config: ExtensionConfig, enabled: bool) -> ExtensionEntry {
         ExtensionEntry { enabled, config }
@@ -480,10 +480,8 @@ mod tests {
         let offered = unseeded_bundled(&present);
 
         assert_eq!(offered.len(), McpCommand::ALL.len() - 1);
-        assert!(
-            offered
-                .iter()
-                .all(|row| row.config.name() != McpCommand::Memory.name())
-        );
+        assert!(offered
+            .iter()
+            .all(|row| row.config.name() != McpCommand::Memory.name()));
     }
 }

@@ -35,3 +35,11 @@ impl From<&Current> for Choice {
         }
     }
 }
+
+/// Having nothing to offer is not a failure of the prompt, and every caller has
+/// its own sentence for it, so it travels back as an answer rather than an error.
+pub enum SessionPick {
+    Chosen(String),
+    Cancelled,
+    NoSessions,
+}

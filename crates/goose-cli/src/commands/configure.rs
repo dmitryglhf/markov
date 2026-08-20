@@ -715,11 +715,7 @@ fn prompt_unlisted_model(
     Ok(model.trim().to_string())
 }
 
-pub fn try_store_secret(
-    config: &Config,
-    key_name: &str,
-    value: String,
-) -> anyhow::Result<bool> {
+pub fn try_store_secret(config: &Config, key_name: &str, value: String) -> anyhow::Result<bool> {
     match config.set_secret(key_name, &value) {
         Ok(_) => Ok(true),
         Err(ConfigError::FallbackToFileStorage) => Ok(true),
