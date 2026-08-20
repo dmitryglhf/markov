@@ -9,12 +9,14 @@ compile_error!("Features `rustls-tls` and `native-tls` are mutually exclusive");
 pub mod cli;
 pub mod commands;
 pub mod logging;
-pub mod markov;
-pub mod project_tracker;
 pub mod recipes;
 pub mod scenario_tests;
 pub mod session;
 pub mod signal;
+
+// Ours. Declared apart from the upstream list so a neighbour upstream deletes
+// cannot turn this line into a conflict.
+pub mod markov;
 
 // Re-export commonly used types
 pub use cli::Cli;

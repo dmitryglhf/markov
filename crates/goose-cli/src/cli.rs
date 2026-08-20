@@ -38,8 +38,6 @@ use goose::session::session_manager::SessionType;
 use goose::session::SessionManager;
 use std::io::Read;
 use std::path::PathBuf;
-use tracing::warn;
-
 const GOOSE_SERVER_SECRET_KEY_ENV: &str = "GOOSE_SERVER__SECRET_KEY";
 
 fn generate_serve_secret_key() -> String {
@@ -2259,10 +2257,6 @@ pub async fn run_matches(matches: &clap::ArgMatches) -> anyhow::Result<()> {
     register_builtin_extensions(goose_mcp::BUILTIN_EXTENSIONS.clone());
 
     let cli = Cli::from_arg_matches(matches)?;
-
-    if let Err(e) = crate::project_tracker::update_project_tracker(None, None) {
-        warn!("Warning: Failed to update project tracker: {}", e);
-    }
 
     let command_name = get_command_name(&cli.command);
     tracing::info!(
