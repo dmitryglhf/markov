@@ -160,6 +160,23 @@ jobs:
             install.ps1
             SHA256SUMS
 
+      # `canary` is a moving tag, but the .deb/.rpm names carry the commit hash,
+      # so a new build lands beside the old one instead of replacing it. Drop
+      # the previous set first; everything else has a stable name and is
+      # overwritten in place.
+      - name: Drop superseded packages from the canary tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          stale=$(gh release view canary --repo "$GITHUB_REPOSITORY" \
+                    --json assets --jq '.assets[].name' 2>/dev/null \
+                  | grep -E '\.(deb|rpm)$' || true)
+          [ -n "$stale" ] || { echo "nothing to drop"; exit 0; }
+          echo "$stale" | while read -r asset; do
+            echo "removing $asset"
+            gh release delete-asset canary "$asset" --repo "$GITHUB_REPOSITORY" --yes
+          done
+
       # Create/update the canary release
       - name: Release canary
         uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd  # v1.21.0
