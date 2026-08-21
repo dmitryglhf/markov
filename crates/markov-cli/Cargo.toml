@@ -50,7 +50,11 @@ chrono.workspace = true
 # dictation provider, at the price of llama.cpp and cmake), aws-providers
 # (nobody uses Bedrock), tui (launches the npm package upstream deprecated in
 # 1.46). Every one of them stays available below to opt into.
-default = ["code-mode", "rustls-tls", "otel", "update", "disable-update"]
+default = ["rustls-tls", "otel", "update", "disable-update"]
+# Off by default and no longer wired for us: the `vendor/v8` shim that pointed
+# `v8` at the CRT-patched v8-goose fork is gone, so enabling this now resolves
+# v8 straight from crates.io. Untested here — treat as opt-in at your own risk,
+# and prefer wiring code execution as an MCP server instead.
 code-mode = ["goose-cli/code-mode"]
 local-inference = ["goose-cli/local-inference"]
 aws-providers = ["goose-cli/aws-providers"]

@@ -83,7 +83,6 @@ winapi = { workspace = true, features = [
 # workspace-wide `cargo test` and `cargo clippy --workspace` compile. Keeping
 # the two in step means CI checks the configuration we ship.
 default = [
-    "code-mode",
     "otel",
     "rustls-tls",
     "update",

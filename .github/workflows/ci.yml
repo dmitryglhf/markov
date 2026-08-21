@@ -187,7 +187,7 @@ jobs:
           # play nicely with hermit-managed rust
           hermit uninstall rustup
           export CARGO_INCREMENTAL=0
-          cargo clippy --workspace --all-targets --exclude v8 -- -D warnings
+          cargo clippy --workspace --all-targets -- -D warnings
 
   schema-check:
     name: Check Generated Schemas are Up-to-Date
