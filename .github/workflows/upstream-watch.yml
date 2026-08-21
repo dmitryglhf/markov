@@ -27,6 +27,10 @@ concurrency:
 env:
   UPSTREAM: aaif-goose/goose
   GH_TOKEN: ${{ github.token }}
+  # gh picks its repository from the git remotes, and this job adds `upstream`
+  # pointing at aaif-goose/goose. Without pinning, every gh call — the label,
+  # the pull request, the stale-PR check in the gate — lands on upstream.
+  GH_REPO: ${{ github.repository }}
 
 jobs:
   watch:
