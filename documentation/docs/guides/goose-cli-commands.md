@@ -479,7 +479,7 @@ Review the current git diff using goose. By default, `goose review` reviews the 
 - **`--turn-limit <N>`**: Set the default turn limit for orchestrated review subprocesses and checks
 - **`--dry-run`**: Print the assembled review prompt and discovered checks without running the review
 - **`-q, --quiet`**: Suppress non-result output from the underlying agent
-- **`--no-orchestrate`**: Disable the default Rust-driven parallel orchestrator and use the single-prompt path
+- **`--no-orchestrate`**: Disable the default Rust-driven parallel orchestrator and use the single-prompt path. Checks that declare `tools` are rejected because this path cannot enforce per-check tool allowlists.
 - **`-i, --instructions <TEXT>`**: Add free-form review instructions
 - **`-f, --files <FILE>...`**: Restrict the review to specific files
 - **`-c, --check-filter <NAME>...`**: Run only checks with matching names
@@ -725,32 +725,6 @@ goose serve --with-builtin developer,memory
 :::warning
 `goose serve` requires `GOOSE_SERVER__SECRET_KEY` unless you pass `--dangerously-unauthenticated`. Only use `--dangerously-unauthenticated` with local trusted clients.
 :::
-
----
-
-### Project Management
-
-#### project
-Start working on your last project or create a new one.
-
-**Alias**: `p`
-
-**Usage:**
-```bash
-goose project
-```
-
----
-
-#### projects
-Choose one of your projects to start working on.
-
-**Alias**: `ps`
-
-**Usage:**
-```bash
-goose projects
-```
 
 ---
 

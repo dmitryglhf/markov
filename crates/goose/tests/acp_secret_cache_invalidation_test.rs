@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 #[allow(dead_code)]
 #[path = "acp_common_tests/mod.rs"]
 mod common_tests;
@@ -44,13 +45,15 @@ impl Provider for MockProvider {
 }
 
 fn mock_provider_factory() -> goose::acp::server::AcpProviderFactory {
-    Arc::new(|provider_name, _extensions, _working_dir| {
-        Box::pin(async move {
-            Ok(Arc::new(MockProvider {
-                name: provider_name,
-            }) as Arc<dyn Provider>)
-        })
-    })
+    Arc::new(
+        |provider_name, _extensions, _working_dir, _use_default_model| {
+            Box::pin(async move {
+                Ok(Arc::new(MockProvider {
+                    name: provider_name,
+                }) as Arc<dyn Provider>)
+            })
+        },
+    )
 }
 
 fn write_config(config_dir: &std::path::Path) {

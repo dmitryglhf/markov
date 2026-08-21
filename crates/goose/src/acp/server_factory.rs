@@ -1,4 +1,6 @@
-use crate::acp::server::{AcpProviderFactory, GooseAcpAgent, GooseAcpAgentOptions};
+use crate::acp::server::{
+    AcpBuiltinSelection, AcpProviderFactory, GooseAcpAgent, GooseAcpAgentOptions,
+};
 use crate::agents::GoosePlatform;
 use crate::scheduler_trait::SchedulerTrait;
 use crate::session::SessionManager;
@@ -9,7 +11,7 @@ use tokio::sync::OnceCell;
 use tracing::info;
 
 pub struct AcpServerFactoryConfig {
-    pub builtins: Vec<String>,
+    pub builtins: AcpBuiltinSelection,
     pub data_dir: std::path::PathBuf,
     pub config_dir: std::path::PathBuf,
     pub goose_platform: GoosePlatform,
@@ -28,6 +30,13 @@ impl AcpServer {
             config,
             scheduler: OnceCell::new(),
         }
+    }
+
+    /// Start the scheduler now instead of on first client connect, so a
+    /// headless `goose serve` runs scheduled jobs; on failure `create_agent`
+    /// retries. No-op when the scheduler is disabled.
+    pub async fn start_scheduler(&self) -> Result<()> {
+        self.scheduler().await.map(|_| ())
     }
 
     async fn scheduler(&self) -> Result<Option<Arc<dyn SchedulerTrait>>> {
@@ -55,27 +64,37 @@ impl AcpServer {
         let config = crate::config::Config::global();
         let disable_session_naming = config.get_goose_disable_session_naming().unwrap_or(false);
         let scheduler = self.scheduler().await?;
+        if let Some(scheduler) = &scheduler {
+            // Listing syncs from storage, registering jobs persisted by other processes.
+            scheduler.list_scheduled_jobs().await;
+        }
 
-        let provider_factory: AcpProviderFactory =
-            Arc::new(move |provider_name, extensions, working_dir| {
+        let provider_factory: AcpProviderFactory = Arc::new(
+            move |provider_name, extensions, working_dir, use_default_model| {
                 Box::pin(async move {
-                    match working_dir {
-                        Some(working_dir) => {
-                            crate::providers::create_with_working_dir(
-                                &provider_name,
-                                extensions,
-                                working_dir,
-                            )
+                    if use_default_model {
+                        crate::providers::create_with_default_model(&provider_name, extensions)
                             .await
+                    } else {
+                        match working_dir {
+                            Some(working_dir) => {
+                                crate::providers::create_with_working_dir(
+                                    &provider_name,
+                                    extensions,
+                                    working_dir,
+                                )
+                                .await
+                            }
+                            None => crate::providers::create(&provider_name, extensions).await,
                         }
-                        None => crate::providers::create(&provider_name, extensions).await,
                     }
                 })
-            });
+            },
+        );
 
         let agent = GooseAcpAgent::new(GooseAcpAgentOptions {
             provider_factory,
-            builtins: self.config.builtins.clone(),
+            builtin_selection: self.config.builtins.clone(),
             data_dir: self.config.data_dir.clone(),
             config_dir: self.config.config_dir.clone(),
             disable_session_naming,
@@ -96,7 +115,7 @@ mod tests {
 
     fn server(data_dir: std::path::PathBuf, enable_scheduler: bool) -> AcpServer {
         AcpServer::new(AcpServerFactoryConfig {
-            builtins: Vec::new(),
+            builtins: AcpBuiltinSelection::default(),
             config_dir: data_dir.clone(),
             data_dir,
             goose_platform: GoosePlatform::GooseCli,
@@ -120,5 +139,33 @@ mod tests {
         let server = server(root.path().to_path_buf(), true);
 
         assert!(server.scheduler().await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn start_scheduler_initializes_before_any_client_connects() {
+        let root = tempfile::tempdir().unwrap();
+        let server = server(root.path().to_path_buf(), true);
+
+        assert!(!server.scheduler.initialized());
+        server.start_scheduler().await.unwrap();
+        assert!(server.scheduler.initialized());
+    }
+
+    #[tokio::test]
+    async fn start_scheduler_is_idempotent() {
+        let root = tempfile::tempdir().unwrap();
+        let server = server(root.path().to_path_buf(), true);
+
+        server.start_scheduler().await.unwrap();
+        server.start_scheduler().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn start_scheduler_does_not_construct_one_when_disabled() {
+        let root = tempfile::tempdir().unwrap();
+        let server = server(root.path().to_path_buf(), false);
+
+        server.start_scheduler().await.unwrap();
+        assert!(!server.scheduler.initialized());
     }
 }
