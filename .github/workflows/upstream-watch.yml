@@ -35,6 +35,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          # GITHUB_TOKEN may not push anything under .github/workflows — the
+          # remote rejects it outright and no `permissions:` key can grant it.
+          # Every upstream merge touches those files, so the push needs a PAT
+          # carrying Workflows: write. `gh` keeps using GITHUB_TOKEN below, so
+          # the pull request stays authored by the bot and does not set CI off
+          # on a commit that still has conflict markers in it.
+          token: ${{ secrets.UPSTREAM_PR_TOKEN }}
 
       # /releases/latest already excludes prereleases and drafts. Picking the
       # highest tag instead would land on v2.0.0-rc-04-27-0, dead since April,
