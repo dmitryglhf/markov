@@ -1,0 +1,152 @@
+name: Upstream watch
+
+# GitHub cannot notify us about tags in a repository we do not own, so this
+# polls. It never resolves anything: it builds the branch, commits the merge as
+# it came out — conflict markers included — and hands a human a draft PR with an
+# inventory of what is left. Draft is the safety catch; GitHub refuses to merge
+# a draft, and this branch must never reach main unresolved.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "upstream tag to merge (default: latest published release)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-watch
+
+env:
+  UPSTREAM: aaif-goose/goose
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # /releases/latest already excludes prereleases and drafts. Picking the
+      # highest tag instead would land on v2.0.0-rc-04-27-0, dead since April,
+      # or on a vX.Y.0 tag that upstream cuts when it opens a release branch —
+      # about a day before the release actually ships.
+      - name: Resolve upstream release
+        id: rel
+        run: |
+          tag="${{ inputs.tag }}"
+          [ -n "$tag" ] || tag="$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "branch=upstream-merge/$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch upstream tag
+        run: |
+          git remote add upstream "https://github.com/$UPSTREAM" 2>/dev/null || true
+          git fetch --no-tags upstream \
+            "refs/tags/${{ steps.rel.outputs.tag }}:refs/tags/${{ steps.rel.outputs.tag }}"
+
+      # Three ways there is nothing to do, and one way to be useful without
+      # opening a second competing merge.
+      - name: Decide whether to act
+        id: gate
+        run: |
+          tag='${{ steps.rel.outputs.tag }}'
+          branch='${{ steps.rel.outputs.branch }}'
+
+          if git merge-base --is-ancestor "$tag" HEAD; then
+            echo "$tag уже влит в main" >> "$GITHUB_STEP_SUMMARY"
+            echo "act=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "ветка $branch уже существует, идёт работа" >> "$GITHUB_STEP_SUMMARY"
+            echo "act=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          # An older merge still open: warn there instead of forking a rival
+          # branch off a main that knows nothing about the previous release.
+          stale="$(gh pr list --label upstream-merge --state open \
+                     --json number,headRefName --jq '.[0].number // empty')"
+          if [ -n "$stale" ]; then
+            gh pr comment "$stale" --body \
+              "Апстрим выпустил \`$tag\`. Этот PR отстал — довести его до main, новый соберётся следующим прогоном."
+            echo "предупредил PR #$stale о выходе $tag" >> "$GITHUB_STEP_SUMMARY"
+            echo "act=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          echo "act=true" >> "$GITHUB_OUTPUT"
+
+      # Without this the attributes in .gitattributes quietly decay into an
+      # ordinary three-way merge and the inventory fills with phantom conflicts
+      # across ui/desktop.
+      - name: Register merge drivers
+        if: steps.gate.outputs.act == 'true'
+        run: |
+          source ./bin/activate-hermit
+          just markov-setup-merge
+
+      - name: Merge
+        if: steps.gate.outputs.act == 'true'
+        id: merge
+        run: |
+          tag='${{ steps.rel.outputs.tag }}'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b '${{ steps.rel.outputs.branch }}'
+          git merge --no-ff -m "merge upstream $tag" "$tag" && clean=true || clean=false
+          echo "clean=$clean" >> "$GITHUB_OUTPUT"
+
+      # Must run before the index is touched: committing wipes the unmerged
+      # entries the inventory is built from.
+      - name: Build PR body
+        if: steps.gate.outputs.act == 'true'
+        env:
+          BRANCH: ${{ steps.rel.outputs.branch }}
+        run: scripts/upstream-inventory.sh '${{ steps.rel.outputs.tag }}' > /tmp/body.md
+
+      - name: Explain the conflicts
+        if: steps.gate.outputs.act == 'true' && steps.merge.outputs.clean == 'false'
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: scripts/upstream-explain.sh >> /tmp/body.md
+
+      - name: Commit the merge as it came out
+        if: steps.gate.outputs.act == 'true' && steps.merge.outputs.clean == 'false'
+        run: |
+          # `git add -A` stages the upstream copy of every file we deleted, so
+          # the workflows and scripts this fork dropped on purpose would come
+          # back invisibly inside a five-thousand-line diff. Keep the deletions.
+          git status --porcelain | awk '$1 == "DU" { print $2 }' \
+            | while read -r f; do git rm -q -f -- "$f"; done
+          git add -A
+          git commit --no-edit
+
+      - name: Push and open the pull request
+        if: steps.gate.outputs.act == 'true'
+        run: |
+          tag='${{ steps.rel.outputs.tag }}'
+          branch='${{ steps.rel.outputs.branch }}'
+          git push origin "$branch"
+
+          gh label create upstream-merge --color 5319e7 \
+            --description "слияние с релизом апстрима" 2>/dev/null || true
+
+          draft=--draft
+          [ '${{ steps.merge.outputs.clean }}' = 'true' ] && draft=""
+
+          gh pr create $draft \
+            --base main --head "$branch" \
+            --title "merge upstream $tag" \
+            --label upstream-merge \
+            --body-file /tmp/body.md
