@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write      # labels are an issues API, and gh pr create --label needs it
 
 concurrency:
   group: upstream-watch
@@ -146,8 +147,11 @@ jobs:
           branch='${{ steps.rel.outputs.branch }}'
           git push origin "$branch"
 
+          # Swallowing this quietly once cost a run: the label failed to appear,
+          # and the error only surfaced from gh pr create one line later.
           gh label create upstream-merge --color 5319e7 \
-            --description "слияние с релизом апстрима" 2>/dev/null || true
+            --description "слияние с релизом апстрима" \
+            || echo "лейбл уже есть или создать не вышло — смотри ошибку выше" 
 
           draft=--draft
           [ '${{ steps.merge.outputs.clean }}' = 'true' ] && draft=""
