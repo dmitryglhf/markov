@@ -2,3 +2,10 @@ crates/goose/src/agents/snapshots/*.snap linguist-language=Text
 
 # fork pins its own inputs, upstream churn here is never worth a conflict
 flake.lock merge=ours
+
+# desktop is frozen until upstream replaces Electron with Tauri; resolving
+# conflicts in code we plan to throw away buys nothing
+ui/desktop/** merge=ours
+
+# the site is not published from this fork
+documentation/** merge=theirs
