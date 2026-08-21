@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write      # labels are an issues API, and gh pr create --label needs it
 
 concurrency:
   group: upstream-watch
@@ -26,6 +27,10 @@ concurrency:
 env:
   UPSTREAM: aaif-goose/goose
   GH_TOKEN: ${{ github.token }}
+  # gh picks its repository from the git remotes, and this job adds `upstream`
+  # pointing at aaif-goose/goose. Without pinning, every gh call — the label,
+  # the pull request, the stale-PR check in the gate — lands on upstream.
+  GH_REPO: ${{ github.repository }}
 
 jobs:
   watch:
@@ -35,6 +40,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
+          # GITHUB_TOKEN may not push anything under .github/workflows — the
+          # remote rejects it outright and no `permissions:` key can grant it.
+          # Every upstream merge touches those files, so the push needs a PAT
+          # carrying Workflows: write. `gh` keeps using GITHUB_TOKEN below, so
+          # the pull request stays authored by the bot and does not set CI off
+          # on a commit that still has conflict markers in it.
+          token: ${{ secrets.UPSTREAM_PR_TOKEN }}
 
       # /releases/latest already excludes prereleases and drafts. Picking the
       # highest tag instead would land on v2.0.0-rc-04-27-0, dead since April,
@@ -63,12 +75,12 @@ jobs:
           branch='${{ steps.rel.outputs.branch }}'
 
           if git merge-base --is-ancestor "$tag" HEAD; then
-            echo "$tag уже влит в main" >> "$GITHUB_STEP_SUMMARY"
+            echo "$tag is already merged into main" >> "$GITHUB_STEP_SUMMARY"
             echo "act=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-            echo "ветка $branch уже существует, идёт работа" >> "$GITHUB_STEP_SUMMARY"
+            echo "branch $branch already exists, work is under way" >> "$GITHUB_STEP_SUMMARY"
             echo "act=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
@@ -78,8 +90,8 @@ jobs:
                      --json number,headRefName --jq '.[0].number // empty')"
           if [ -n "$stale" ]; then
             gh pr comment "$stale" --body \
-              "Апстрим выпустил \`$tag\`. Этот PR отстал — довести его до main, новый соберётся следующим прогоном."
-            echo "предупредил PR #$stale о выходе $tag" >> "$GITHUB_STEP_SUMMARY"
+              "Upstream released \`$tag\`. This pull request is now behind — land it on main and the next run will assemble the new one."
+            echo "warned PR #$stale that $tag is out" >> "$GITHUB_STEP_SUMMARY"
             echo "act=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
@@ -139,8 +151,11 @@ jobs:
           branch='${{ steps.rel.outputs.branch }}'
           git push origin "$branch"
 
+          # Swallowing this quietly once cost a run: the label failed to appear,
+          # and the error only surfaced from gh pr create one line later.
           gh label create upstream-merge --color 5319e7 \
-            --description "слияние с релизом апстрима" 2>/dev/null || true
+            --description "merge with an upstream release" \
+            || echo "label already exists, or creation failed — see the error above"
 
           draft=--draft
           [ '${{ steps.merge.outputs.clean }}' = 'true' ] && draft=""

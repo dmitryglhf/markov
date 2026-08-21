@@ -39,25 +39,16 @@ aa="$(unmerged AA)"
 
 count() { printf '%s\n' "$1" | grep -c . ; }
 
-# "1 файл", "2 файла", "5 файлов"
 plural() {
-    n=$1; one=$2; few=$3; many=$4
-    case $((n % 100)) in
-        1[1-9]) echo "$n $many"; return ;;
-    esac
-    case $((n % 10)) in
-        1) echo "$n $one" ;;
-        2|3|4) echo "$n $few" ;;
-        *) echo "$n $many" ;;
-    esac
+    if [ "$1" -eq 1 ]; then echo "$1 $2"; else echo "$1 ${2}s"; fi
 }
-files() { plural "$1" файл файла файлов; }
-blocks() { plural "$1" блок блока блоков; }
+files() { plural "$1" file; }
+blocks() { plural "$1" block; }
 
 echo "## upstream \`$TAG\` → \`main\`"
 echo
-echo "Ветку собрал \`upstream-watch\`. **Внутри маркеры конфликтов — черновик снимать"
-echo "только после разрешения.** Полные заметки к релизу:"
+echo "Assembled by \`upstream-watch\`. **This branch carries conflict markers — do"
+echo "not take it out of draft until they are resolved.** Full release notes:"
 echo "<https://github.com/$UPSTREAM/releases/tag/$TAG>"
 echo
 
@@ -84,51 +75,51 @@ render_rows() { printf '%b' "$1" | grep -v '^$' | sort -rn \
     | awk -F'\t' '{ printf "- [ ] `%s` — %s\n", $2, $1 }'; }
 
 if [ -n "$hand_rows" ]; then
-    echo "### Разрешить руками — $(blocks "$hand_total")"
+    echo "### Resolve by hand — $(blocks "$hand_total")"
     echo
     render_rows "$hand_rows"
     echo
 fi
 
 if [ -n "$lock_rows" ]; then
-    echo "### Перегенерировать, не править — $(blocks "$lock_total")"
+    echo "### Regenerate, do not edit — $(blocks "$lock_total")"
     echo
     render_rows "$lock_rows"
     echo
 fi
 
 if [ -z "$uu" ]; then
-    echo "### Содержательных конфликтов нет"
+    echo "### No content conflicts"
     echo
-    echo "Слияние прошло чисто. Проверить сборку и снимать черновик."
+    echo "The merge came out clean. Check the build, then take it out of draft."
     echo
 fi
 
 # --- deletions, both directions ----------------------------------------------
 
 if [ -n "$du" ]; then
-    echo "### Наши удаления сохранены — $(files "$(count "$du")")"
+    echo "### Our deletions kept — $(files "$(count "$du")")"
     echo
-    echo "Апстрим их правил, мы их удалили; выбрано наше. Проверить, что среди них"
-    echo "нет ничего, что стоило бы вернуть."
+    echo "Upstream modified these; this fork had deleted them, and ours won. Check"
+    echo "that the list holds nothing worth bringing back."
     echo
     printf '%s\n' "$du" | sed 's/^/- `/; s/$/`/'
     echo
 fi
 
 if [ -n "$ud" ]; then
-    echo "### Требуют решения — $(files "$(count "$ud")")"
+    echo "### Need a decision — $(files "$(count "$ud")")"
     echo
-    echo "Мы правили, апстрим удалил. Автоматика тут не решает: либо принять"
-    echo "удаление и потерять наши правки, либо оставить файл вне апстрима."
-    echo "Сейчас файл **оставлен**."
+    echo "This fork modified these, upstream deleted them. Nothing automatic covers"
+    echo "it: either accept the deletion and lose our changes, or keep the file with"
+    echo "no upstream counterpart. Right now the file is **kept**."
     echo
     printf '%s\n' "$ud" | sed 's/^/- [ ] `/; s/$/`/'
     echo
 fi
 
 if [ -n "$aa" ]; then
-    echo "### Столкновение имён — $(files "$(count "$aa")")"
+    echo "### Name collisions — $(files "$(count "$aa")")"
     echo
     printf '%s\n' "$aa" | sed 's/^/- [ ] `/; s/$/`/'
     echo
@@ -144,13 +135,13 @@ ours_dropped="$(
 )"
 if [ -n "$ours_dropped" ]; then
     n="$(printf '%s\n' "$ours_dropped" | wc -l | tr -d ' ')"
-    echo "### Апстримные правки отброшены драйвером — $(files "$n")"
+    echo "### Upstream changes dropped by a merge driver — $(files "$n")"
     echo
-    echo "\`merge=ours\` по \`.gitattributes\`. Это не конфликты: изменения апстрима"
-    echo "в этих файлах выброшены целиком, включая непересекающиеся, и **в диффе"
-    echo "их не видно**."
+    echo "\`merge=ours\` from \`.gitattributes\`. These are not conflicts: upstream's"
+    echo "changes to these files were discarded whole, non-overlapping ones included,"
+    echo "and **the diff does not show it**."
     echo
-    echo '<details><summary>показать</summary>'
+    echo '<details><summary>show</summary>'
     echo
     printf '%s\n' "$ours_dropped" | sed 's/^/- `/; s/$/`/'
     echo
@@ -166,9 +157,9 @@ if [ -n "$ours" ]; then
     # Unquoted on purpose: one pathspec per file. No path in this repo has a space.
     mine="$(git log --oneline --no-decorate "$BASE..$TAG" -- $ours 2>/dev/null)"
     n="$(count "$mine")"
-    echo "### Апстрим в наших файлах — $(plural "$n" коммит коммита коммитов) из $all"
+    echo "### Upstream work in files this fork touched — $n of $all commits"
     echo
-    echo '<details><summary>показать</summary>'
+    echo '<details><summary>show</summary>'
     echo
     echo '```'
     printf '%s\n' "$mine"
@@ -183,9 +174,9 @@ fi
 # In a detached worktree `rev-parse --abbrev-ref` answers "HEAD"; the
 # workflow knows the real name and passes it.
 branch="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
-echo "### Продолжить локально"
+echo "### Continue locally"
 echo
 echo '```sh'
 echo "git fetch github && git checkout $branch"
-echo "just markov-setup-merge   # драйверы живут в .git/config, у каждого свои"
+echo "just markov-setup-merge   # drivers live in .git/config, once per clone"
 echo '```'
