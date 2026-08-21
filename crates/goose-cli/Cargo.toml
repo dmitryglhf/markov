@@ -78,12 +78,12 @@ winapi = { workspace = true, features = [
 ] }
 
 [features]
+# Mirrors markov-cli's `default`, which is the authority — the binary takes
+# this crate with default-features = false, so this list only decides what
+# workspace-wide `cargo test` and `cargo clippy --workspace` compile. Keeping
+# the two in step means CI checks the configuration we ship.
 default = [
     "code-mode",
-    "local-inference",
-    "tui",
-    "aws-providers",
-    "telemetry",
     "otel",
     "rustls-tls",
     "update",

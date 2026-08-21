@@ -24,8 +24,7 @@ set -euo pipefail
 #   MARKOV_APP_DIR          where the app goes (default: ~/Applications, ~/.local/share on Linux)
 #   MARKOV_INSTALL_DIR      where the CLI goes (default: ~/.local/bin)
 #   MARKOV_OS               darwin|linux|windows, overrides detection
-#   MARKOV_LINUX_VARIANT    standard|vulkan|musl (musl is detected)
-#   MARKOV_WINDOWS_VARIANT  standard|cuda
+#   MARKOV_LINUX_VARIANT    standard|musl (musl is detected)
 ##############################################################################
 
 VERSION="${MARKOV_VERSION:-}"
@@ -184,9 +183,8 @@ case "$OS" in
     fi
     case "$VARIANT" in
       standard) TARGET="$ARCH-unknown-linux-gnu" ;;
-      vulkan) TARGET="$ARCH-unknown-linux-gnu-vulkan" ;;
       musl) TARGET="$ARCH-unknown-linux-musl" ;;
-      *) die "unsupported MARKOV_LINUX_VARIANT '$VARIANT' (standard|vulkan|musl)" ;;
+      *) die "unsupported MARKOV_LINUX_VARIANT '$VARIANT' (standard|musl)" ;;
     esac
     CLI_ARCHIVE="markov-cli-$TARGET.tar.gz"
     APP_ARCHIVE="markov-desktop-$TARGET.zip"
@@ -200,11 +198,7 @@ case "$OS" in
     ;;
   windows)
     [ "$ARCH" = "x86_64" ] || die "Windows builds are x86_64 only"
-    case "${MARKOV_WINDOWS_VARIANT:-standard}" in
-      standard) TARGET="x86_64-pc-windows-msvc" ;;
-      cuda) TARGET="x86_64-pc-windows-msvc-cuda" ;;
-      *) die "unsupported MARKOV_WINDOWS_VARIANT (standard|cuda)" ;;
-    esac
+    TARGET="x86_64-pc-windows-msvc"
     CLI_ARCHIVE="markov-cli-$TARGET.zip"
     CLI_ONLY=true
     ;;

@@ -38,7 +38,19 @@ chrono.workspace = true
 
 [features]
 # Forwarded to goose-cli: this crate owns the binary, so the build flags land here.
-default = ["goose-cli/default"]
+#
+# THIS LIST IS THE SHIPPED PRODUCT. goose-cli is pulled with
+# default-features = false above, so nothing reaches the binary except what is
+# named here — local builds, CI and release artefacts all read this one place
+# and pass no --features of their own.
+#
+# Dropped from upstream's list: telemetry and nostr (they phone home),
+# system-keyring (ad-hoc signing changes identity every build, so the keychain
+# re-asks and the prompt reads as a hang), local-inference (only adds a fourth
+# dictation provider, at the price of llama.cpp and cmake), aws-providers
+# (nobody uses Bedrock), tui (launches the npm package upstream deprecated in
+# 1.46). Every one of them stays available below to opt into.
+default = ["code-mode", "rustls-tls", "otel", "update", "disable-update"]
 code-mode = ["goose-cli/code-mode"]
 local-inference = ["goose-cli/local-inference"]
 aws-providers = ["goose-cli/aws-providers"]

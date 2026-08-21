@@ -18,14 +18,6 @@ on:
         required: false
         type: boolean
         default: false
-      windows_variant:
-        description: 'Windows artifact variant: standard or cuda'
-        required: false
-        type: choice
-        options:
-          - standard
-          - cuda
-        default: 'standard'
   workflow_call:
     inputs:
       version:
@@ -52,11 +44,6 @@ on:
         required: false
         type: string
         default: ''
-      windows_variant:
-        description: 'Windows artifact variant: standard or cuda'
-        required: false
-        type: string
-        default: 'standard'
 
 permissions:
   contents: read
@@ -64,7 +51,7 @@ permissions:
 jobs:
   build-markov-windows:
     name: Build Markov (Windows)
-    runs-on: ${{ inputs.windows_variant == 'cuda' && 'windows-2022' || 'windows-latest' }}
+    runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -81,7 +68,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
-          key: windows-msvc-desktop-${{ inputs.windows_variant }}
+          key: windows-msvc-desktop
 
       - name: Setup Rust
         shell: bash
@@ -89,45 +76,11 @@ jobs:
           rustup show
           rustup target add x86_64-pc-windows-msvc
 
-      - name: Install CUDA toolkit
-        if: ${{ inputs.windows_variant == 'cuda' }}
-        uses: Jimver/cuda-toolkit@3d45d157f327c09c04b50ee6ccdea2d9d017ec76  # v0.2.35
-        with:
-          cuda: '12.9.1'
-          method: 'local'
-          log-file-suffix: 'bundle-windows-cuda.txt'
-
-      - name: Set up MSVC developer environment
-        if: ${{ inputs.windows_variant == 'cuda' }}
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
-        with:
-          arch: amd64
-
-      - name: Verify CUDA toolchain
-        if: ${{ inputs.windows_variant == 'cuda' }}
-        shell: pwsh
-        env:
-          CUDA_COMPUTE_CAP: "80"
-        run: |
-          Write-Output "CUDA_PATH=$env:CUDA_PATH"
-          Write-Output "CUDA_COMPUTE_CAP=$env:CUDA_COMPUTE_CAP"
-          where.exe cl
-          where.exe nvcc
-          nvcc -V
-
       - name: Build Windows executable
         shell: pwsh
-        env:
-          CUDA_COMPUTE_CAP: ${{ inputs.windows_variant == 'cuda' && '80' || '' }}
         run: |
-          $isCuda = "${{ inputs.windows_variant }}" -eq "cuda"
-
-          # Explicit list rather than the upstream default, which enables telemetry.
-          $features = "code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update"
-          if ($isCuda) {
-            $features = "$features,cuda"
-          }
-          cargo build --release --target x86_64-pc-windows-msvc -p markov-cli --bin markov --no-default-features --features $features
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release --target x86_64-pc-windows-msvc -p markov-cli --bin markov
 
           $binaryPath = "./target/x86_64-pc-windows-msvc/release/markov.exe"
           if (-not (Test-Path $binaryPath)) {
@@ -140,7 +93,7 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: internal-markov-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-markov-x86_64-pc-windows-msvc
           path: target/x86_64-pc-windows-msvc/release/markov.exe
           if-no-files-found: error
           retention-days: 1
@@ -150,28 +103,26 @@ jobs:
     name: Package CLI (Windows)
     if: ${{ inputs.package_cli }}
     needs: build-markov-windows
-    runs-on: ${{ inputs.windows_variant == 'cuda' && 'windows-2022' || 'windows-latest' }}
+    runs-on: windows-latest
     steps:
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-markov-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-markov-x86_64-pc-windows-msvc
           path: package
 
       - name: Package CLI
         shell: bash
-        env:
-          VARIANT_SUFFIX: ${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
         run: |
           mkdir -p markov-package
           cp package/markov.exe markov-package/
-          7z a -tzip "markov-cli-x86_64-pc-windows-msvc${VARIANT_SUFFIX}.zip" markov-package/
+          7z a -tzip "markov-cli-x86_64-pc-windows-msvc.zip" markov-package/
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: markov-cli-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-          path: markov-cli-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}.zip
+          name: markov-cli-x86_64-pc-windows-msvc
+          path: markov-cli-x86_64-pc-windows-msvc.zip
           if-no-files-found: error
           overwrite: true
 
@@ -179,7 +130,7 @@ jobs:
     name: Build Desktop (Windows)
     if: ${{ inputs.package_desktop }}
     needs: build-markov-windows
-    runs-on: ${{ inputs.windows_variant == 'cuda' && 'windows-2022' || 'windows-latest' }}
+    runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -217,7 +168,7 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-markov-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-markov-x86_64-pc-windows-msvc
           path: backend
 
       - name: Prepare Windows binary
@@ -274,7 +225,7 @@ jobs:
       - name: Upload unsigned distribution
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: internal-windows-unsigned${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-windows-unsigned
           path: ui/desktop/dist-windows/
           if-no-files-found: error
           retention-days: 1
@@ -292,7 +243,7 @@ jobs:
       - name: Download unsigned distribution
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-windows-unsigned${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-windows-unsigned
           path: dist-windows
 
       - name: Azure login
@@ -328,15 +279,13 @@ jobs:
 
       - name: Create Windows zip package
         shell: bash
-        env:
-          VARIANT_SUFFIX: ${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-        run: 7z a -tzip "markov-desktop-x86_64-pc-windows-msvc${VARIANT_SUFFIX}.zip" dist-windows/
+        run: 7z a -tzip "markov-desktop-x86_64-pc-windows-msvc.zip" dist-windows/
 
       - name: Upload signed Windows build
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: markov-desktop-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-          path: markov-desktop-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}.zip
+          name: markov-desktop-x86_64-pc-windows-msvc
+          path: markov-desktop-x86_64-pc-windows-msvc.zip
           if-no-files-found: error
           overwrite: true
 
@@ -349,19 +298,17 @@ jobs:
       - name: Download unsigned distribution
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-windows-unsigned${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
+          name: internal-windows-unsigned
           path: dist-windows
 
       - name: Create Windows zip package
         shell: bash
-        env:
-          VARIANT_SUFFIX: ${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-        run: 7z a -tzip "markov-desktop-x86_64-pc-windows-msvc${VARIANT_SUFFIX}.zip" dist-windows/
+        run: 7z a -tzip "markov-desktop-x86_64-pc-windows-msvc.zip" dist-windows/
 
       - name: Upload Windows build
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: markov-desktop-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}
-          path: markov-desktop-x86_64-pc-windows-msvc${{ inputs.windows_variant == 'cuda' && '-cuda' || '' }}.zip
+          name: markov-desktop-x86_64-pc-windows-msvc
+          path: markov-desktop-x86_64-pc-windows-msvc.zip
           if-no-files-found: error
           overwrite: true

@@ -15,6 +15,8 @@ use sigstore_verify::VerificationPolicy;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+// Only the real updater shells out; the stub below has nothing to run.
+#[cfg(not(feature = "disable-update"))]
 use std::process::Command;
 
 /// Asset name for this platform (compile-time).
@@ -268,7 +270,7 @@ pub async fn update(canary: bool, reconfigure: bool) -> Result<()> {
         );
         println!();
         println!("Settings, credentials and sessions are left alone.");
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(feature = "disable-update"))]

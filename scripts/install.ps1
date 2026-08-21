@@ -21,7 +21,6 @@
 #   MARKOV_BASE_URL         full release asset base, overrides the two above
 #   MARKOV_APP_DIR          where the app goes (default: %LOCALAPPDATA%\Programs\Markov)
 #   MARKOV_INSTALL_DIR      where the CLI goes (default: %USERPROFILE%\markov)
-#   MARKOV_WINDOWS_VARIANT  standard|cuda
 ##############################################################################
 
 param(
@@ -67,12 +66,7 @@ if ($channel -ne 'stable' -and $channel -ne 'canary') {
     throw "unsupported MARKOV_CHANNEL '$channel' (stable|canary)"
 }
 
-$variant = if ($env:MARKOV_WINDOWS_VARIANT) { $env:MARKOV_WINDOWS_VARIANT.ToLowerInvariant() } else { 'standard' }
-switch ($variant) {
-    'standard' { $target = 'x86_64-pc-windows-msvc' }
-    'cuda'     { $target = 'x86_64-pc-windows-msvc-cuda' }
-    default    { throw "unsupported MARKOV_WINDOWS_VARIANT '$variant' (standard|cuda)" }
-}
+$target = 'x86_64-pc-windows-msvc'
 
 $repo       = if ($env:MARKOV_REPO) { $env:MARKOV_REPO } else { 'dmitryglhf/markov' }
 $appDir     = if ($env:MARKOV_APP_DIR) { $env:MARKOV_APP_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\Markov' }

@@ -45,14 +45,6 @@ jobs:
             target-suffix: unknown-linux-musl
             build-on: ubuntu-22.04-arm
             variant: musl
-          - architecture: x86_64
-            target-suffix: unknown-linux-gnu
-            build-on: ubuntu-24.04
-            variant: vulkan
-          - architecture: aarch64
-            target-suffix: unknown-linux-gnu
-            build-on: ubuntu-24.04-arm
-            variant: vulkan
 
     steps:
       - name: Checkout code
@@ -77,13 +69,6 @@ jobs:
             libssl-dev \
             libdbus-1-dev \
             libxcb1-dev
-
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            sudo apt-get install -y \
-              libvulkan-dev \
-              libvulkan1 \
-              glslc
-          fi
 
           if [ "${{ matrix.variant }}" = "musl" ]; then
             sudo apt-get install -y musl-tools
@@ -124,20 +109,8 @@ jobs:
           echo "Rust toolchain info:"
           rustup show
 
-          # Explicit lists rather than default/portable-default, which enable telemetry.
-          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update"
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            FEATURES="${FEATURES},vulkan"
-          fi
-
-          if [ "${{ matrix.variant }}" = "musl" ]; then
-            cargo build --release --target ${TARGET} -p markov-cli --bin markov \
-              --no-default-features \
-              --features rustls-tls,aws-providers,otel,tui
-          else
-            cargo build --release --target ${TARGET} -p markov-cli --bin markov \
-              --no-default-features --features "${FEATURES}"
-          fi
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release --target ${TARGET} -p markov-cli --bin markov
 
       - name: Build CLI (manylinux container)
         if: matrix.container != ''
@@ -158,10 +131,8 @@ jobs:
           rustup toolchain install "$RUST_CHANNEL" --profile minimal \
             --component rustc,cargo --target "$TARGET"
           rustup show
-          # Explicit list rather than the upstream default, which enables telemetry.
-          cargo build --release --target "$TARGET" -p markov-cli --bin markov \
-            --no-default-features \
-            --features code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release --target "$TARGET" -p markov-cli --bin markov
 
       - name: Package CLI
         run: |
@@ -170,10 +141,6 @@ jobs:
             source ./bin/activate-hermit
           fi
           export TARGET="${{ matrix.architecture }}-${{ matrix.target-suffix }}"
-          export VARIANT_SUFFIX=""
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            VARIANT_SUFFIX="-vulkan"
-          fi
 
           # Create a directory for the package contents
           mkdir -p "target/${TARGET}/release/markov-package"
@@ -181,11 +148,11 @@ jobs:
           cp "target/${TARGET}/release/markov" "target/${TARGET}/release/markov-package/"
 
           cd "target/${TARGET}/release"
-          tar -cf - -C markov-package markov | gzip -n > "markov-cli-${TARGET}${VARIANT_SUFFIX}.tar.gz"
-          echo "ARTIFACT_GZ=target/${TARGET}/release/markov-cli-${TARGET}${VARIANT_SUFFIX}.tar.gz" >> $GITHUB_ENV
+          tar -cf - -C markov-package markov | gzip -n > "markov-cli-${TARGET}.tar.gz"
+          echo "ARTIFACT_GZ=target/${TARGET}/release/markov-cli-${TARGET}.tar.gz" >> $GITHUB_ENV
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: markov-cli-${{ matrix.architecture }}-${{ matrix.target-suffix }}${{ matrix.variant != 'standard' && matrix.variant != 'musl' && format('-{0}', matrix.variant) || '' }}
+          name: markov-cli-${{ matrix.architecture }}-${{ matrix.target-suffix }}
           path: ${{ env.ARTIFACT_GZ }}

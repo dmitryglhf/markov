@@ -24,16 +24,8 @@ permissions:
 
 jobs:
   build-desktop-linux:
-    name: Build Desktop (Linux, ${{ matrix.variant }})
-    runs-on: ${{ matrix.build-on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - variant: standard
-            build-on: ubuntu-22.04
-          - variant: vulkan
-            build-on: ubuntu-24.04
+    name: Build Desktop (Linux)
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repository
@@ -90,15 +82,7 @@ jobs:
             flatpak-builder \
             elfutils
 
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            sudo apt-get install -y \
-              libasound2t64 \
-              libvulkan-dev \
-              libvulkan1 \
-              glslc
-          else
-            sudo apt-get install -y libasound2
-          fi
+          sudo apt-get install -y libasound2
 
       - name: Configure RPM packaging
         run: |
@@ -118,7 +102,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
-          key: linux-${{ matrix.build-on }}-${{ matrix.variant }}
+          key: linux-ubuntu-22.04
 
       - name: Build desktop backend binary
         env:
@@ -128,14 +112,8 @@ jobs:
           source ./bin/activate-hermit
           export TARGET="x86_64-unknown-linux-gnu"
           rustup target add "${TARGET}"
-          # Explicit list rather than the upstream default, which enables telemetry.
-          FEATURES="code-mode,local-inference,tui,aws-providers,otel,rustls-tls,update,disable-update"
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            FEATURES="${FEATURES},vulkan"
-          fi
-
-          cargo build --release --target ${TARGET} -p markov-cli --bin markov \
-            --no-default-features --features "${FEATURES}"
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release --target ${TARGET} -p markov-cli --bin markov
 
       - name: Copy backend binary into Electron folder
         run: |
@@ -171,24 +149,13 @@ jobs:
           ls -la node_modules/.bin/ | head -5
 
       - name: Build Linux packages
-        env:
-          GOOSE_DESKTOP_LINUX_VARIANT: ${{ matrix.variant }}
         run: |
           source ./bin/activate-hermit
           cd ui/desktop
-          echo "Building Linux packages (.deb, .rpm, and .flatpak) for ${{ matrix.variant }}..."
+          echo "Building Linux packages (.deb, .rpm, and .flatpak)..."
 
           # Build all configured packages
           pnpm run make --platform=linux --arch=x64
-
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            for package in out/make/deb/x64/*.deb out/make/rpm/x64/*.rpm out/make/flatpak/x86_64/*.flatpak; do
-              [ -e "$package" ] || continue
-              extension="${package##*.}"
-              base="${package%.*}"
-              mv "$package" "${base}-vulkan.${extension}"
-            done
-          fi
 
           for package in out/make/rpm/x64/*.rpm; do
             package_contents="$(rpm -qlp "$package")"
@@ -203,15 +170,10 @@ jobs:
           find out/ -name "*.deb" -o -name "*.rpm" -o -name "*.flatpak" | head -10
 
       - name: Package desktop archive
-        env:
-          VARIANT: ${{ matrix.variant }}
         run: |
           # The distro packages need a package manager and root; this archive is
           # what install.sh unpacks into the user's home.
           TARGET="x86_64-unknown-linux-gnu"
-          if [ "$VARIANT" = "vulkan" ]; then
-            TARGET="${TARGET}-vulkan"
-          fi
           PACKAGED="$(find ui/desktop/out -maxdepth 1 -type d -name 'Markov-linux-*' | head -1)"
           [ -n "$PACKAGED" ] || { echo "::error::no packaged app directory in ui/desktop/out"; exit 1; }
           (cd "$(dirname "$PACKAGED")" &&
@@ -221,7 +183,7 @@ jobs:
       - name: Upload desktop archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: markov-desktop-linux-x64${{ matrix.variant == 'vulkan' && '-vulkan' || '' }}
+          name: markov-desktop-linux-x64
           path: markov-desktop-*.zip
           if-no-files-found: error
 
@@ -237,49 +199,22 @@ jobs:
           find ui/desktop/out/ -name "*.deb" -o -name "*.rpm" -o -name "*.flatpak" -exec ls -lh {} \;
 
       - name: Upload .deb package
-        if: matrix.variant == 'standard'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: Goose-linux-x64-deb
           path: ui/desktop/out/make/deb/x64/*.deb
           if-no-files-found: error
 
-      - name: Upload .deb package (Vulkan)
-        if: matrix.variant == 'vulkan'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: Goose-linux-x64-vulkan-deb
-          path: ui/desktop/out/make/deb/x64/*-vulkan.deb
-          if-no-files-found: error
-
       - name: Upload .rpm package
-        if: matrix.variant == 'standard'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: Goose-linux-x64-rpm
           path: ui/desktop/out/make/rpm/x64/*.rpm
           if-no-files-found: error
 
-      - name: Upload .rpm package (Vulkan)
-        if: matrix.variant == 'vulkan'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: Goose-linux-x64-vulkan-rpm
-          path: ui/desktop/out/make/rpm/x64/*-vulkan.rpm
-          if-no-files-found: error
-
       - name: Upload .flatpak package
-        if: matrix.variant == 'standard'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: Goose-linux-x64-flatpak
           path: ui/desktop/out/make/flatpak/x86_64/*.flatpak
-          if-no-files-found: error
-
-      - name: Upload .flatpak package (Vulkan)
-        if: matrix.variant == 'vulkan'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: Goose-linux-x64-vulkan-flatpak
-          path: ui/desktop/out/make/flatpak/x86_64/*-vulkan.flatpak
           if-no-files-found: error

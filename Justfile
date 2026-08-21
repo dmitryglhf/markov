@@ -1,9 +1,8 @@
 # Justfile
 
-# no system-keyring: an ad-hoc signed binary gets a new identity on every build,
-# so the OS keychain re-asks for permission and the prompt reads as a hang.
-# Secrets go to config_dir/secrets.yaml (0600) instead.
-FEATURES := "rustls-tls,code-mode"
+# The shipped feature set lives in crates/markov-cli/Cargo.toml as `default`.
+# It pulls goose-cli with default-features = false, so that one list decides
+# what ends up in the binary — here and in CI alike. Nothing to pass.
 
 # where `just install` puts the binary
 INSTALL_DIR := env("MARKOV_INSTALL_DIR", home_directory() / ".local/bin")
@@ -27,13 +26,13 @@ check-everything:
 # Default release command
 release-binary:
     @echo "Building release version..."
-    cargo build --release -p markov-cli --bin markov --no-default-features --features {{FEATURES}}
+    cargo build --release -p markov-cli --bin markov
     @just copy-binary
 
 # Debug build of the CLI, same features as the release
 debug-binary:
     @echo "Building debug version..."
-    cargo build -p markov-cli --bin markov --no-default-features --features {{FEATURES}}
+    cargo build -p markov-cli --bin markov
     @echo "Built ./target/debug/markov"
 
 # Build the release binary and put it on PATH as `markov`
@@ -88,12 +87,12 @@ release-windows:
 
 [windows]
 release-windows:
-    @powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'rustup target add x86_64-pc-windows-msvc; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cargo build --release --target x86_64-pc-windows-msvc -p markov-cli --bin markov --no-default-features --features {{FEATURES}}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Write-Host "Windows executable created at ./target/x86_64-pc-windows-msvc/release/markov.exe"'
+    @powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'rustup target add x86_64-pc-windows-msvc; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cargo build --release --target x86_64-pc-windows-msvc -p markov-cli --bin markov; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; Write-Host "Windows executable created at ./target/x86_64-pc-windows-msvc/release/markov.exe"'
 
 # Build for Intel Mac
 release-intel:
     @echo "Building release version for Intel Mac..."
-    cargo build --release --target x86_64-apple-darwin -p markov-cli --bin markov --no-default-features --features {{FEATURES}}
+    cargo build --release --target x86_64-apple-darwin -p markov-cli --bin markov
     @just copy-binary-intel
 
 copy-binary BUILD_MODE="release":
@@ -203,7 +202,7 @@ run-docs:
 # Run server
 run-server:
     @echo "Running external ACP backend..."
-    GOOSE_SERVER__SECRET_KEY="${GOOSE_SERVER__SECRET_KEY:-test}" cargo run -p markov-cli --bin markov --no-default-features --features {{FEATURES}} -- serve --platform desktop --enable-scheduler --host 127.0.0.1 --port 3000
+    GOOSE_SERVER__SECRET_KEY="${GOOSE_SERVER__SECRET_KEY:-test}" cargo run -p markov-cli --bin markov -- serve --platform desktop --enable-scheduler --host 127.0.0.1 --port 3000
 
 # Check if generated ACP schema and TypeScript types are up-to-date
 check-acp-schema: generate-acp-types
