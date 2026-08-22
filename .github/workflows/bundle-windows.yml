@@ -105,6 +105,19 @@ jobs:
     needs: build-markov-windows
     runs-on: windows-latest
     steps:
+      # This job builds nothing and normally has no working copy, but the
+      # tarball has to carry the license (Apache-2.0 section 4(a)), so take
+      # those two files and nothing else. Runs before the download, because
+      # checkout cleans the directory it lands in.
+      - name: Check out the license files
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || '' }}
+          sparse-checkout: |
+            LICENSE
+            NOTICE
+          sparse-checkout-cone-mode: false
+
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
@@ -116,7 +129,6 @@ jobs:
         run: |
           mkdir -p markov-package
           cp package/markov.exe markov-package/
-          # Apache-2.0 section 4(a): a recipient of the binary gets the license with it
           cp LICENSE NOTICE markov-package/
           7z a -tzip "markov-cli-x86_64-pc-windows-msvc.zip" markov-package/
 
