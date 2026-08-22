@@ -13,6 +13,28 @@ on:
   workflow_dispatch:
 
 jobs:
+<<<<<<< HEAD
+=======
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs-only: ${{ steps.filter.outputs.docs-only }}
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Check for file changes
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # pin@v3
+        id: filter
+        with:
+          filters: |
+            docs-only:
+              - 'documentation/**'
+            code:
+              - '!documentation/**'
+
+>>>>>>> v1.47.0
   rust-format:
     name: Check Rust Code Format
     runs-on: ubuntu-latest
@@ -51,6 +73,30 @@ jobs:
         env:
           RUST_MIN_STACK: 8388608
 
+  goose-sdk-uniffi:
+    name: Check goose-sdk UniFFI
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y libdbus-1-dev libxcb1-dev
+
+      - name: Check UniFFI feature
+        run: |
+          export CARGO_INCREMENTAL=0
+          cargo check -p goose-sdk --features uniffi --locked
+          cargo test -p goose-sdk --features uniffi --locked
+        env:
+          RUST_MIN_STACK: 8388608
+
   rust-build-and-test-tls:
     name: Build and Test TLS Backend (${{ matrix.tls-feature }})
     runs-on: ubuntu-latest
@@ -72,7 +118,7 @@ jobs:
           sudo apt install -y libdbus-1-dev gnome-keyring libxcb1-dev
 
       - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
         with:
           key: ${{ matrix.tls-feature }}
 
@@ -97,7 +143,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
         with:
           key: windows-ci
 
@@ -185,12 +231,11 @@ jobs:
           source ./bin/activate-hermit
           just check-acp-schema
 
-      - name: Test ACP Client SDK
+      - name: Check ACP Client SDK
         run: |
           source ./bin/activate-hermit
           cd ui/sdk
-          pnpm test
-          pnpm run typecheck:test
+          pnpm run lint
 
   desktop-lint:
     name: Test and Lint Electron Desktop App

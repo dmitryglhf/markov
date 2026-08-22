@@ -39,6 +39,11 @@ on:
         required: false
         type: boolean
         default: false
+      environment:
+        description: 'GitHub Environment containing signing secrets. Leave empty for unsigned builds.'
+        required: false
+        type: string
+        default: ''
       ref:
         description: 'Git ref to checkout'
         required: false
@@ -66,7 +71,7 @@ jobs:
         run: bash scripts/set-cargo-version.sh "$VERSION"
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
         with:
           key: windows-msvc-desktop
 
@@ -76,6 +81,35 @@ jobs:
           rustup show
           rustup target add x86_64-pc-windows-msvc
 
+<<<<<<< HEAD
+=======
+      - name: Install CUDA toolkit
+        if: ${{ inputs.windows_variant == 'cuda' }}
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d  # v0.2.36
+        with:
+          cuda: '12.9.1'
+          method: 'local'
+          log-file-suffix: 'bundle-windows-cuda.txt'
+
+      - name: Set up MSVC developer environment
+        if: ${{ inputs.windows_variant == 'cuda' }}
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: amd64
+
+      - name: Verify CUDA toolchain
+        if: ${{ inputs.windows_variant == 'cuda' }}
+        shell: pwsh
+        env:
+          CUDA_COMPUTE_CAP: "80"
+        run: |
+          Write-Output "CUDA_PATH=$env:CUDA_PATH"
+          Write-Output "CUDA_COMPUTE_CAP=$env:CUDA_COMPUTE_CAP"
+          where.exe cl
+          where.exe nvcc
+          nvcc -V
+
+>>>>>>> v1.47.0
       - name: Build Windows executable
         shell: pwsh
         run: |
@@ -250,7 +284,7 @@ jobs:
     needs: build-desktop-windows
     if: ${{ inputs.package_desktop && inputs.signing }}
     runs-on: windows-latest
-    environment: ${{ inputs.signing && 'signing' || null }}
+    environment: ${{ inputs.environment || '' }}
     permissions:
       id-token: write
     steps:
@@ -261,7 +295,7 @@ jobs:
           path: dist-windows
 
       - name: Azure login
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43  # v3.0.0
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca  # v3.0.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}

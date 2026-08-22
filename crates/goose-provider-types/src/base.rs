@@ -2,10 +2,12 @@ use async_trait::async_trait;
 use futures::Stream;
 use rmcp::model::Tool;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
 use std::pin::Pin;
 
 use crate::{
-    canonical::{map_to_canonical_model, CanonicalModelRegistry},
+    canonical::{catalog::ProviderSetupMetadata, map_to_canonical_model, CanonicalModelRegistry},
     conversation::{
         message::{Message, MessageContentBlock},
         token_usage::{ProviderUsage, Usage},
@@ -44,6 +46,17 @@ pub struct ProviderMetadata {
     /// compaction). When set, fast-path callers prefer this model over the main model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fast_model: Option<String>,
+    /// Setup information exposed to clients.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup: Option<ProviderSetupMetadata>,
+    /// Structured deprecation information for providers kept for compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<ProviderDeprecation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderDeprecation {
+    pub replacement: Option<String>,
 }
 
 impl ProviderMetadata {
@@ -70,6 +83,8 @@ impl ProviderMetadata {
             setup_steps: vec![],
             model_selection_hint: None,
             fast_model: None,
+            setup: None,
+            deprecated: None,
         }
     }
 
@@ -93,6 +108,8 @@ impl ProviderMetadata {
             setup_steps: vec![],
             model_selection_hint: None,
             fast_model: None,
+            setup: None,
+            deprecated: None,
         }
     }
 
@@ -108,6 +125,8 @@ impl ProviderMetadata {
             setup_steps: vec![],
             model_selection_hint: None,
             fast_model: None,
+            setup: None,
+            deprecated: None,
         }
     }
 
@@ -123,6 +142,18 @@ impl ProviderMetadata {
 
     pub fn with_fast_model(mut self, fast_model: &str) -> Self {
         self.fast_model = Some(fast_model.to_string());
+        self
+    }
+
+    pub fn with_setup(mut self, setup: ProviderSetupMetadata) -> Self {
+        self.setup = Some(setup);
+        self
+    }
+
+    pub fn deprecated(mut self, replacement: Option<&str>) -> Self {
+        self.deprecated = Some(ProviderDeprecation {
+            replacement: replacement.map(str::to_string),
+        });
         self
     }
 }
@@ -216,6 +247,21 @@ impl ConfigKey {
     }
 }
 
+/// How a model's thinking is replayed back to the provider on subsequent turns.
+///
+/// Cerebras rejects requests that replay `messages[].reasoning_content`, so such models
+/// declare an inline `content` form instead.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThinkingPreservationFormat {
+    /// Prepend the thinking to the message content as plain text.
+    ContentPrepend,
+    /// Prepend the thinking to the message content wrapped in `<think>` tags.
+    ContentXml,
+    /// Replay in the separate `reasoning_content` field, the OpenAI-compatible default.
+    ReasoningContent,
+}
+
 /// Information about a model's capabilities
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModelInfo {
@@ -237,6 +283,11 @@ pub struct ModelInfo {
     /// Whether this model supports reasoning/thinking controls
     #[serde(default)]
     pub reasoning: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_preservation_format: Option<ThinkingPreservationFormat>,
+    /// Static params merged into the request body for this model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_params: Option<HashMap<String, Value>>,
 }
 
 impl ModelInfo {
@@ -251,6 +302,8 @@ impl ModelInfo {
             currency: None,
             supports_cache_control: None,
             reasoning: false,
+            thinking_preservation_format: None,
+            request_params: None,
         }
     }
 
@@ -270,6 +323,8 @@ impl ModelInfo {
             currency: Some("$".to_string()),
             supports_cache_control: None,
             reasoning: false,
+            thinking_preservation_format: None,
+            request_params: None,
         }
     }
 }
@@ -315,6 +370,8 @@ pub fn model_info_for_provider_model(provider_name: &str, model_name: &str) -> M
         currency: None,
         supports_cache_control: None,
         reasoning,
+        thinking_preservation_format: None,
+        request_params: None,
     }
 }
 
@@ -396,6 +453,14 @@ pub fn stream_from_single_message(message: Message, usage: ProviderUsage) -> Mes
 pub trait Provider: Send + Sync {
     /// Get the name of this provider instance
     fn get_name(&self) -> &str;
+
+    fn provider_session_id(&self) -> Option<String> {
+        None
+    }
+
+    async fn resume(&self, _session_id: &str) -> Result<(), ProviderError> {
+        Ok(())
+    }
 
     /// Primary streaming method that all providers must implement.
     async fn stream(
@@ -784,6 +849,8 @@ mod tests {
             currency: None,
             supports_cache_control: None,
             reasoning: false,
+            thinking_preservation_format: None,
+            request_params: None,
         };
         assert_eq!(info.context_limit, 1000);
 
@@ -797,6 +864,8 @@ mod tests {
             currency: None,
             supports_cache_control: None,
             reasoning: false,
+            thinking_preservation_format: None,
+            request_params: None,
         };
         assert_eq!(info, info2);
 
@@ -810,8 +879,37 @@ mod tests {
             currency: None,
             supports_cache_control: None,
             reasoning: false,
+            thinking_preservation_format: None,
+            request_params: None,
         };
         assert_ne!(info, info3);
+    }
+
+    #[test]
+    fn test_model_info_deserializes_thinking_preservation_and_request_params() {
+        let info: ModelInfo = serde_json::from_str(
+            r#"{
+                "name": "zai-glm-4.7",
+                "context_limit": 131072,
+                "thinking_preservation_format": "content_xml",
+                "request_params": {"reasoning_format": "parsed"}
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            info.thinking_preservation_format,
+            Some(ThinkingPreservationFormat::ContentXml)
+        );
+        assert_eq!(
+            info.request_params.unwrap().get("reasoning_format"),
+            Some(&serde_json::json!("parsed"))
+        );
+
+        let bare: ModelInfo =
+            serde_json::from_str(r#"{"name": "gpt-4o", "context_limit": 128000}"#).unwrap();
+        assert_eq!(bare.thinking_preservation_format, None);
+        assert_eq!(bare.request_params, None);
     }
 
     #[test]
