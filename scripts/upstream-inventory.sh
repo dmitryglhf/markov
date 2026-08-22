@@ -51,8 +51,9 @@ blocks() { plural "$1" block; }
 
 echo "## upstream \`$TAG\` → \`main\`"
 echo
-echo "Assembled by \`upstream-watch\`. **This branch carries conflict markers — do"
-echo "not take it out of draft until they are resolved.** Full release notes:"
+echo "Assembled by \`upstream-watch\`. The branch carries upstream's code, so the"
+echo "conflicts below are the ones that appear when \`main\` is merged into it."
+echo "**Leave it a draft until they are resolved.** Full release notes:"
 echo "<https://github.com/$UPSTREAM/releases/tag/$TAG>"
 echo
 
@@ -130,6 +131,8 @@ echo
 echo '```sh'
 echo "git fetch origin"
 echo "git switch $branch"
+echo "git merge origin/main"
+echo "scripts/upstream-merge-policy.sh MERGE_HEAD"
 echo
 echo "# resolve the conflicts, then"
 echo "git add -A && git commit"

@@ -97,66 +97,65 @@ jobs:
 
           echo "act=true" >> "$GITHUB_OUTPUT"
 
-      - name: Merge
+      # GitHub only offers its conflict tooling when base and head genuinely
+      # diverge, so the branch has to carry upstream's code rather than the
+      # result of merging it. The merge happens here anyway, in a throwaway
+      # worktree, purely to work out what the report should say.
+      - name: Assemble the branch and the report
         if: steps.gate.outputs.act == 'true'
+        id: assemble
+        env:
+          TAG: ${{ steps.rel.outputs.tag }}
+          BRANCH: ${{ steps.rel.outputs.branch }}
         run: |
-          tag='${{ steps.rel.outputs.tag }}'
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b '${{ steps.rel.outputs.branch }}'
-          # --no-commit so that both outcomes leave a merge in progress: the
-          # policy pass needs MERGE_HEAD, and a merge that succeeded outright
-          # would already have cleared it.
-          git merge --no-ff --no-commit -m "merge upstream $tag" "$tag" \
-            || echo "conflicts, as expected — the policy pass and the PR body take it from here"
+          ours="$(git rev-parse HEAD)"
+          base="$(git merge-base "$ours" "$TAG")"
 
-      # .gitattributes assigns a policy per path, but git has no built-in
-      # ours/theirs driver to carry it out, and a driver would have to be
-      # registered in .git/config on every runner. Applied here instead.
-      - name: Apply the merge policy
-        if: steps.gate.outputs.act == 'true'
-        id: policy
-        run: |
-          scripts/upstream-merge-policy.sh
-          # "Clean" means nothing is left for a human, so it cannot be decided
-          # before the policy has had its say.
-          if [ -z "$(git ls-files --unmerged)" ]; then clean=true; else clean=false; fi
+          # --- the branch ------------------------------------------------
+          # Upstream still ships every file this fork deleted, about a thousand
+          # of them. Left in, each one arrives as a modify/delete conflict
+          # answered "keep deleted", and upstream's own workflow files would
+          # start firing on our runners. The fork's answer never varies, so
+          # apply it once here instead of asking a hundred times.
+          bw="$(mktemp -d)"
+          git worktree add -q --detach "$bw" "$TAG"
+          comm -12 \
+            <(git diff --diff-filter=D --name-only "$base" "$ours" | sort) \
+            <(git ls-tree -r --name-only "$TAG" | sort) > /tmp/dropped
+          if [ -s /tmp/dropped ]; then
+            tr '\n' '\0' < /tmp/dropped | xargs -0 git -C "$bw" rm -q --
+            git -C "$bw" commit -q \
+              -m "drop the $(wc -l < /tmp/dropped | tr -d ' ') paths this fork does not carry"
+          fi
+          echo "head=$(git -C "$bw" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+          # --- the report ------------------------------------------------
+          tw="$(mktemp -d)"
+          git worktree add -q --detach "$tw" "$ours"
+          git -C "$tw" merge --no-ff --no-commit "$TAG" \
+            || echo "conflicts, as expected"
+          ( cd "$tw" && scripts/upstream-merge-policy.sh )
+          if [ -z "$(git -C "$tw" ls-files --unmerged)" ]; then clean=true; else clean=false; fi
           echo "clean=$clean" >> "$GITHUB_OUTPUT"
-
-      # Must run before the index is touched: committing wipes the unmerged
-      # entries the inventory is built from.
-      - name: Build PR body
-        if: steps.gate.outputs.act == 'true'
-        env:
-          BRANCH: ${{ steps.rel.outputs.branch }}
-        run: scripts/upstream-inventory.sh '${{ steps.rel.outputs.tag }}' > /tmp/body.md
+          ( cd "$tw" && scripts/upstream-inventory.sh "$TAG" ) > /tmp/body.md
+          echo "trial=$tw" >> "$GITHUB_OUTPUT"
 
       - name: Explain the conflicts
-        if: steps.gate.outputs.act == 'true' && steps.policy.outputs.clean == 'false'
+        if: steps.gate.outputs.act == 'true' && steps.assemble.outputs.clean == 'false'
         continue-on-error: true
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
-        run: scripts/upstream-explain.sh > /tmp/explain.md
-
-      # Always: --no-commit left the merge open even when it went through cleanly.
-      - name: Commit the merge as it came out
-        if: steps.gate.outputs.act == 'true'
-        run: |
-          # `git add -A` stages the upstream copy of every file we deleted, so
-          # the workflows and scripts this fork dropped on purpose would come
-          # back invisibly inside a five-thousand-line diff. Keep the deletions.
-          git status --porcelain | awk '$1 == "DU" { print $2 }' \
-            | while read -r f; do git rm -q -f -- "$f"; done
-          git add -A
-          git commit --no-edit
+        run: cd '${{ steps.assemble.outputs.trial }}' && scripts/upstream-explain.sh > /tmp/explain.md
 
       - name: Push and open the pull request
         if: steps.gate.outputs.act == 'true'
         run: |
           tag='${{ steps.rel.outputs.tag }}'
           branch='${{ steps.rel.outputs.branch }}'
-          git push origin "$branch"
+          git push origin '${{ steps.assemble.outputs.head }}':"refs/heads/$branch"
 
           # Swallowing this quietly once cost a run: the label failed to appear,
           # and the error only surfaced from gh pr create one line later.
@@ -165,7 +164,7 @@ jobs:
             || echo "label already exists, or creation failed — see the error above"
 
           draft=--draft
-          [ '${{ steps.policy.outputs.clean }}' = 'true' ] && draft=""
+          [ '${{ steps.assemble.outputs.clean }}' = 'true' ] && draft=""
 
           url="$(gh pr create $draft \
             --base main --head "$branch" \
