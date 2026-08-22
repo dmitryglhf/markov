@@ -94,11 +94,44 @@ markov-install: markov-release
     #!/usr/bin/env bash
     set -euo pipefail
 
+    dest="{{INSTALL_DIR}}"
+    mkdir -p "$dest"
+
+    # Copied beside the target and renamed into place: rename swaps the directory
+    # entry, so a markov session running right now keeps the file it started with
+    # instead of having it rewritten underneath.
+    cp ./target/release/markov "$dest/.markov.new"
+    chmod 755 "$dest/.markov.new"
+    mv -f "$dest/.markov.new" "$dest/markov"
+
+    # awk, because `markov --version` answers with a leading space
+    version=$("$dest/markov" --version | awk '{print $1}')
+    echo "Installed markov $version to $dest/markov"
+
+    case ":$PATH:" in
+        *":$dest:"*) ;;
+        *) echo "Note: $dest is not on your PATH, so plain \`markov\` will not find it" ;;
+    esac
+
+    on_path=$(command -v markov || true)
+    if [ -n "$on_path" ] && [ "$on_path" != "$dest/markov" ]; then
+        echo "Note: \`markov\` on your PATH is $on_path, which wins over the copy just installed"
+    fi
+
 # Remove the binary `just markov-install` put on PATH
 [unix]
 markov-uninstall:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    dest="{{INSTALL_DIR}}"
+    if [ -e "$dest/markov" ]; then
+        rm -f "$dest/markov"
+        echo "Removed $dest/markov"
+    else
+        echo "Nothing to remove at $dest/markov"
+    fi
+
 
 # ----------------------------------------------------------------------
 # Desktop
@@ -189,17 +222,46 @@ markov-reset CONFIRM="":
     #!/usr/bin/env bash
     set -euo pipefail
 
-# ----------------------------------------------------------------------
-# Repository setup
-# ----------------------------------------------------------------------
+    config="${XDG_CONFIG_HOME:-$HOME/.config}/markov"
+    data="${XDG_DATA_HOME:-$HOME/.local/share}/markov"
+    state="${XDG_STATE_HOME:-$HOME/.local/state}/markov"
+    desktop="$HOME/Library/Application Support/Markov"
 
-# Git ships no per-file `ours`/`theirs`, so without this the attributes in
-# .gitattributes quietly decay into an ordinary three-way merge.
-# Register the merge drivers .gitattributes names; run once per clone
-markov-setup-merge:
-    git config merge.ours.name "keep our version of the file"
-    git config merge.ours.driver true
-    git config merge.theirs.name "take the upstream version of the file"
-    git config merge.theirs.driver "cp -f %B %A"
-    @echo "registered:"
-    @git config --get-regexp '^merge\.'
+    targets=()
+    for path in "$config" "$data" "$state" "$desktop"; do
+        [ -e "$path" ] && targets+=("$path")
+    done
+
+    if [ ${#targets[@]} -eq 0 ]; then
+        echo "No markov directories on disk"
+    else
+        echo "About to remove:"
+        printf '  %s\n' "${targets[@]}"
+    fi
+    # the fork kept the upstream keyring service name, secrets live under "goose"
+    echo "Also clearing keyring secrets (service goose, account secrets)"
+
+    if pgrep -x markov >/dev/null 2>&1; then
+        echo "Warning: markov is running, quit it first or it will rewrite the state"
+    fi
+
+    if [ "{{CONFIRM}}" != "force" ]; then
+        read -r -p "Proceed? [y/N] " reply
+        case "$reply" in
+            y|Y) ;;
+            *) echo "Cancelled"; exit 0 ;;
+        esac
+    fi
+
+    for path in "${targets[@]:-}"; do
+        [ -n "$path" ] && rm -rf "$path"
+    done
+
+    if command -v security >/dev/null 2>&1; then
+        security delete-generic-password -s goose -a secrets >/dev/null 2>&1 || true
+    elif command -v secret-tool >/dev/null 2>&1; then
+        secret-tool clear service goose username secrets >/dev/null 2>&1 || true
+    fi
+
+    echo "Done, next markov run starts the first-time setup"
+    echo "Tip: GOOSE_PATH_ROOT=<dir> markov keeps a throwaway setup out of your real one"

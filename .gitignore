@@ -95,3 +95,7 @@ gooseselftest/
 /crates/goose-sdk/examples/uniffi/kotlin/.gradle/
 /crates/goose-sdk/examples/uniffi/kotlin/.kotlin/
 /crates/goose-sdk/examples/uniffi/kotlin/build/
+
+# Desktop main-process bundle; it belongs in ui/desktop/.vite/build, and a copy
+# in the root is always a stray from an interrupted build
+/main.js

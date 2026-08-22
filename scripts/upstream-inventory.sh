@@ -9,6 +9,10 @@
 
 set -uo pipefail
 
+# Every list here is sorted, and half of them are paired with comm.
+# Collation must not depend on whose machine this runs on.
+export LC_ALL=C
+
 TAG="${1:?usage: upstream-inventory.sh <upstream-tag>}"
 UPSTREAM="${UPSTREAM:-aaif-goose/goose}"
 
@@ -125,7 +129,7 @@ if [ -n "$aa" ]; then
     echo
 fi
 
-# --- what the merge drivers threw away, which the diff cannot show ------------
+# --- what the merge policy threw away, which the diff cannot show -------------
 
 ours_dropped="$(
     comm -12 \
@@ -135,7 +139,7 @@ ours_dropped="$(
 )"
 if [ -n "$ours_dropped" ]; then
     n="$(printf '%s\n' "$ours_dropped" | wc -l | tr -d ' ')"
-    echo "### Upstream changes dropped by a merge driver — $(files "$n")"
+    echo "### Upstream changes dropped by the merge policy — $(files "$n")"
     echo
     echo "\`merge=ours\` from \`.gitattributes\`. These are not conflicts: upstream's"
     echo "changes to these files were discarded whole, non-overlapping ones included,"
@@ -178,5 +182,4 @@ echo "### Continue locally"
 echo
 echo '```sh'
 echo "git fetch github && git checkout $branch"
-echo "just markov-setup-merge   # drivers live in .git/config, once per clone"
 echo '```'
