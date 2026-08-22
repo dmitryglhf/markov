@@ -10,8 +10,6 @@ Markov is a general purpose agent. It reads and writes files, runs commands, and
 
 It ships in two shapes. There is a desktop application for macOS, Linux and Windows, and there is a command line interface for people who live in a terminal. Both are built from the same Rust core, so a session started in one is readable by the other.
 
-Models are reached through a provider layer that covers the usual hosted services as well as local servers such as Ollama. External tools arrive over the Model Context Protocol, which means an extension written for another agent works here without changes.
-
 ## Install
 
 The installer places the CLI, and on macOS and Linux the desktop application as well, inside your home directory, so it needs no administrator rights. Everything is checked against published checksums before it is unpacked.
