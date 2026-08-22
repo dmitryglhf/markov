@@ -134,6 +134,9 @@
   "baseChat.reconnecting": {
     "defaultMessage": "Verbindung unterbrochen. Verbindung wird wiederhergestellt…"
   },
+  "baseChat.retry": {
+    "defaultMessage": "Wiederholen"
+  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Erweiterung aktualisiert"
   },
@@ -929,6 +932,18 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "Zuletzt verwendete Verzeichnisse"
   },
+  "gitBranchIndicator.failedToSwitch": {
+    "defaultMessage": "Wechsel zu {branch} fehlgeschlagen"
+  },
+  "gitBranchIndicator.noBranchesFound": {
+    "defaultMessage": "Keine Branches gefunden"
+  },
+  "gitBranchIndicator.searchBranches": {
+    "defaultMessage": "Branches durchsuchen…"
+  },
+  "gitBranchIndicator.uncommittedChanges": {
+    "defaultMessage": "Möglicherweise gibt es noch nicht committete Änderungen."
+  },
   "elicitationRequest.accept": {
     "defaultMessage": "Akzeptieren"
   },
@@ -1225,6 +1240,15 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Verbindung zu einem anderswo laufenden goose-Server herstellen (erfordert Neustart der App)"
+  },
+  "externalBackendSection.workingDir": {
+    "defaultMessage": "Remote-Arbeitsverzeichnis (optional)"
+  },
+  "externalBackendSection.workingDirHelp": {
+    "defaultMessage": "Absoluter Pfad auf dem externen Backend. Leer lassen, um das lokale Arbeitsverzeichnis zu senden."
+  },
+  "externalBackendSection.workingDirPlaceholder": {
+    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "Schließen"
@@ -2360,8 +2384,35 @@
   "navigationPanel.chats": {
     "defaultMessage": "Chats"
   },
+  "navigationPanel.metaCreated": {
+    "defaultMessage": "Erstellt"
+  },
+  "navigationPanel.metaDirectory": {
+    "defaultMessage": "Verzeichnis"
+  },
+  "navigationPanel.metaModel": {
+    "defaultMessage": "Modell"
+  },
+  "navigationPanel.metaStatus": {
+    "defaultMessage": "Status"
+  },
+  "navigationPanel.metaUpdated": {
+    "defaultMessage": "Aktualisiert"
+  },
   "navigationPanel.noChats": {
     "defaultMessage": "Keine aktuellen Chats"
+  },
+  "navigationPanel.statusError": {
+    "defaultMessage": "Fehler"
+  },
+  "navigationPanel.statusIdle": {
+    "defaultMessage": "Inaktiv"
+  },
+  "navigationPanel.statusStreaming": {
+    "defaultMessage": "Streaming"
+  },
+  "navigationPanel.statusUnread": {
+    "defaultMessage": "Ungelesene Aktivität"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Unbenannte Sitzung"
@@ -3731,6 +3782,12 @@
   "sessions.action.export": {
     "defaultMessage": "Sitzung exportieren"
   },
+  "sessions.action.exportJson": {
+    "defaultMessage": "JSON"
+  },
+  "sessions.action.exportMarkdown": {
+    "defaultMessage": "Markdown"
+  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "In neuem Fenster öffnen"
   },
@@ -3829,6 +3886,9 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Sitzung \"{name}\" erfolgreich dupliziert"
+  },
+  "sessions.toast.exportFailed": {
+    "defaultMessage": "Sitzung konnte nicht exportiert werden: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Sitzung erfolgreich exportiert"
@@ -4661,6 +4721,9 @@
   "userMessage.editButton": {
     "defaultMessage": "Bearbeiten"
   },
+  "userMessage.editImagesHeading": {
+    "defaultMessage": "Angehängte Bilder:"
+  },
   "userMessage.editInPlace": {
     "defaultMessage": "An Ort und Stelle bearbeiten"
   },
@@ -4693,5 +4756,38 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Eine neue Sitzung mit der bearbeiteten Nachricht erstellen"
+  },
+  "userMessage.removeImageFromEdit": {
+    "defaultMessage": "Bild aus Nachricht entfernen"
+  },
+  "modelsBottomBar.recentModels": {
+    "defaultMessage": "Zuletzt verwendet"
+  },
+  "providerConfigurationModal.chooseModel": {
+    "defaultMessage": "Modell auswählen"
+  },
+  "providerCard.deprecatedReplacement": {
+    "defaultMessage": "Veraltet — verwenden Sie stattdessen {replacement}."
+  },
+  "acpReadinessPanel.adapterFound": {
+    "defaultMessage": "ACP-Adapter gefunden"
+  },
+  "acpReadinessPanel.adapterNotFound": {
+    "defaultMessage": "ACP-Adapter nicht gefunden"
+  },
+  "acpReadinessPanel.authenticationHelp": {
+    "defaultMessage": "Melden Sie sich über die Anbieter-CLI an und prüfen Sie die Verbindung erneut."
+  },
+  "acpReadinessPanel.checkAgain": {
+    "defaultMessage": "Erneut prüfen"
+  },
+  "acpReadinessPanel.checking": {
+    "defaultMessage": "Wird geprüft..."
+  },
+  "acpReadinessPanel.connected": {
+    "defaultMessage": "Erfolgreich verbunden"
+  },
+  "acpReadinessPanel.connectionNotChecked": {
+    "defaultMessage": "Prüfen Sie Ihre Kontoverbindung, bevor Sie fortfahren."
   }
 }
