@@ -9,10 +9,7 @@ export function setTelemetryEnabled(_enabled: boolean): void {
   // Frontend telemetry is disabled.
 }
 
-function sendEvent(
-  _eventName: string,
-  _properties: Record<string, unknown> = {}
-): void {
+function sendEvent(_eventName: string, _properties: Record<string, unknown> = {}): void {
   // Frontend telemetry is disabled.
 }
 
@@ -271,10 +268,7 @@ export function trackOnboardingCompleted(provider: string, model?: string): void
   onboardingStartTime = null;
 }
 
-export function trackOnboardingSetupFailed(
-  provider: 'local',
-  errorMessage?: string
-): void {
+export function trackOnboardingSetupFailed(provider: 'local', errorMessage?: string): void {
   trackEvent({
     name: 'onboarding_setup_failed',
     properties: { provider, error_message: errorMessage },

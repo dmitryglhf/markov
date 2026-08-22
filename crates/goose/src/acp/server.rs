@@ -1540,11 +1540,11 @@ impl GooseAcpAgent {
             .mcp_capabilities(McpCapabilities::new().http(true))
             .meta(agent_capabilities_meta());
         Ok(InitializeResponse::new(args.protocol_version)
-            .agent_info(Implementation::new("goose", env!("CARGO_PKG_VERSION")))
+            .agent_info(Implementation::new("markov", env!("CARGO_PKG_VERSION")))
             .agent_capabilities(capabilities)
             .auth_methods(vec![AuthMethod::Agent(
                 AuthMethodAgent::new("goose-provider", "Configure Provider")
-                    .description("Run `goose configure` to set up your AI provider and API key"),
+                    .description("Run `markov configure` to set up your AI provider and API key"),
             )]))
     }
 

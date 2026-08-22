@@ -1,12 +1,11 @@
-import {
-  methods,
-  type ForkSessionRequest,
-  type ListSessionsRequest,
-  type LoadSessionResponse,
-  type NewSessionRequest,
-  type SessionInfo,
+import type {
+  ForkSessionRequest,
+  ListSessionsRequest,
+  LoadSessionResponse,
+  NewSessionRequest,
+  SessionInfo,
 } from '@agentclientprotocol/sdk';
-import type { GooseExtension, SessionExportFormat, SessionImportSource } from '@aaif/goose-sdk';
+import type { GooseExtension, SessionImportSource } from '@aaif/goose-sdk';
 import { getAcpClient } from './acpConnection';
 import type { ExtensionLoadResult } from '../types/extensions';
 import type { Session } from '../types/session';
@@ -152,7 +151,7 @@ export async function acpListSessions(
     meta.query = keyword;
   }
   request._meta = meta;
-  const response = await client.connection.agent.request(methods.agent.session.list, request);
+  const response = await client.listSessions(request);
   return {
     sessions: response.sessions.map(sessionInfoToListItem),
     nextCursor: response.nextCursor ?? null,
@@ -165,9 +164,7 @@ export async function acpListRecentSessions(maxSessions: number): Promise<Sessio
   }
 
   const client = await getAcpClient();
-  const response = await client.connection.agent.request(methods.agent.session.list, {
-    _meta: { types: SESSION_LIST_TYPES },
-  });
+  const response = await client.listSessions({ _meta: { types: SESSION_LIST_TYPES } });
   return response.sessions.slice(0, maxSessions).map(sessionInfoToListItem);
 }
 
@@ -202,7 +199,7 @@ async function loadAcpSession(sessionId: string): Promise<AcpLoadSessionResult> 
   const client = await getAcpClient();
   const initialSessionInfoResponse = await client.goose.sessionInfo_unstable({ sessionId });
   const initialSessionInfo = initialSessionInfoResponse.session;
-  const response = await client.connection.agent.request(methods.agent.session.load, {
+  const response = await client.loadSession({
     sessionId,
     cwd: initialSessionInfo.cwd,
     mcpServers: [],
@@ -226,7 +223,6 @@ export interface AcpNewSessionResult {
 export interface AcpRecipeOptions {
   recipeId?: string;
   recipeDeeplink?: string;
-  recipeParameterScopeId?: string;
 }
 
 export async function acpNewSession(
@@ -244,11 +240,8 @@ export async function acpNewSession(
   } else if (recipe?.recipeDeeplink) {
     meta.recipeDeeplink = recipe.recipeDeeplink;
   }
-  if (recipe?.recipeParameterScopeId) {
-    meta.recipeParameterScopeId = recipe.recipeParameterScopeId;
-  }
   const request: NewSessionRequest = { cwd, mcpServers: [], _meta: meta };
-  const response = await client.connection.agent.request(methods.agent.session.new, request);
+  const response = await client.newSession(request);
   const sessionId = String(response.sessionId);
   const sessionInfoResponse = await client.goose.sessionInfo_unstable({ sessionId });
 
@@ -261,12 +254,12 @@ export async function acpNewSession(
 
 export async function acpDeleteSession(sessionId: string): Promise<void> {
   const client = await getAcpClient();
-  await client.connection.agent.request(methods.agent.session.delete, { sessionId });
+  await client.goose.sessionDelete({ sessionId });
 }
 
 export async function acpCloseSession(sessionId: string): Promise<void> {
   const client = await getAcpClient();
-  await client.connection.agent.request(methods.agent.session.close, { sessionId });
+  await client.unstable_closeSession({ sessionId });
 }
 
 export async function acpRenameSession(sessionId: string, title: string): Promise<void> {
@@ -298,16 +291,13 @@ export async function acpForkSession(
   if (conversationBefore !== undefined) {
     request._meta = { conversationBefore };
   }
-  const response = await client.connection.agent.request(methods.agent.session.fork, request);
+  const response = await client.unstable_forkSession(request);
   return String(response.sessionId);
 }
 
-export async function acpExportSession(
-  sessionId: string,
-  format: SessionExportFormat = 'json'
-): Promise<string> {
+export async function acpExportSession(sessionId: string): Promise<string> {
   const client = await getAcpClient();
-  const response = await client.goose.sessionExport_unstable({ sessionId, format });
+  const response = await client.goose.sessionExport_unstable({ sessionId });
   return response.data;
 }
 

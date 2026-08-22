@@ -1,3 +1,8 @@
+// The downloader below is kept whole but unreachable while `disable-update` is
+// on: it names upstream's repository and upstream's asset names, and both have
+// to change together before it can run against our own releases.
+#![cfg_attr(feature = "disable-update", allow(dead_code))]
+
 use anyhow::{bail, Context, Result};
 use reqwest::{
     header::{HeaderValue, AUTHORIZATION},
@@ -10,6 +15,8 @@ use sigstore_verify::VerificationPolicy;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+// Only the real updater shells out; the stub below has nothing to run.
+#[cfg(not(feature = "disable-update"))]
 use std::process::Command;
 
 /// Asset name for this platform (compile-time).
@@ -245,7 +252,21 @@ async fn verify_provenance(archive_data: &[u8], tag: &str) -> Result<()> {
 pub async fn update(canary: bool, reconfigure: bool) -> Result<()> {
     #[cfg(feature = "disable-update")]
     {
-        bail!("Update is disabled in this build.");
+        let _ = (canary, reconfigure);
+        println!("markov cannot update itself yet: everything below this point still asks the upstream goose releases for a binary that is not markov.");
+        println!();
+        println!("Run the installer again to move to the latest version:");
+        #[cfg(windows)]
+        println!(
+            "  irm https://github.com/dmitryglhf/markov/releases/download/stable/install.ps1 | iex"
+        );
+        #[cfg(not(windows))]
+        println!(
+            "  curl -fsSL https://github.com/dmitryglhf/markov/releases/download/stable/install.sh | bash"
+        );
+        println!();
+        println!("Settings, credentials and sessions are left alone.");
+        Ok(())
     }
 
     #[cfg(not(feature = "disable-update"))]
@@ -308,13 +329,13 @@ pub async fn update(canary: bool, reconfigure: bool) -> Result<()> {
 
         // --- Reconfigure if requested -------------------------------------------
         if reconfigure {
-            println!("Running goose configure...");
+            println!("Running markov configure...");
             let status = Command::new(current_exe)
                 .arg("configure")
                 .status()
-                .context("Failed to run goose configure")?;
+                .context("Failed to run markov configure")?;
             if !status.success() {
-                eprintln!("Warning: goose configure exited with {status}");
+                eprintln!("Warning: markov configure exited with {status}");
             }
         }
 

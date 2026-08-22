@@ -45,14 +45,6 @@ jobs:
             target-suffix: unknown-linux-musl
             build-on: ubuntu-22.04-arm
             variant: musl
-          - architecture: x86_64
-            target-suffix: unknown-linux-gnu
-            build-on: ubuntu-24.04
-            variant: vulkan
-          - architecture: aarch64
-            target-suffix: unknown-linux-gnu
-            build-on: ubuntu-24.04-arm
-            variant: vulkan
 
     steps:
       - name: Checkout code
@@ -78,13 +70,6 @@ jobs:
             libdbus-1-dev \
             libxcb1-dev
 
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            sudo apt-get install -y \
-              libvulkan-dev \
-              libvulkan1 \
-              glslc
-          fi
-
           if [ "${{ matrix.variant }}" = "musl" ]; then
             sudo apt-get install -y musl-tools
           fi
@@ -107,7 +92,7 @@ jobs:
             tar
 
       - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
           key: ${{ matrix.architecture }}-${{ matrix.target-suffix }}-${{ matrix.build-on }}-${{ matrix.container || 'native' }}
 
@@ -124,18 +109,8 @@ jobs:
           echo "Rust toolchain info:"
           rustup show
 
-          FEATURE_ARGS=()
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            FEATURE_ARGS=(--features vulkan)
-          fi
-
-          if [ "${{ matrix.variant }}" = "musl" ]; then
-            cargo build --release --target ${TARGET} -p goose-cli --bin goose \
-              --no-default-features \
-              --features portable-default
-          else
-            cargo build --release --target ${TARGET} -p goose-cli --bin goose "${FEATURE_ARGS[@]}"
-          fi
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release --target ${TARGET} -p markov-cli --bin markov
 
       - name: Build CLI (manylinux container)
         if: matrix.container != ''
@@ -156,7 +131,8 @@ jobs:
           rustup toolchain install "$RUST_CHANNEL" --profile minimal \
             --component rustc,cargo --target "$TARGET"
           rustup show
-          cargo build --release --target "$TARGET" -p goose-cli --bin goose
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release --target "$TARGET" -p markov-cli --bin markov
 
       - name: Package CLI
         run: |
@@ -165,27 +141,20 @@ jobs:
             source ./bin/activate-hermit
           fi
           export TARGET="${{ matrix.architecture }}-${{ matrix.target-suffix }}"
-          export VARIANT_SUFFIX=""
-          if [ "${{ matrix.variant }}" = "vulkan" ]; then
-            VARIANT_SUFFIX="-vulkan"
-          fi
 
           # Create a directory for the package contents
-          mkdir -p "target/${TARGET}/release/goose-package"
+          mkdir -p "target/${TARGET}/release/markov-package"
 
-          # Copy the goose binary
-          cp "target/${TARGET}/release/goose" "target/${TARGET}/release/goose-package/"
+          cp "target/${TARGET}/release/markov" "target/${TARGET}/release/markov-package/"
+          # Apache-2.0 section 4(a): a recipient of the binary gets the license with it
+          cp LICENSE NOTICE "target/${TARGET}/release/markov-package/"
 
           cd "target/${TARGET}/release"
-          tar -cjf "goose-${TARGET}${VARIANT_SUFFIX}.tar.bz2" -C goose-package .
-          tar -czf "goose-${TARGET}${VARIANT_SUFFIX}.tar.gz" -C goose-package .
-          echo "ARTIFACT_BZ2=target/${TARGET}/release/goose-${TARGET}${VARIANT_SUFFIX}.tar.bz2" >> $GITHUB_ENV
-          echo "ARTIFACT_GZ=target/${TARGET}/release/goose-${TARGET}${VARIANT_SUFFIX}.tar.gz" >> $GITHUB_ENV
+          tar -cf - -C markov-package markov LICENSE NOTICE | gzip -n > "markov-cli-${TARGET}.tar.gz"
+          echo "ARTIFACT_GZ=target/${TARGET}/release/markov-cli-${TARGET}.tar.gz" >> $GITHUB_ENV
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: goose-${{ matrix.architecture }}-${{ matrix.target-suffix }}${{ matrix.variant != 'standard' && matrix.variant != 'musl' && format('-{0}', matrix.variant) || '' }}
-          path: |
-            ${{ env.ARTIFACT_BZ2 }}
-            ${{ env.ARTIFACT_GZ }}
+          name: markov-cli-${{ matrix.architecture }}-${{ matrix.target-suffix }}
+          path: ${{ env.ARTIFACT_GZ }}

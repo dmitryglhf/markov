@@ -134,9 +134,6 @@
   "baseChat.reconnecting": {
     "defaultMessage": "Connessione persa. Riconnessione…"
   },
-  "baseChat.retry": {
-    "defaultMessage": "Riprova"
-  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Estensione aggiornata"
   },
@@ -932,18 +929,6 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "Cartelle recenti"
   },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "Impossibile passare a {branch}"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "Nessun branch trovato"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "Cerca branch…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "Potresti avere modifiche non incluse in un commit."
-  },
   "elicitationRequest.accept": {
     "defaultMessage": "Accetta"
   },
@@ -1240,15 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Connettiti a un server goose in esecuzione altrove (richiede il riavvio dell'app)"
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "Directory di lavoro remota (facoltativa)"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "Percorso assoluto sul backend esterno. Lascia vuoto per inviare la directory di lavoro locale."
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "Chiudi"
@@ -2384,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "Chat"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "Creato"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "Directory"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "Modello"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "Stato"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "Aggiornato"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "Nessuna chat recente"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "Errore"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "Inattivo"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "In streaming"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "Attività non letta"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Sessione senza titolo"
@@ -2421,7 +2370,7 @@
     "defaultMessage": "Il server potrebbe essere in fase di avvio o temporaneamente non disponibile."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Impossibile connettersi al server Goose"
+    "defaultMessage": "Impossibile connettersi al server Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Riprova"
@@ -2430,10 +2379,10 @@
     "defaultMessage": "Il tuo agente IA locale. Collega un provider di modelli IA per iniziare."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Benvenuto in goose"
+    "defaultMessage": "Benvenuto in Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Tutto è pronto per iniziare a usare goose."
+    "defaultMessage": "Tutto è pronto per iniziare a usare Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Connesso a {providerName}"
@@ -2441,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Inizia"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Scopri di più"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Modello locale pronto"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "I dati di utilizzo anonimi aiutano a migliorare goose. Non raccogliamo mai le tue conversazioni, il tuo codice o i tuoi dati personali."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Privacy"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Condividi dati di utilizzo anonimi"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Valore predefinito"
@@ -3794,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "Esporta sessione"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Apri in una nuova finestra"
   },
@@ -3898,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Sessione \"{name}\" duplicata correttamente"
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "Impossibile esportare la sessione: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Sessione esportata correttamente"
@@ -4133,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Salva"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Anche in"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (non usato)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argomenti"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Chiudi"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "File"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Non usato"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} risponde a questo nome"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Apri cartella"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Origine"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Percorso"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "È integrata nell'app, quindi non si può modificare qui."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Arriva da un plugin, che conserva l'originale. Una modifica qui durerebbe solo fino al prossimo aggiornamento del plugin."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Annulla"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Istruzioni"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Cosa deve fare l'agente una volta caricata questa skill"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Una skill è un file SKILL.md che l'agente carica quando la descrizione corrisponde al compito."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Nuova skill"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Descrizione"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Quando l'agente dovrebbe ricorrere a questa skill"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "È dalla descrizione che l'agente decide se caricare una skill"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Modifica skill"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "I nomi possono contenere solo lettere minuscole, cifre e trattini"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Il nome della skill non può essere vuoto"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "I nomi non devono iniziare né finire con un trattino"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "I nomi devono avere al massimo 64 caratteri"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Nome"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "minuscole-con-trattini"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Salva"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Salvataggio..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Ovunque"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Dove deve stare?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Solo in questo progetto"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Aggiungi competenza"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Prova a modificare i termini di ricerca"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Prossimamente"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Eliminare «{name}»?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Rimuove l'intera cartella: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Impossibile eliminare la skill"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Elimina skill"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Skill eliminata"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Modifica {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Errore durante il caricamento delle competenze"
@@ -4149,13 +4188,37 @@
     "defaultMessage": "Nessuna competenza corrispondente trovata"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Le competenze vengono caricate dai file SKILL.md in ~/.config/agents/skills/, .goose/skills/ o altre directory supportate."
+    "defaultMessage": "Le skill sono file SKILL.md. Le tue si trovano in ~/.agents/skills, oppure in .agents/skills dentro un progetto."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Nessuna competenza installata"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "integrata"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "globale"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "progetto"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Rimuovi {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Skill salvata"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Salvata, ma non in uso: {path} risponde già a «{name}»"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Cerca competenze..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "oscurata"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Visualizza le competenze installate che estendono le funzionalità di Goose. {shortcut} per cercare."
@@ -4598,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "Modifica"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "Immagini allegate:"
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "Modifica sul posto"
   },
@@ -4633,38 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Crea una nuova sessione con il messaggio modificato"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "Rimuovi immagine dal messaggio"
-  },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "Recenti"
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "Scegli modello"
-  },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "Deprecato — usa invece {replacement}."
-  },
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "Adattatore ACP trovato"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "Adattatore ACP non trovato"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "Accedi tramite la CLI del provider, quindi verifica di nuovo."
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "Verifica di nuovo"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "Verifica in corso..."
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "Connessione riuscita"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "Verifica la connessione del tuo account prima di continuare."
   }
 }

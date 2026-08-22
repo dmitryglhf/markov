@@ -104,10 +104,7 @@ const HelpText = () => {
               variant="link"
               className="text-blue-500 hover:text-blue-600 p-0 h-auto"
               onClick={() =>
-                window.open(
-                  'https://goose-docs.ai/docs/guides/using-goosehints/',
-                  '_blank'
-                )
+                window.open('https://goose-docs.ai/docs/guides/using-goosehints/', '_blank')
               }
             >
               {intl.formatMessage(i18n.helpTextLink)}
@@ -148,6 +145,8 @@ const FileInfo = ({ filePath, found }: { filePath: string; found: boolean }) => 
   );
 };
 
+const getGoosehintsFile = async (filePath: string) => await window.electron.readFile(filePath);
+
 interface GoosehintsModalProps {
   directory: string;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
@@ -165,26 +164,23 @@ export const GoosehintsModal = ({ directory, setIsGoosehintsModalOpen }: Goosehi
   useEffect(() => {
     const fetchGoosehintsFile = async () => {
       try {
-        const { file, error, found } = await window.electron.readGoosehints();
+        const { file, error, found } = await getGoosehintsFile(goosehintsFilePath);
         setGoosehintsFile(file);
         setGoosehintsFileFound(found);
-        setGoosehintsFileReadError(error ?? '');
+        setGoosehintsFileReadError(found && error ? error : '');
       } catch (error) {
         console.error('Error fetching .goosehints file:', error);
         setGoosehintsFileReadError(intl.formatMessage(i18n.failedToAccess));
       }
     };
     if (directory) fetchGoosehintsFile();
-  }, [directory, intl]);
+  }, [directory, goosehintsFilePath, intl]);
 
   const writeFile = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
     try {
-      const saved = await window.electron.writeGoosehints(goosehintsFile);
-      if (!saved) {
-        throw new Error('Unable to save .goosehints');
-      }
+      await window.electron.writeFile(goosehintsFilePath, goosehintsFile);
       setSaveSuccess(true);
       setGoosehintsFileFound(true);
       setTimeout(() => setSaveSuccess(false), 3000);

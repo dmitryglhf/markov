@@ -145,15 +145,18 @@ impl Drop for CursorRestoreGuard {
 pub async fn handle_configure() -> anyhow::Result<()> {
     if !std::io::stdin().is_terminal() {
         anyhow::bail!(
-            "goose configure requires an interactive terminal.\n\
-             If you installed via 'curl ... | bash', run 'goose configure' separately after installation."
+            "markov configure requires an interactive terminal.\n\
+             If you installed via 'curl ... | bash', run 'markov configure' separately after installation."
         );
     }
 
     let _cursor_restore = CursorRestoreGuard;
     let config = Config::global();
 
-    if !config.exists() {
+    // The config file appears as soon as anything is stored — a telemetry
+    // answer, an extension toggled on — so the provider, not the file, is what
+    // says whether this is a first run.
+    if config.get_goose_provider().is_err() {
         handle_first_time_setup(config).await
     } else {
         handle_existing_config().await
@@ -203,7 +206,7 @@ pub fn configure_telemetry_consent_dialog() -> anyhow::Result<bool> {
     );
     println!(
         "{}",
-        style("or any personal data. You can change this anytime with 'goose configure'.").dim()
+        style("or any personal data. You can change this anytime with 'markov configure'.").dim()
     );
     println!();
 
@@ -223,8 +226,14 @@ pub fn configure_telemetry_consent_dialog() -> anyhow::Result<bool> {
 }
 
 async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
+    // Anything already stored — extensions, plugins, a telemetry answer — is
+    // not ours to throw away when the provider fails to configure.
+    let ours_to_discard = !config.exists();
     println!();
-    println!("{}", style("Welcome to goose! Let's get you set up.").dim());
+    println!(
+        "{}",
+        style("Welcome to Markov! Let's get you set up.").dim()
+    );
     println!(
         "{}",
         style("  you can rerun this command later to update your configuration").dim()
@@ -235,30 +244,33 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
     configure_telemetry_consent_dialog()?;
 
     println!();
-    cliclack::intro(style(" goose-configure ").on_cyan().black())?;
+    cliclack::intro(style(" markov-configure ").on_cyan().black())?;
 
     let setup_method = cliclack::select("How would you like to set up your provider?")
         .item(
+            "pgpro",
+            "Postgres Professional (Recommended)",
+            "Use the company model gateway with your API key",
+        )
+        .item(
             "openrouter",
-            "OpenRouter Login (Recommended)",
+            "OpenRouter Login",
             "Sign in with OpenRouter to automatically configure models",
         )
         .item(
-            "tetrate",
-            "Tetrate Agent Router Service Login",
-            "Sign in with Tetrate Agent Router Service to automatically configure models",
-        )
-        .item(
             "manual",
-            "Manual Configuration",
-            "Choose a provider and enter credentials manually",
+            "Other Providers",
+            "Choose from all supported providers and enter credentials manually",
         )
         .interact()?;
 
     match setup_method {
+        "pgpro" => handle_manual_provider_setup(config, Some("pgpro"), ours_to_discard).await,
         "openrouter" => {
             if let Err(e) = handle_openrouter_auth().await {
-                let _ = config.clear();
+                if ours_to_discard {
+                    let _ = config.clear();
+                }
                 println!(
                     "\n  {} OpenRouter authentication failed: {} \n  Please try again or use manual configuration",
                     style("Error").red().italic(),
@@ -266,29 +278,37 @@ async fn handle_first_time_setup(config: &Config) -> anyhow::Result<()> {
                 );
             }
         }
-        "tetrate" => {
-            if let Err(e) = handle_tetrate_auth().await {
-                let _ = config.clear();
-                println!(
-                    "\n  {} Tetrate Agent Router Service authentication failed: {} \n  Please try again or use manual configuration",
-                    style("Error").red().italic(),
-                    e,
-                );
-            }
-        }
-        "manual" => handle_manual_provider_setup(config).await,
+        "manual" => handle_manual_provider_setup(config, None, ours_to_discard).await,
         _ => unreachable!(),
     }
     Ok(())
 }
 
-async fn handle_manual_provider_setup(config: &Config) {
-    match configure_provider_dialog().await {
+/// `ours_to_discard` says whether the config file was absent when setup began.
+/// Clearing throws the whole file away — extensions, plugins and all — and
+/// setup now also runs for a config that exists but names no provider.
+async fn handle_manual_provider_setup(
+    config: &Config,
+    provider_name: Option<&str>,
+    ours_to_discard: bool,
+) {
+    let discard = || {
+        if ours_to_discard {
+            let _ = config.clear();
+        }
+    };
+
+    let outcome = match provider_name {
+        Some(name) => configure_selected_provider(name).await,
+        None => configure_provider_dialog().await,
+    };
+
+    match outcome {
         Ok(true) => {
             println!(
                 "\n  {}: Run '{}' again to adjust your config or add extensions",
                 style("Tip").green().italic(),
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
             set_extension(ExtensionEntry {
                 enabled: true,
@@ -296,15 +316,15 @@ async fn handle_manual_provider_setup(config: &Config) {
             });
         }
         Ok(false) => {
-            let _ = config.clear();
+            discard();
             println!(
-                "\n  {}: We did not save your config, inspect your credentials\n   and run '{}' again to ensure goose can connect",
+                "\n  {}: We did not save your config, inspect your credentials\n   and run '{}' again to ensure markov can connect",
                 style("Warning").yellow().italic(),
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Err(e) => {
-            let _ = config.clear();
+            discard();
             print_manual_config_error(&e);
         }
     }
@@ -317,7 +337,7 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Required configuration key '{}' not found \n  Please provide this value and run '{}' again",
                 style("Error").red().italic(),
                 key,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Some(ConfigError::KeyringError(msg)) => {
@@ -328,7 +348,7 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Invalid configuration value: {} \n  Please check your input and run '{}' again",
                 style("Error").red().italic(),
                 msg,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Some(ConfigError::FileError(err)) => {
@@ -336,7 +356,7 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Failed to access config file: {} \n  Please check file permissions and run '{}' again",
                 style("Error").red().italic(),
                 err,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         Some(ConfigError::DirectoryError(msg)) => {
@@ -344,15 +364,15 @@ fn print_manual_config_error(e: &anyhow::Error) {
                 "\n  {} Failed to access config directory: {} \n  Please check directory permissions and run '{}' again",
                 style("Error").red().italic(),
                 msg,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
         _ => {
             println!(
-                "\n  {} {} \n  We did not save your config, inspect your credentials\n   and run '{}' again to ensure goose can connect",
+                "\n  {} {} \n  We did not save your config, inspect your credentials\n   and run '{}' again to ensure markov can connect",
                 style("Error").red().italic(),
                 e,
-                style("goose configure").cyan()
+                style("markov configure").cyan()
             );
         }
     }
@@ -364,7 +384,7 @@ fn print_keyring_error(msg: &str) {
         "\n  {} Failed to access secure storage (keyring): {} \n  Please check your system keychain and run '{}' again. \n  If your system is unable to use the keyring, please try setting secret key(s) via environment variables.",
         style("Error").red().italic(),
         msg,
-        style("goose configure").cyan()
+        style("markov configure").cyan()
     );
 }
 
@@ -374,7 +394,7 @@ fn print_keyring_error(msg: &str) {
         "\n  {} Failed to access Windows Credential Manager: {} \n  Please check Windows Credential Manager and run '{}' again. \n  If your system is unable to use the Credential Manager, please try setting secret key(s) via environment variables.",
         style("Error").red().italic(),
         msg,
-        style("goose configure").cyan()
+        style("markov configure").cyan()
     );
 }
 
@@ -384,7 +404,7 @@ fn print_keyring_error(msg: &str) {
         "\n  {} Failed to access secure storage: {} \n  Please check your system's secure storage and run '{}' again. \n  If your system is unable to use secure storage, please try setting secret key(s) via environment variables.",
         style("Error").red().italic(),
         msg,
-        style("goose configure").cyan()
+        style("markov configure").cyan()
     );
 }
 
@@ -403,38 +423,33 @@ async fn handle_existing_config() -> anyhow::Result<()> {
     );
     println!();
 
-    cliclack::intro(style(" goose-configure ").on_cyan().black())?;
+    cliclack::intro(style(" markov-configure ").on_cyan().black())?;
+    // Turning extensions on and off and removing a server each have a command of
+    // their own now, and each does the job better than the walk that used to live
+    // here. Provider and model kept their place: this is where the first run asks
+    // for them, and disowning them a minute later left the habit with nowhere to
+    // go. The door is here, the form behind it is `markov model` itself.
     let action = cliclack::select("What would you like to configure?")
         .item(
-            "providers",
-            "Configure Providers",
-            "Change provider or update credentials",
+            "provider",
+            "Provider and model",
+            "Choose which model answers, and save it as the default",
         )
         .item(
             "custom_providers",
             "Custom Providers",
             "Add custom provider with compatible API",
         )
-        .item("add", "Add Extension", "Connect to a new extension")
-        .item(
-            "toggle",
-            "Toggle Extensions",
-            "Enable or disable connected extensions",
-        )
-        .item("remove", "Remove Extension", "Remove an extension")
         .item(
             "settings",
-            "goose settings",
-            "Set the goose mode, Tool Output, Tool Permissions, Experiment, goose recipe github repo and more",
+            "markov settings",
+            "Set the markov mode, Tool Output, Tool Permissions, Experiment, markov recipe github repo and more",
         )
         .interact()?;
 
     match action {
-        "toggle" => toggle_extensions_dialog(),
-        "add" => configure_extensions_dialog(),
-        "remove" => remove_extension_dialog(),
+        "provider" => crate::markov::hooks::hooks().handle_model_command().await,
         "settings" => configure_settings_dialog().await,
-        "providers" => configure_provider_dialog().await.map(|_| ()),
         "custom_providers" => configure_custom_provider_dialog().await,
         _ => unreachable!(),
     }
@@ -578,6 +593,38 @@ fn interactive_model_search(
     }
 }
 
+/// Asks the provider what it serves and lets the user pick from the answer. A
+/// provider that refuses to answer is an error for the caller to render: mid-form
+/// that is a line in the log, on the way in it closes the walk.
+pub async fn fetch_and_select_model(
+    provider: &std::sync::Arc<dyn goose::providers::base::Provider>,
+    provider_meta: &goose::providers::base::ProviderMetadata,
+) -> anyhow::Result<String> {
+    let spin = spinner();
+    spin.start("Attempting to fetch supported models...");
+    let models = retry_operation(&RetryConfig::default(), || async {
+        provider
+            .fetch_recommended_models(goose::model_config::global_toolshim())
+            .await
+    })
+    .await;
+    match &models {
+        Ok(_) => spin.stop(style("Model fetch complete").green()),
+        Err(_) => spin.stop(style("Model fetch failed").red()),
+    }
+
+    match models? {
+        models if !models.is_empty() => select_model_from_list(&models, provider_meta),
+        _ => {
+            let default_model =
+                std::env::var("GOOSE_MODEL").unwrap_or(provider_meta.default_model.clone());
+            Ok(cliclack::input("Enter a model from that provider:")
+                .default_input(&default_model)
+                .interact()?)
+        }
+    }
+}
+
 fn select_model_from_list(
     models: &[String],
     provider_meta: &goose::providers::base::ProviderMetadata,
@@ -668,7 +715,7 @@ fn prompt_unlisted_model(
     Ok(model.trim().to_string())
 }
 
-fn try_store_secret(config: &Config, key_name: &str, value: String) -> anyhow::Result<bool> {
+pub fn try_store_secret(config: &Config, key_name: &str, value: String) -> anyhow::Result<bool> {
     match config.set_secret(key_name, &value) {
         Ok(_) => Ok(true),
         Err(ConfigError::FallbackToFileStorage) => Ok(true),
@@ -894,18 +941,27 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
             .interact()?
     };
 
-    // Get the selected provider's metadata
+    configure_selected_provider(&provider_name).await
+}
+
+/// Walks the provider's config keys, asking for each one. Every key is offered
+/// even when it already has a value, so call this only when the credentials are
+/// the point — the model manager asks for them only for a provider that has none.
+pub async fn ensure_credentials(provider_name: &str) -> anyhow::Result<bool> {
+    let config = Config::global();
+
+    let available_providers = providers().await;
     let (provider_meta, _) = available_providers
         .iter()
-        .find(|(p, _)| p.name == provider_name.as_str())
-        .expect("Selected provider must exist in metadata");
+        .find(|(p, _)| p.name == provider_name)
+        .ok_or_else(|| anyhow::anyhow!("Unknown provider: {provider_name}"))?;
 
     for key in provider_meta
         .config_keys
         .iter()
         .filter(|k| k.primary || k.oauth_flow)
     {
-        if !configure_single_key(config, &provider_name, &provider_meta.display_name, key).await? {
+        if !configure_single_key(config, provider_name, &provider_meta.display_name, key).await? {
             return Ok(false);
         }
     }
@@ -921,7 +977,7 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
             .interact()?
     {
         for key in non_primary_keys {
-            if !configure_single_key(config, &provider_name, &provider_meta.display_name, key)
+            if !configure_single_key(config, provider_name, &provider_meta.display_name, key)
                 .await?
             {
                 return Ok(false);
@@ -929,31 +985,29 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
         }
     }
 
-    let spin = spinner();
-    spin.start("Attempting to fetch supported models...");
-    let temp_provider = create(&provider_name, Vec::new()).await?;
-    let models_res = retry_operation(&RetryConfig::default(), || async {
-        temp_provider
-            .fetch_recommended_models(goose::model_config::global_toolshim())
-            .await
-    })
-    .await;
-    spin.stop(style("Model fetch complete").green());
+    Ok(true)
+}
 
-    // Select a model: on fetch error show styled error and abort; if models available, show list; otherwise free-text input
-    let model: String = match models_res {
+/// Configures credentials and a model for a provider that is already chosen.
+pub async fn configure_selected_provider(provider_name: &str) -> anyhow::Result<bool> {
+    let config = Config::global();
+
+    let available_providers = providers().await;
+    let (provider_meta, _) = available_providers
+        .iter()
+        .find(|(p, _)| p.name == provider_name)
+        .ok_or_else(|| anyhow::anyhow!("Unknown provider: {provider_name}"))?;
+
+    if !ensure_credentials(provider_name).await? {
+        return Ok(false);
+    }
+
+    let temp_provider = create(provider_name, Vec::new()).await?;
+    let model = match fetch_and_select_model(&temp_provider, provider_meta).await {
+        Ok(model) => model,
         Err(e) => {
-            // Provider hook error
             cliclack::outro(style(e.to_string()).on_red().white())?;
             return Ok(false);
-        }
-        Ok(models) if !models.is_empty() => select_model_from_list(&models, provider_meta)?,
-        Ok(_) => {
-            let default_model =
-                std::env::var("GOOSE_MODEL").unwrap_or(provider_meta.default_model.clone());
-            cliclack::input("Enter a model from that provider:")
-                .default_input(&default_model)
-                .interact()?
         }
     };
 
@@ -987,11 +1041,10 @@ pub async fn configure_provider_dialog() -> anyhow::Result<bool> {
         .unwrap_or(false);
     let toolshim_model = std::env::var("GOOSE_TOOLSHIM_OLLAMA_MODEL").ok();
 
-    match test_provider_configuration(&provider_name, &model, toolshim_enabled, toolshim_model)
-        .await
+    match test_provider_configuration(provider_name, &model, toolshim_enabled, toolshim_model).await
     {
         Ok(()) => {
-            goose::config::set_active_provider(config, &provider_name, &model)?;
+            goose::config::set_active_provider(config, provider_name, &model)?;
             print_config_file_saved()?;
             Ok(true)
         }
@@ -1428,8 +1481,8 @@ pub async fn configure_settings_dialog() -> anyhow::Result<()> {
     #[allow(unused_mut)]
     let mut setting_select = cliclack::select("What setting would you like to configure?").item(
         "goose_mode",
-        "goose mode",
-        "Configure goose mode",
+        "markov mode",
+        "Configure markov mode",
     );
     #[cfg(feature = "telemetry")]
     {
@@ -1467,8 +1520,8 @@ pub async fn configure_settings_dialog() -> anyhow::Result<()> {
         )
         .item(
             "recipe",
-            "goose recipe github repo",
-            "goose will pull recipes from this repo if not found locally.",
+            "markov recipe github repo",
+            "markov will pull recipes from this repo if not found locally.",
         )
         .interact()?;
 
@@ -1521,7 +1574,7 @@ pub fn configure_goose_mode_dialog() -> anyhow::Result<()> {
         );
     }
 
-    let mode = cliclack::select("Which goose mode would you like to configure?")
+    let mode = cliclack::select("Which markov mode would you like to configure?")
         .item(
             GooseMode::Auto,
             "Auto Mode",
@@ -1664,8 +1717,9 @@ pub fn configure_keyring_dialog() -> anyhow::Result<()> {
             // Set to empty string to enable keyring (absence or empty = enabled)
             config.set_param("GOOSE_DISABLE_KEYRING", Value::String("".to_string()))?;
             cliclack::outro("Secret storage set to system keyring (secure)")?;
-            let _ =
-                cliclack::log::info("You may need to restart goose for this change to take effect");
+            let _ = cliclack::log::info(
+                "You may need to restart markov for this change to take effect",
+            );
         }
         "file" => {
             // Set the disable flag to use file storage
@@ -1674,8 +1728,9 @@ pub fn configure_keyring_dialog() -> anyhow::Result<()> {
                 "Secret storage set to file ({}). Keep this file secure!",
                 secrets_path.display(),
             ))?;
-            let _ =
-                cliclack::log::info("You may need to restart goose for this change to take effect");
+            let _ = cliclack::log::info(
+                "You may need to restart markov for this change to take effect",
+            );
         }
         _ => unreachable!(),
     };
@@ -1902,7 +1957,7 @@ fn configure_recipe_dialog() -> anyhow::Result<()> {
         .ok()
         .or_else(|| config.get_param(key_name).unwrap_or(None));
     let mut recipe_repo_input = cliclack::input(
-        "Enter your goose recipe GitHub repo (owner/repo): eg: my_org/goose-recipes",
+        "Enter your markov recipe GitHub repo (owner/repo): eg: my_org/goose-recipes",
     )
     .required(false);
     if let Some(recipe_repo) = default_recipe_repo {
@@ -1942,7 +1997,7 @@ pub fn configure_max_turns_dialog() -> anyhow::Result<()> {
     config.set_param("GOOSE_MAX_TURNS", max_turns)?;
 
     cliclack::outro(format!(
-        "Set maximum turns to {} - goose will ask for input after {} consecutive actions",
+        "Set maximum turns to {} - markov will ask for input after {} consecutive actions",
         max_turns, max_turns
     ))?;
 
@@ -2324,6 +2379,10 @@ pub async fn configure_custom_provider_dialog() -> anyhow::Result<()> {
         _ => unreachable!(),
     }?;
 
+    // Adding a provider used to be followed by the provider walk one item up in
+    // the same menu; that walk is `markov model` now, and a new provider is of no
+    // use until something picks a model from it.
+    cliclack::log::info("To use it, choose a model with `markov model`")?;
     print_config_file_saved()?;
 
     Ok(())

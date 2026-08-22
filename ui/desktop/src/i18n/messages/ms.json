@@ -134,9 +134,6 @@
   "baseChat.reconnecting": {
     "defaultMessage": "Sambungan terputus. Menyambung semula…"
   },
-  "baseChat.retry": {
-    "defaultMessage": "Cuba semula"
-  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Sambungan Dikemas Kini"
   },
@@ -932,18 +929,6 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "Direktori terkini"
   },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "Gagal beralih ke {branch}"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "Tiada cabang ditemui"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "Cari cabang…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "Anda mungkin mempunyai perubahan yang belum dikomit."
-  },
   "elicitationRequest.accept": {
     "defaultMessage": "Terima"
   },
@@ -1240,15 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Sambung ke pelayan goose yang berjalan di tempat lain (memerlukan memulakan semula aplikasi)"
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "Direktori kerja jauh (pilihan)"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "Laluan mutlak pada backend luaran. Biarkan kosong untuk menghantar direktori kerja setempat."
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "Tutup"
@@ -2384,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "Sembang"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "Dicipta"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "Direktori"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "Model"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "Status"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "Dikemas kini"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "Tiada sembang terkini"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "Ralat"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "Terbiar"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "Penstriman"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "Aktiviti belum dibaca"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Sesi tanpa tajuk"
@@ -2421,7 +2370,7 @@
     "defaultMessage": "Pelayan mungkin sedang dimulakan atau tidak tersedia buat sementara waktu."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Tidak dapat menyambung ke pelayan Goose"
+    "defaultMessage": "Tidak dapat menyambung ke pelayan Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Cuba Semula"
@@ -2430,10 +2379,10 @@
     "defaultMessage": "Ejen AI tempatan anda. Sambungkan penyedia model AI untuk bermula."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Selamat datang ke goose"
+    "defaultMessage": "Selamat datang ke Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Anda sudah bersedia untuk mula menggunakan goose."
+    "defaultMessage": "Anda sudah bersedia untuk mula menggunakan Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Disambungkan ke {providerName}"
@@ -2441,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Mulakan"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Ketahui lebih lanjut"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Model setempat sedia"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Data penggunaan tanpa nama membantu menambah baik goose. Kami tidak sekali-kali mengumpul perbualan, kod atau data peribadi anda."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Privasi"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Kongsi data penggunaan tanpa nama"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Nilai Lalai"
@@ -3794,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "Eksport sesi"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Buka dalam tetingkap baharu"
   },
@@ -3898,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Sesi \"{name}\" berjaya diduplikasi"
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "Gagal mengeksport sesi: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Sesi berjaya dieksport"
@@ -4133,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Simpan"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Juga di"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (tidak digunakan)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Argumen"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Tutup"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Fail"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Tidak digunakan"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} yang menjawab nama ini"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Buka folder"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Asal"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Laluan"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Terbina dalam aplikasi, jadi ia tidak boleh diubah di sini."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Datang daripada pemalam, yang menyimpan salinan asal. Suntingan di sini hanya bertahan sehingga pemalam dikemas kini."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Batal"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Arahan"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Apa yang patut ejen lakukan setelah kemahiran ini dimuatkan"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Kemahiran ialah fail SKILL.md yang dimuatkan ejen apabila penerangannya sepadan dengan tugasan."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Kemahiran baharu"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Penerangan"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Bila ejen patut menggunakan kemahiran ini"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Penerangan inilah yang menentukan sama ada ejen memuatkan kemahiran"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Sunting kemahiran"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Nama hanya boleh mengandungi huruf kecil, digit dan sengkang"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Nama kemahiran tidak boleh kosong"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Nama tidak boleh bermula atau berakhir dengan sengkang"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Nama mestilah tidak melebihi 64 aksara"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Nama"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "huruf-kecil-dengan-sengkang"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Simpan"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Menyimpan..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Di mana-mana"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Di mana ia patut disimpan?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Projek ini sahaja"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Tambah Kemahiran"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Cuba laraskan terma carian anda"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Akan datang"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Padam “{name}”?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Ini membuang seluruh direktori: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Gagal memadam kemahiran"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Padam kemahiran"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Kemahiran dipadam"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Sunting {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Ralat Memuatkan Kemahiran"
@@ -4149,13 +4188,37 @@
     "defaultMessage": "Tiada kemahiran sepadan ditemui"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Kemahiran dimuatkan daripada fail SKILL.md dalam ~/.config/agents/skills/, .goose/skills/, atau direktori lain yang disokong."
+    "defaultMessage": "Kemahiran ialah fail SKILL.md. Milik anda berada di ~/.agents/skills, atau di .agents/skills dalam sesebuah projek."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Tiada kemahiran dipasang"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "terbina"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "pemalam"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "projek"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Buang {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Kemahiran disimpan"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Disimpan, tetapi tidak digunakan: {path} sudah menjawab nama “{name}”"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Cari kemahiran..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "terlindung"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Lihat kemahiran terpasang yang meluaskan keupayaan Goose. {shortcut} untuk mencari."
@@ -4598,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "Sunting"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "Imej dilampirkan:"
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "Sunting di Tempat"
   },
@@ -4633,38 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Cipta sesi baharu dengan mesej yang disunting"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "Alih keluar imej daripada mesej"
-  },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "Terkini"
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "Pilih Model"
-  },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "Tidak digunakan lagi — gunakan {replacement} sebagai gantinya."
-  },
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "Penyesuai ACP ditemui"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "Penyesuai ACP tidak ditemui"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "Log masuk melalui CLI penyedia, kemudian semak semula."
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "Semak semula"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "Menyemak..."
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "Berjaya disambungkan"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "Semak sambungan akaun anda sebelum meneruskan."
   }
 }

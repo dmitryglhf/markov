@@ -5118,6 +5118,11 @@
           "type": "boolean",
           "description": "When true, also scan the working directories of all known projects for\nproject-scoped sources (e.g. skills stored under `{workingDir}/.agents/skills/`).",
           "default": false
+        },
+        "includeShadowed": {
+          "type": "boolean",
+          "description": "When true, keep every copy of a repeated name instead of only the one\ndiscovery would use. Skills are found across many roots and only the\nfirst of a name is ever loaded, so a manager needs the rest to explain\nwhy editing one of them changed nothing.",
+          "default": false
         }
       },
       "description": "List discovered sources.\n\nIf `type` is omitted or `skill`, this lists filesystem/plugin skills only.\nBoth global and project-scoped skills are included when `project_dir` is\nset. If `type` is `builtinSkill`, this lists shipped read-only built-in\nskills.",

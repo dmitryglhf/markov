@@ -14,9 +14,6 @@ ui/desktop/src/bin/
 .gitignore
 
 # Documentation builds
-documentation/build/
-documentation/.docusaurus/
-documentation/.cache-loader/
 
 # IDE and editor files
 .vscode/
@@ -66,7 +63,6 @@ Dockerfile
 docker-compose.yml
 
 # Development scripts that aren't needed in build
-scripts/bench-postprocess-scripts/
 
 # macOS
 .DS_Store

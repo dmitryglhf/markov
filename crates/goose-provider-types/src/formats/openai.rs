@@ -251,11 +251,18 @@ pub fn format_messages_with_options(
         let mut has_non_text_content = false;
         let mut reasoning_text = String::new();
 
+        // A client that attached an image also tends to name its path in the
+        // text; reading the file again would send the same picture twice.
+        let carries_image = message
+            .content
+            .iter()
+            .any(|content| matches!(content, MessageContentBlock::Image(_)));
+
         for content in &message.content {
             match content {
                 MessageContentBlock::Text(text) => {
                     if !text.text.is_empty() {
-                        if message.role == Role::User {
+                        if message.role == Role::User && !carries_image {
                             if let Some(image_path) = detect_image_path(&text.text) {
                                 if let Ok(image) = load_image_file(image_path.as_ref()) {
                                     has_non_text_content = true;
@@ -2289,6 +2296,42 @@ mod tests {
             "Assistant message content should be a string, not an array with image"
         );
         assert!(content.unwrap().contains(png_path_str));
+
+        Ok(())
+    }
+
+    #[test]
+    fn an_attached_image_is_not_loaded_a_second_time_from_its_path() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let png_path = temp_dir.path().join("pasted.png");
+        std::fs::write(
+            &png_path,
+            [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00],
+        )?;
+        let png_path_str = png_path.to_str().unwrap();
+
+        // What the desktop sends: the picture as data, and its path in the text
+        // so the model can point a tool at the file.
+        let message = Message::user()
+            .with_text(format!("what is this? {}", png_path_str))
+            .with_image("aW1hZ2VkYXRh", "image/png");
+
+        let spec = format_messages(&[message], &ImageFormat::OpenAi);
+        let content = spec[0]["content"].as_array().unwrap();
+
+        let images: Vec<_> = content
+            .iter()
+            .filter(|item| item["type"] == "image_url")
+            .collect();
+        assert_eq!(images.len(), 1, "the same picture was sent twice");
+        assert_eq!(
+            images[0]["image_url"]["url"], "data:image/png;base64,aW1hZ2VkYXRh",
+            "the attached image is the one that should survive"
+        );
+        assert!(content
+            .iter()
+            .any(|item| item["type"] == "text"
+                && item["text"].as_str().unwrap().contains(png_path_str)));
 
         Ok(())
     }

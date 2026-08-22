@@ -1,8 +1,7 @@
 [Desktop Entry]
-Name=Goose
-Exec=/usr/lib/Goose/Goose %U
-Icon=/usr/share/pixmaps/Goose.png
+Name=Markov
+Exec=/usr/lib/Markov/Markov %U
+Icon=/usr/share/pixmaps/Markov.png
 Terminal=false
 Type=Application
 Categories=Development;
-MimeType=x-scheme-handler/goose;

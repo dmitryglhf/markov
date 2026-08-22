@@ -1346,6 +1346,7 @@ impl SummonClient {
         }
 
         let working_dir = session.working_dir.clone();
+        let task_label = safe_truncate(&Self::get_task_description(&params), TASK_LABEL_BUDGET);
         let recipe = self
             .build_delegate_recipe(&params, session_id, &working_dir)
             .await?;
@@ -1384,6 +1385,7 @@ impl SummonClient {
             cancellation_token: Some(cancellation_token),
             on_message: None,
             notification_tx: None,
+            label: Some(task_label),
         };
         let result = Self::run_subagent_with_notifications(
             Self::notification_sink(notification_emitter),
@@ -1951,6 +1953,7 @@ impl SummonClient {
         let notification_sink = Self::notification_sink(None);
         let task_notification_sink = Arc::clone(&notification_sink);
 
+        let task_description = description.clone();
         let handle = tokio::spawn(async move {
             let params = SubagentRunParams {
                 config: agent_config,
@@ -1961,6 +1964,7 @@ impl SummonClient {
                 cancellation_token: Some(task_token_clone),
                 on_message: Some(on_message),
                 notification_tx: None,
+                label: Some(task_description),
             };
             Self::run_subagent_with_notifications(task_notification_sink, move |notification_tx| {
                 let mut params = params;
@@ -2969,7 +2973,7 @@ You review code."#;
                 .clone(),
         );
         let content = MessageContent::tool_request(request_id, Ok(tool_call));
-        create_tool_notification(&content, subagent_id).unwrap()
+        create_tool_notification(&content, subagent_id, None).unwrap()
     }
 
     fn notification_subagent_id(notification: &ServerNotification) -> Option<String> {

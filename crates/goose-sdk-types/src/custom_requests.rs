@@ -1472,6 +1472,12 @@ pub struct ListSourcesRequest {
     /// project-scoped sources (e.g. skills stored under `{workingDir}/.agents/skills/`).
     #[serde(default)]
     pub include_project_sources: bool,
+    /// When true, keep every copy of a repeated name instead of only the one
+    /// discovery would use. Skills are found across many roots and only the
+    /// first of a name is ever loaded, so a manager needs the rest to explain
+    /// why editing one of them changed nothing.
+    #[serde(default)]
+    pub include_shadowed: bool,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, JsonSchema, JsonRpcResponse)]

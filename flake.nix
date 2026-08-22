@@ -35,6 +35,42 @@
         
         buildInputs = commonInputs
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinInputs;
+
+        # Electron dlopens these at runtime, npm ships it as a prebuilt ELF
+        electronLibs = with pkgs; [
+          alsa-lib
+          at-spi2-core
+          cairo
+          cups
+          dbus
+          expat
+          fontconfig
+          freetype
+          gdk-pixbuf
+          glib
+          gtk3
+          libGL
+          libdrm
+          libgbm
+          libx11
+          libxcb
+          libxcomposite
+          libxcursor
+          libxdamage
+          libxext
+          libxfixes
+          libxi
+          libxkbcommon
+          libxrandr
+          libxrender
+          libxscrnsaver
+          libxtst
+          mesa
+          nspr
+          nss
+          pango
+          udev
+        ];
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
@@ -45,28 +81,6 @@
           cargoLock.lockFile = ./Cargo.lock;
 
           LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
-
-          # Pre-fetch rusty_v8 binary to avoid network access during build
-          # Map Nix system to rusty_v8 target triple
-          RUSTY_V8_ARCHIVE = let
-            cargoLock = builtins.fromTOML (builtins.readFile ./Cargo.lock);
-            rustyV8Version = (builtins.head (builtins.filter (p: p.name == "v8") cargoLock.package)).version;
-            rustyV8Target = {
-              "x86_64-linux" = "x86_64-unknown-linux-gnu";
-              "aarch64-linux" = "aarch64-unknown-linux-gnu";
-              "x86_64-darwin" = "x86_64-apple-darwin";
-              "aarch64-darwin" = "aarch64-apple-darwin";
-            }.${system} or (throw "Unsupported system: ${system}");
-            rustyV8Sha256 = {
-              "x86_64-linux" = "sha256-chV1PAx40UH3Ute5k3lLrgfhih39Rm3KqE+mTna6ysE=";
-              "aarch64-linux" = "sha256-4IivYskhUSsMLZY97+g23UtUYh4p5jk7CzhMbMyqXyY=";
-              "x86_64-darwin" = "sha256-1jUuC+z7saQfPYILNyRJanD4+zOOhXU2ac/LFoytwho=";
-              "aarch64-darwin" = "sha256-yHa1eydVCrfYGgrZANbzgmmf25p7ui1VMas2A7BhG6k=";
-            }.${system};
-          in pkgs.fetchurl {
-            url = "https://github.com/denoland/rusty_v8/releases/download/v${rustyV8Version}/librusty_v8_release_${rustyV8Target}.a.gz";
-            sha256 = rustyV8Sha256;
-          };
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -116,6 +130,7 @@
             go_1_25 # 'just' run-ui
             just # used in dev/test
             nodejs_24 # 'just' run-ui
+            pnpm_10 # ui/desktop wants >=10.30, plain pnpm is 11 and rewrites the lockfile
             ripgrep
             rustfmt
             libxcb
@@ -124,6 +139,9 @@
           ]);
           
           shellHook = ''
+            # only used on NixOS, where nix-ld provides the loader Electron asks for
+            export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath electronLibs}''${NIX_LD_LIBRARY_PATH:+:$NIX_LD_LIBRARY_PATH}"
+
             echo "goose development environment"
             echo "Rust version: $(rustc --version)"
             echo ""
@@ -132,6 +150,7 @@
             echo "  nix run             - Run goose CLI"
             echo "  cargo build -p goose-cli - Build with cargo"
             echo "  cargo run -p goose-cli   - Run with cargo"
+            echo "  just run-ui              - Build the CLI and start the desktop"
           '';
         };
       }

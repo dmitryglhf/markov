@@ -50,11 +50,6 @@ on:
         required: false
         default: false
         type: boolean
-      environment:
-        description: 'GitHub Environment containing signing secrets. Leave empty for unsigned builds.'
-        required: false
-        default: ''
-        type: string
       ref:
         description: 'Git ref to checkout (branch, tag, or SHA). Defaults to main branch if not specified.'
         required: false
@@ -64,8 +59,8 @@ on:
 name: "Bundle CLI and Desktop (macOS)"
 
 jobs:
-  build-goose:
-    name: Build Goose (macOS)
+  build-markov:
+    name: Build Markov (macOS)
     runs-on: ${{ inputs.target == 'x86_64-apple-darwin' && 'macos-15-intel' || 'macos-latest' }}
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
@@ -129,30 +124,31 @@ jobs:
         run: bash scripts/set-cargo-version.sh "$VERSION"
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
           key: ${{ inputs.target == 'x86_64-apple-darwin' && 'intel-macos-deployment-target-12' || 'macos-deployment-target-12' }}
 
-      - name: Build goose
+      - name: Build markov
         env:
           TARGET: ${{ inputs.target }}
         run: |
           source ./bin/activate-hermit
           rustup target add "$TARGET"
-          cargo build --release -p goose-cli --bin goose --target "$TARGET"
+          # Feature set comes from markov-cli's `default`; nothing to pass here.
+          cargo build --release -p markov-cli --bin markov --target "$TARGET"
 
       - name: Prepare binary artifact
         env:
           TARGET: ${{ inputs.target }}
         run: |
           mkdir -p artifacts
-          cp "target/${TARGET}/release/goose" "artifacts/internal-goose-${TARGET}"
+          cp "target/${TARGET}/release/markov" "artifacts/internal-markov-${TARGET}"
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: internal-goose-${{ inputs.target }}
-          path: artifacts/internal-goose-${{ inputs.target }}
+          name: internal-markov-${{ inputs.target }}
+          path: artifacts/internal-markov-${{ inputs.target }}
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -160,42 +156,54 @@ jobs:
   package-cli:
     name: Package CLI (macOS)
     if: ${{ inputs.package_cli }}
-    needs: build-goose
+    needs: build-markov
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     steps:
+      # This job builds nothing and normally has no working copy, but the
+      # tarball has to carry the license (Apache-2.0 section 4(a)), so take
+      # those two files and nothing else. Runs before the download, because
+      # checkout cleans the directory it lands in.
+      - name: Check out the license files
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || '' }}
+          sparse-checkout: |
+            LICENSE
+            NOTICE
+          sparse-checkout-cone-mode: false
+
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-goose-${{ inputs.target }}
+          name: internal-markov-${{ inputs.target }}
           path: package
 
       - name: Package CLI
         env:
           TARGET: ${{ inputs.target }}
         run: |
-          mv "package/internal-goose-${TARGET}" package/goose
-          chmod +x package/goose
+          mv "package/internal-markov-${TARGET}" package/markov
+          chmod +x package/markov
+          cp LICENSE NOTICE package/
           mkdir -p dist
-          tar -cjf "dist/goose-${TARGET}.tar.bz2" -C package .
-          tar -czf "dist/goose-${TARGET}.tar.gz" -C package .
+          tar -cf - -C package markov LICENSE NOTICE | gzip -n > "dist/markov-cli-${TARGET}.tar.gz"
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: goose-${{ inputs.target }}
-          path: |
-            dist/goose-${{ inputs.target }}.tar.bz2
-            dist/goose-${{ inputs.target }}.tar.gz
+          name: markov-cli-${{ inputs.target }}
+          path: dist/markov-cli-${{ inputs.target }}.tar.gz
           if-no-files-found: error
           overwrite: true
 
   package-desktop:
     name: Package Desktop (macOS)
     if: ${{ inputs.package_desktop }}
-    needs: build-goose
+    needs: build-markov
     runs-on: ${{ inputs.target == 'x86_64-apple-darwin' && 'macos-15-intel' || 'macos-latest' }}
-    environment: ${{ inputs.environment || '' }}
+    environment: ${{ inputs.signing && 'signing' || null }}
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
     permissions:
@@ -223,16 +231,16 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
-          name: internal-goose-${{ inputs.target }}
+          name: internal-markov-${{ inputs.target }}
           path: ui/desktop/src/bin
 
       - name: Prepare desktop backend
         env:
           TARGET: ${{ inputs.target }}
         run: |
-          rm -f ui/desktop/src/bin/goose
-          mv "ui/desktop/src/bin/internal-goose-${TARGET}" ui/desktop/src/bin/goose
-          chmod +x ui/desktop/src/bin/goose
+          rm -f ui/desktop/src/bin/markov
+          mv "ui/desktop/src/bin/internal-markov-${TARGET}" ui/desktop/src/bin/markov
+          chmod +x ui/desktop/src/bin/markov
           ls -la ui/desktop/src/bin/
 
       - name: Cache pnpm dependencies
@@ -288,7 +296,7 @@ jobs:
 
       - name: Verify macOS updater resources
         env:
-          APP_PATH: ${{ inputs.target == 'x86_64-apple-darwin' && 'out/Goose-darwin-x64/Goose.app' || 'out/Goose-darwin-arm64/Goose.app' }}
+          APP_PATH: ${{ inputs.target == 'x86_64-apple-darwin' && 'out/Markov-darwin-x64/Markov.app' || 'out/Markov-darwin-arm64/Markov.app' }}
         run: node scripts/verify-mac-update-resources.js "$APP_PATH"
         working-directory: ui/desktop
 
@@ -301,31 +309,37 @@ jobs:
 
       - name: Final cleanup before artifact upload
         run: |
-          rm -f ui/desktop/src/bin/goose
+          rm -f ui/desktop/src/bin/markov
           df -h
+
+      - name: Name desktop archive
+        env:
+          TARGET: ${{ inputs.target }}
+          BUILT: ${{ inputs.target == 'x86_64-apple-darwin' && 'ui/desktop/out/Markov-darwin-x64/Markov_intel_mac.zip' || 'ui/desktop/out/Markov-darwin-arm64/Markov.zip' }}
+        run: mv "$BUILT" "markov-desktop-${TARGET}.zip"
 
       - name: Upload Desktop artifact
         id: upload-app-bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: ${{ inputs.target == 'x86_64-apple-darwin' && 'Goose-darwin-x64' || 'Goose-darwin-arm64' }}
-          path: ${{ inputs.target == 'x86_64-apple-darwin' && 'ui/desktop/out/Goose-darwin-x64/Goose_intel_mac.zip' || 'ui/desktop/out/Goose-darwin-arm64/Goose.zip' }}
+          name: markov-desktop-${{ inputs.target }}
+          path: markov-desktop-${{ inputs.target }}.zip
           if-no-files-found: error
           overwrite: true
 
       - name: Quick launch test (macOS)
         env:
-          APP_PATH: ${{ inputs.target == 'x86_64-apple-darwin' && 'ui/desktop/out/Goose-darwin-x64/Goose.app' || 'ui/desktop/out/Goose-darwin-arm64/Goose.app' }}
+          APP_PATH: ${{ inputs.target == 'x86_64-apple-darwin' && 'ui/desktop/out/Markov-darwin-x64/Markov.app' || 'ui/desktop/out/Markov-darwin-arm64/Markov.app' }}
         run: |
           xattr -cr "$APP_PATH"
-          echo "Opening Goose.app..."
+          echo "Opening Markov.app..."
           open -g "$APP_PATH"
           sleep 5
 
-          if pgrep -f "Goose.app/Contents/MacOS/Goose" > /dev/null; then
+          if pgrep -f "Markov.app/Contents/MacOS/Markov" > /dev/null; then
             echo "App appears to be running."
           else
             echo "App did not stay open. Possible crash or startup error."
             exit 1
           fi
-          pkill -f "Goose.app/Contents/MacOS/Goose"
+          pkill -f "Markov.app/Contents/MacOS/Markov"

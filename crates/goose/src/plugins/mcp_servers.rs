@@ -12,10 +12,12 @@ use tracing::warn;
 const DEFAULT_MCP_CONFIG: &str = ".mcp.json";
 const PLUGIN_ROOT: &str = "${PLUGIN_ROOT}";
 
+/// Servers are held unparsed so that one entry this format cannot express does
+/// not decide the fate of the whole file.
 #[derive(Debug, Deserialize)]
 struct McpServersDocument {
     #[serde(default, rename = "mcpServers")]
-    mcp_servers: HashMap<String, McpServerConfig>,
+    mcp_servers: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,7 +62,7 @@ pub fn plugin_mcp_servers(plugin_name: &str, plugin_root: &Path) -> Result<Vec<E
         configs.extend(document_to_extension_configs(
             plugin_name,
             plugin_root,
-            document.mcp_servers,
+            usable(document.mcp_servers, &path),
         ));
     }
 
@@ -73,7 +75,7 @@ pub fn plugin_mcp_servers(plugin_name: &str, plugin_root: &Path) -> Result<Vec<E
         configs.extend(document_to_extension_configs(
             plugin_name,
             plugin_root,
-            servers,
+            usable(servers, plugin_root),
         ));
     }
 
@@ -110,9 +112,35 @@ fn is_inline_config(value: &serde_json::Value) -> bool {
     })
 }
 
-fn parse_inline_servers(value: &serde_json::Value) -> Result<HashMap<String, McpServerConfig>> {
+fn parse_inline_servers(value: &serde_json::Value) -> Result<HashMap<String, serde_json::Value>> {
     serde_json::from_value(value.clone())
         .with_context(|| "Failed to parse inline Open Plugins MCP servers")
+}
+
+/// The entries this format can actually express, with the rest reported and left
+/// behind. Reading the file as a whole used to mean that a single server goose
+/// cannot describe — a remote one, say, since only `command` is understood —
+/// took every working server of that plugin down with it, leaving nothing on
+/// screen and one line in the log.
+fn usable(
+    servers: HashMap<String, serde_json::Value>,
+    source: &Path,
+) -> HashMap<String, McpServerConfig> {
+    servers
+        .into_iter()
+        .filter_map(|(name, value)| match serde_json::from_value(value) {
+            Ok(server) => Some((name, server)),
+            Err(err) => {
+                warn!(
+                    server = %name,
+                    source = %source.display(),
+                    error = %err,
+                    "Skipping plugin MCP server that this format cannot describe",
+                );
+                None
+            }
+        })
+        .collect()
 }
 
 fn document_to_extension_configs(
@@ -183,8 +211,13 @@ pub fn validate_mcp_server_document(value: &serde_json::Value) -> Result<()> {
     validate_servers(document.mcp_servers)
 }
 
-fn validate_servers(servers: HashMap<String, McpServerConfig>) -> Result<()> {
-    for (name, server) in servers {
+/// Installing is where an author finds out, so this stays strict even though
+/// loading now skips what it cannot read: a plugin that ships a server goose
+/// will silently ignore is worth refusing while someone is still watching.
+fn validate_servers(servers: HashMap<String, serde_json::Value>) -> Result<()> {
+    for (name, value) in servers {
+        let server: McpServerConfig = serde_json::from_value(value)
+            .with_context(|| format!("Open Plugins MCP server '{name}' is not supported"))?;
         if server.command.trim().is_empty() {
             bail!(
                 "Open Plugins MCP server '{}' command must not be empty",
@@ -199,6 +232,43 @@ fn validate_servers(servers: HashMap<String, McpServerConfig>) -> Result<()> {
 mod tests {
     use super::*;
     use crate::agents::extension::ExtensionConfig;
+
+    /// A remote server is the everyday case this format cannot describe, and it
+    /// used to cost the plugin every other server it had.
+    #[test]
+    fn a_server_this_format_cannot_describe_does_not_take_its_neighbours_down() {
+        let plugin = tempfile::tempdir().unwrap();
+        fs::write(
+            plugin.path().join(DEFAULT_MCP_CONFIG),
+            r#"{
+              "mcpServers": {
+                "docs": {"command": "npx", "args": ["-y", "docs-mcp"]},
+                "remote": {"type": "http", "url": "https://example.test/mcp"},
+                "memory": {"command": "npx", "args": ["-y", "memory-mcp"]}
+              }
+            }"#,
+        )
+        .unwrap();
+
+        let configs = plugin_mcp_servers("test-plugin", plugin.path()).unwrap();
+        let mut names: Vec<String> = configs.iter().map(|config| config.name()).collect();
+        names.sort();
+
+        assert_eq!(names, ["test-plugin:docs", "test-plugin:memory"]);
+    }
+
+    /// Loading skips what it cannot read, but installing must still say so while
+    /// the author is watching.
+    #[test]
+    fn installing_still_refuses_a_server_that_would_be_skipped() {
+        let document = serde_json::json!({
+            "mcpServers": {
+                "remote": {"type": "http", "url": "https://example.test/mcp"}
+            }
+        });
+
+        assert!(validate_mcp_server_document(&document).is_err());
+    }
 
     #[test]
     fn loads_default_mcp_json_with_plugin_root_expansion() {

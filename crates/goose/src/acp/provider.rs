@@ -138,6 +138,14 @@ enum AcpUpdate {
         kind: ToolKind,
         raw_input: Option<serde_json::Value>,
     },
+    /// The title and arguments of a call that was announced before its input
+    /// finished streaming.
+    ToolCallRefine {
+        id: String,
+        name: Option<String>,
+        kind: Option<ToolKind>,
+        raw_input: Option<serde_json::Value>,
+    },
     ToolCallComplete {
         id: String,
         raw_output: Option<serde_json::Value>,
@@ -602,6 +610,12 @@ impl Provider for AcpProvider {
         PermissionRouting::ActionRequired
     }
 
+    /// `claim_handoff_context` puts the earlier turns into the first prompt, so
+    /// the adapter starts knowing what was said before it existed.
+    fn accepts_conversation_handoff(&self) -> bool {
+        true
+    }
+
     fn manages_own_context(&self) -> bool {
         true
     }
@@ -676,6 +690,9 @@ impl Provider for AcpProvider {
             // Stable id+timestamp per contiguous run so Desktop coalesces chunks into one bubble.
             let mut text_run: Option<(String, i64)> = None;
             let mut thought_run: Option<(String, i64)> = None;
+            // Calls announced with a placeholder title, held back until their
+            // arguments arrive.
+            let mut unannounced_tool_calls: HashMap<String, (String, ToolKind)> = HashMap::new();
 
             while let Some(update) = rx.recv().await {
                 match update {
@@ -704,24 +721,22 @@ impl Provider for AcpProvider {
                         if reject_all_tools {
                             suppress_text = true;
                             rejected_tool_calls.insert(id);
+                        } else if awaits_refinement(raw_input.as_ref()) {
+                            unannounced_tool_calls.insert(id, (name, kind));
                         } else {
-                            let mut params = CallToolRequestParams::new(name);
-                            if let Some(serde_json::Value::Object(map)) = raw_input {
-                                params = params.with_arguments(map);
-                            }
-                            // external_dispatch tells the agent loop not to redispatch this
-                            // call. goose.acp.kind preserves ACP's stable categorization for
-                            // downstream consumers (metrics, observability, icon selection)
-                            // independent of the display title we put in `name`.
-                            let tool_meta = Some(serde_json::json!({
-                                TOOL_META_EXTERNAL_DISPATCH_KEY: true,
-                                "goose.acp.kind": kind,
-                            }));
-                            let message = Message::assistant().with_tool_request_with_metadata(
+                            let message = acp_tool_request_message(id, name, kind, raw_input);
+                            yield (Some(message), None);
+                        }
+                    }
+                    AcpUpdate::ToolCallRefine { id, name, kind, raw_input } => {
+                        if let Some((placeholder_name, placeholder_kind)) =
+                            unannounced_tool_calls.remove(&id)
+                        {
+                            let message = acp_tool_request_message(
                                 id,
-                                Ok(params),
-                                None,
-                                tool_meta,
+                                name.unwrap_or(placeholder_name),
+                                kind.unwrap_or(placeholder_kind),
+                                raw_input,
                             );
                             yield (Some(message), None);
                         }
@@ -734,6 +749,14 @@ impl Provider for AcpProvider {
                     } => {
                         text_run = None;
                         thought_run = None;
+                        // A call that finished without ever being refined still
+                        // has to be announced, or its response arrives paired
+                        // with nothing.
+                        if let Some((name, kind)) = unannounced_tool_calls.remove(&id) {
+                            let message =
+                                acp_tool_request_message(id.clone(), name, kind, None);
+                            yield (Some(message), None);
+                        }
                         if rejected_tool_calls.remove(&id) {
                             // In chat mode no tool_request was emitted (suppressed at
                             // ToolCallStart), so surface a plain text message. In other
@@ -766,6 +789,19 @@ impl Provider for AcpProvider {
                     AcpUpdate::PermissionRequest { request, response_tx } => {
                         text_run = None;
                         thought_run = None;
+                        // Asking about a call the user was never shown would
+                        // leave the prompt without a subject, and the request
+                        // carries the arguments the announcement lacked.
+                        let asked_about = request.tool_call.tool_call_id.0.to_string();
+                        if let Some((name, kind)) = unannounced_tool_calls.remove(&asked_about) {
+                            let message = acp_tool_request_message(
+                                asked_about,
+                                request.tool_call.fields.title.clone().unwrap_or(name),
+                                request.tool_call.fields.kind.unwrap_or(kind),
+                                request.tool_call.fields.raw_input.clone(),
+                            );
+                            yield (Some(message), None);
+                        }
                         if let Some(decision) = permission_decision_from_mode(goose_mode) {
                             if decision.should_record_rejection() {
                                 rejected_tool_calls.insert(request.tool_call.tool_call_id.0.to_string());
@@ -1051,6 +1087,19 @@ impl AcpClientLoop {
                                 }
                                 SessionUpdate::ToolCallUpdate(update) => {
                                     let id = update.tool_call_id.0.to_string();
+                                    // A streamed call is announced before its input is
+                                    // known, so the title and arguments an update brings
+                                    // are what the client has to show it by.
+                                    if update.fields.title.is_some()
+                                        || update.fields.raw_input.is_some()
+                                    {
+                                        let _ = tx.try_send(AcpUpdate::ToolCallRefine {
+                                            id: id.clone(),
+                                            name: update.fields.title.clone(),
+                                            kind: update.fields.kind,
+                                            raw_input: update.fields.raw_input.clone(),
+                                        });
+                                    }
                                     // Merge patch-like fields; only emit on terminal status.
                                     let terminal_status = update.fields.status.filter(|s| {
                                         matches!(
@@ -1701,6 +1750,40 @@ fn visible_rmcp_text(text: impl Into<String>) -> RmcpContent {
     )
 }
 
+/// external_dispatch tells the agent loop not to redispatch this call.
+/// goose.acp.kind preserves ACP's stable categorization for downstream consumers
+/// (metrics, observability, icon selection) independent of the display title we
+/// put in `name`.
+fn acp_tool_request_message(
+    id: String,
+    name: String,
+    kind: ToolKind,
+    raw_input: Option<serde_json::Value>,
+) -> Message {
+    let mut params = CallToolRequestParams::new(name);
+    if let Some(serde_json::Value::Object(map)) = raw_input {
+        params = params.with_arguments(map);
+    }
+    let tool_meta = Some(serde_json::json!({
+        TOOL_META_EXTERNAL_DISPATCH_KEY: true,
+        "goose.acp.kind": kind,
+    }));
+    Message::assistant().with_tool_request_with_metadata(id, Ok(params), None, tool_meta)
+}
+
+/// Whether an announced call is still missing its arguments. An agent that
+/// streams tool input announces the call as the block opens, when the title is
+/// a placeholder and the arguments are empty, and refines both once the input
+/// is complete. Showing the placeholder would name a call the user cannot
+/// recognize, so such a call waits for its refinement.
+fn awaits_refinement(raw_input: Option<&serde_json::Value>) -> bool {
+    match raw_input {
+        None => true,
+        Some(serde_json::Value::Object(map)) => map.is_empty(),
+        Some(_) => false,
+    }
+}
+
 fn acp_text_update_message(text: TextContent, id: String, created: i64) -> Message {
     Message::new(Role::Assistant, created, vec![])
         .with_content(acp_text_content_to_rmcp(text).into())
@@ -2232,6 +2315,166 @@ mod tests {
         assert!(!provider.handoff_context_sent.load(Ordering::Acquire));
     }
 
+    /// Drains a prompt stream that the test has already finished feeding.
+    async fn collect_stream(mut stream: crate::providers::base::MessageStream) -> Vec<Message> {
+        use futures::StreamExt;
+
+        let mut messages = Vec::new();
+        while let Some(item) = stream.next().await {
+            let (message, _) = item.unwrap();
+            if let Some(message) = message {
+                messages.push(message);
+            }
+        }
+        messages
+    }
+
+    fn tool_calls(messages: &[Message]) -> Vec<&CallToolRequestParams> {
+        messages
+            .iter()
+            .flat_map(|message| &message.content)
+            .filter_map(|content| match content {
+                MessageContent::ToolRequest(request) => request.tool_call.as_ref().ok(),
+                _ => None,
+            })
+            .collect()
+    }
+
+    async fn prompt_with_updates(
+        provider: &AcpProvider,
+        model: &ModelConfig,
+        rx: &mut mpsc::Receiver<ClientRequest>,
+        updates: Vec<AcpUpdate>,
+    ) -> Vec<Message> {
+        let messages = vec![Message::user().with_text("look around")];
+        let stream = provider.stream(model, "", &messages, &[]).await.unwrap();
+
+        let response_tx = match rx.recv().await.expect("expected ACP prompt request") {
+            ClientRequest::Prompt { response_tx, .. } => response_tx,
+            _ => panic!("expected ACP prompt request"),
+        };
+        for update in updates {
+            response_tx.send(update).await.unwrap();
+        }
+        response_tx
+            .send(AcpUpdate::Complete(StopReason::EndTurn, None))
+            .await
+            .unwrap();
+
+        collect_stream(stream).await
+    }
+
+    #[tokio::test]
+    async fn a_streamed_call_is_announced_with_the_arguments_of_its_refinement() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (provider, model) = test_provider_with_tx(Some(tx));
+
+        let messages = prompt_with_updates(
+            &provider,
+            &model,
+            &mut rx,
+            vec![
+                AcpUpdate::ToolCallStart {
+                    id: "call-1".to_string(),
+                    name: "Terminal".to_string(),
+                    kind: ToolKind::Execute,
+                    raw_input: Some(serde_json::json!({})),
+                },
+                AcpUpdate::ToolCallRefine {
+                    id: "call-1".to_string(),
+                    name: Some("rg --files".to_string()),
+                    kind: Some(ToolKind::Execute),
+                    raw_input: Some(serde_json::json!({ "command": "rg --files" })),
+                },
+                AcpUpdate::ToolCallComplete {
+                    id: "call-1".to_string(),
+                    raw_output: None,
+                    content: None,
+                    is_error: false,
+                },
+            ],
+        )
+        .await;
+
+        let calls = tool_calls(&messages);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "rg --files");
+        assert_eq!(
+            calls[0]
+                .arguments
+                .as_ref()
+                .and_then(|args| args.get("command"))
+                .and_then(|command| command.as_str()),
+            Some("rg --files")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_call_that_arrives_with_its_arguments_is_announced_at_once() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (provider, model) = test_provider_with_tx(Some(tx));
+
+        let messages = prompt_with_updates(
+            &provider,
+            &model,
+            &mut rx,
+            vec![
+                AcpUpdate::ToolCallStart {
+                    id: "call-1".to_string(),
+                    name: "cat README.md".to_string(),
+                    kind: ToolKind::Execute,
+                    raw_input: Some(serde_json::json!({ "command": "cat README.md" })),
+                },
+                AcpUpdate::ToolCallRefine {
+                    id: "call-1".to_string(),
+                    name: Some("cat README.md".to_string()),
+                    kind: Some(ToolKind::Execute),
+                    raw_input: Some(serde_json::json!({ "command": "cat README.md" })),
+                },
+            ],
+        )
+        .await;
+
+        let calls = tool_calls(&messages);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "cat README.md");
+    }
+
+    #[tokio::test]
+    async fn a_call_that_is_never_refined_is_announced_before_its_response() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let (provider, model) = test_provider_with_tx(Some(tx));
+
+        let messages = prompt_with_updates(
+            &provider,
+            &model,
+            &mut rx,
+            vec![
+                AcpUpdate::ToolCallStart {
+                    id: "call-1".to_string(),
+                    name: "Terminal".to_string(),
+                    kind: ToolKind::Execute,
+                    raw_input: None,
+                },
+                AcpUpdate::ToolCallComplete {
+                    id: "call-1".to_string(),
+                    raw_output: Some(serde_json::json!("done")),
+                    content: None,
+                    is_error: false,
+                },
+            ],
+        )
+        .await;
+
+        let calls = tool_calls(&messages);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "Terminal");
+        assert!(messages[1]
+            .content
+            .iter()
+            .any(|content| matches!(content, MessageContent::ToolResponse(_))));
+    }
+
     #[tokio::test]
     async fn chat_mode_denied_tool_messages_get_distinct_provider_ids() {
         use futures::StreamExt;
@@ -2334,6 +2577,18 @@ mod tests {
         let second_claim = provider.claim_handoff_context(&messages);
         assert!(!second_claim.first_prompt);
         assert!(!second_claim.include_context);
+    }
+
+    /// What the CLI reads before it lets a live session move onto a provider.
+    /// The two answers belong together: keeping your own history is only safe
+    /// to switch into because the first prompt carries the earlier turns, so
+    /// anything that retires `claim_handoff_context` has to retire this too.
+    #[test]
+    fn taking_a_conversation_over_is_advertised_alongside_owning_it() {
+        let (provider, _) = test_provider();
+
+        assert!(provider.manages_own_context());
+        assert!(provider.accepts_conversation_handoff());
     }
 
     #[test]

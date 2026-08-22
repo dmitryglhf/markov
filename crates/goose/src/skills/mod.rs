@@ -71,32 +71,41 @@ pub(crate) fn skill_base_dir(global: bool, project_dir: Option<&str>) -> Result<
     }
 }
 
-pub(crate) fn validate_skill_name(name: &str) -> Result<(), Error> {
+/// The rule `create_source` enforces, in a shape a form can show while the name
+/// is still being typed instead of after the write is attempted.
+pub fn skill_name_problem(name: &str) -> Option<String> {
     if name.is_empty() {
-        return Err(Error::invalid_params().data("Skill name must not be empty"));
+        return Some("Skill name must not be empty".to_string());
     }
     if name.len() > 64 {
-        return Err(Error::invalid_params().data(format!(
+        return Some(format!(
             "Invalid skill name \"{}\". Names must be at most 64 characters.",
             name
-        )));
+        ));
     }
     if !name
         .chars()
         .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
     {
-        return Err(Error::invalid_params().data(format!(
+        return Some(format!(
             "Invalid skill name \"{}\". Names may only contain lowercase letters, digits, and hyphens.",
             name
-        )));
+        ));
     }
     if name.starts_with('-') || name.ends_with('-') {
-        return Err(Error::invalid_params().data(format!(
+        return Some(format!(
             "Invalid skill name \"{}\". Names must not start or end with a hyphen.",
             name
-        )));
+        ));
     }
-    Ok(())
+    None
+}
+
+pub(crate) fn validate_skill_name(name: &str) -> Result<(), Error> {
+    match skill_name_problem(name) {
+        Some(problem) => Err(Error::invalid_params().data(problem)),
+        None => Ok(()),
+    }
 }
 
 const DEFAULT_GOOSE_DOCS_ROOT: &str = "https://goose-docs.ai";
@@ -310,38 +319,70 @@ pub(crate) fn parse_skill_frontmatter(raw: &str) -> (String, String) {
     }
 }
 
-/// Every directory the agent reads skills from, paired with whether each is a
-/// global (home-rooted) location. Order matches discovery precedence: project
-/// dirs first, then global dirs.
-pub fn all_skill_dirs(working_dir: Option<&Path>) -> Vec<(PathBuf, bool)> {
-    let mut dirs: Vec<(PathBuf, bool)> = Vec::new();
+/// One directory the agent reads skills from.
+pub struct SkillDir {
+    pub path: PathBuf,
+    /// A home-rooted location, shared across projects.
+    pub global: bool,
+    /// Ours to change. False for directories a plugin owns: the source of
+    /// truth for those is the plugin's repository, and the next update
+    /// overwrites whatever was edited here.
+    pub writable: bool,
+}
+
+impl SkillDir {
+    fn ours(path: PathBuf, global: bool) -> Self {
+        Self {
+            path,
+            global,
+            writable: true,
+        }
+    }
+}
+
+/// Every directory the agent reads skills from. Order matches discovery
+/// precedence: project dirs first, then global dirs.
+pub fn all_skill_dirs(working_dir: Option<&Path>) -> Vec<SkillDir> {
+    let mut dirs: Vec<SkillDir> = Vec::new();
 
     if let Some(wd) = working_dir {
-        dirs.push((wd.join(".agents").join("skills"), false));
-        dirs.push((wd.join(".goose").join("skills"), false));
-        dirs.push((wd.join(".claude").join("skills"), false));
+        dirs.push(SkillDir::ours(wd.join(".agents").join("skills"), false));
+        dirs.push(SkillDir::ours(wd.join(".goose").join("skills"), false));
+        dirs.push(SkillDir::ours(wd.join(".claude").join("skills"), false));
     }
 
     let home = dirs::home_dir();
     if let Some(h) = home.as_ref() {
-        dirs.push((h.join(".agents").join("skills"), true));
+        dirs.push(SkillDir::ours(h.join(".agents").join("skills"), true));
     }
-    dirs.push((Paths::config_dir().join("skills"), true));
+    dirs.push(SkillDir::ours(Paths::config_dir().join("skills"), true));
     if let Some(h) = home.as_ref() {
-        dirs.push((h.join(".claude").join("skills"), true));
-        dirs.push((h.join(".config").join("agents").join("skills"), true));
+        dirs.push(SkillDir::ours(h.join(".claude").join("skills"), true));
+        dirs.push(SkillDir::ours(
+            h.join(".config").join("agents").join("skills"),
+            true,
+        ));
     }
 
     dirs.extend(
         installed_plugin_skill_dirs()
             .into_iter()
-            .map(|dir| (dir, true)),
+            .map(|path| SkillDir {
+                path,
+                global: true,
+                writable: false,
+            }),
     );
 
     dirs
 }
 
-fn parse_skill_content(content: &str, path: &Path, global: bool) -> Option<SourceEntry> {
+fn parse_skill_content(
+    content: &str,
+    path: &Path,
+    global: bool,
+    writable: bool,
+) -> Option<SourceEntry> {
     let (metadata, body): (SkillFrontmatter, String) = match parse_frontmatter(content) {
         Ok(Some(parsed)) => parsed,
         Ok(None) => return None,
@@ -374,7 +415,7 @@ fn parse_skill_content(content: &str, path: &Path, global: bool) -> Option<Sourc
         content: body,
         path: path.to_string_lossy().into_owned(),
         global,
-        writable: true,
+        writable,
         supporting_files: Vec::new(),
         properties: metadata.metadata,
     })
@@ -422,12 +463,12 @@ fn walk_files_recursively<F, G>(
     }
 }
 
-fn scan_skills_from_dir(dir: &Path, global: bool, seen: &mut HashSet<String>) -> Vec<SourceEntry> {
+fn scan_skills_from_dir(dir: &SkillDir, seen: &mut HashSet<String>) -> Vec<SourceEntry> {
     let mut skill_files = Vec::new();
     let mut visited_dirs = HashSet::new();
 
     walk_files_recursively(
-        dir,
+        &dir.path,
         &mut visited_dirs,
         &mut |path| !should_skip_dir(path),
         &mut |path| {
@@ -450,7 +491,8 @@ fn scan_skills_from_dir(dir: &Path, global: bool, seen: &mut HashSet<String>) ->
             }
         };
 
-        if let Some(mut source) = parse_skill_content(&content, skill_dir, global) {
+        if let Some(mut source) = parse_skill_content(&content, skill_dir, dir.global, dir.writable)
+        {
             if !seen.contains(&source.name) {
                 let mut files = Vec::new();
                 let mut visited_support_dirs = HashSet::new();
@@ -474,34 +516,44 @@ fn scan_skills_from_dir(dir: &Path, global: bool, seen: &mut HashSet<String>) ->
     sources
 }
 
-/// Discover skills from all configured filesystem locations and built-ins.
-/// Each returned entry has `global` set according to the directory it was
-/// found in (or `true` for built-ins).
-pub fn discover_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
-    let mut sources: Vec<SourceEntry> = Vec::new();
-    let mut seen = HashSet::new();
+fn builtin_entry(source: SourceEntry) -> SourceEntry {
+    let path = format!("builtin://skills/{}", source.name);
+    SourceEntry {
+        source_type: SourceType::BuiltinSkill,
+        path,
+        ..source
+    }
+}
 
-    for (dir, is_global) in all_skill_dirs(working_dir) {
-        for source in scan_skills_from_dir(&dir, is_global, &mut seen) {
-            sources.push(source);
-        }
+/// Every skill found anywhere, in discovery order and without dropping repeated
+/// names. The agent only ever sees the first of each name; the rest are here so
+/// a manager can say why editing one of them changed nothing.
+pub fn discover_all_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
+    let mut sources: Vec<SourceEntry> = Vec::new();
+
+    for dir in all_skill_dirs(working_dir) {
+        let mut seen = HashSet::new();
+        sources.extend(scan_skills_from_dir(&dir, &mut seen));
     }
 
     for content in builtin::get_all() {
-        if let Some(source) = parse_skill_content(content, &PathBuf::new(), true) {
-            if !seen.contains(&source.name) {
-                seen.insert(source.name.clone());
-                let path = format!("builtin://skills/{}", source.name);
-                sources.push(SourceEntry {
-                    source_type: SourceType::BuiltinSkill,
-                    path,
-                    ..source
-                });
-            }
+        if let Some(source) = parse_skill_content(content, &PathBuf::new(), true, false) {
+            sources.push(builtin_entry(source));
         }
     }
 
     sources
+}
+
+/// Discover skills from all configured filesystem locations and built-ins.
+/// Each returned entry has `global` set according to the directory it was
+/// found in (or `true` for built-ins).
+pub fn discover_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
+    let mut seen = HashSet::new();
+    discover_all_skills(working_dir)
+        .into_iter()
+        .filter(|source| seen.insert(source.name.clone()))
+        .collect()
 }
 
 pub fn list_installed_skills(working_dir: Option<&Path>) -> Vec<SourceEntry> {
@@ -606,5 +658,44 @@ mod tests {
         let rendered = resolve_docs_root_placeholder(&skill, &skill.content, "/tmp/goose-docs");
 
         assert_eq!(rendered, skill.content);
+    }
+
+    /// A directory the agent reads from is not automatically a directory we may
+    /// write to, and the flag is what keeps a manager from offering to edit a
+    /// plugin's copy.
+    #[test]
+    fn a_skill_is_writable_only_when_its_directory_is() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let skill_dir = tmp.path().join("brought-along");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: brought-along\ndescription: From somewhere else\n---\n\nBody",
+        )
+        .unwrap();
+
+        let scan = |writable| {
+            scan_skills_from_dir(
+                &SkillDir {
+                    path: tmp.path().to_path_buf(),
+                    global: true,
+                    writable,
+                },
+                &mut HashSet::new(),
+            )
+        };
+
+        assert!(scan(true)[0].writable);
+        assert!(!scan(false)[0].writable);
+    }
+
+    #[test]
+    fn plugin_directories_are_the_ones_we_do_not_own() {
+        let dirs = all_skill_dirs(None);
+
+        assert!(dirs.iter().any(|dir| dir.writable));
+        for dir in dirs.iter().filter(|dir| !dir.writable) {
+            assert!(installed_plugin_skill_dirs().contains(&dir.path));
+        }
     }
 }

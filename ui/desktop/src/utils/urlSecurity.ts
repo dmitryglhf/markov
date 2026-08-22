@@ -80,6 +80,24 @@ export const isProtocolSafe = (url: string): boolean => {
 };
 
 /**
+ * True when the URL points at the local machine. Used to keep the Origin
+ * header override scoped to the local goose serve instead of every host.
+ */
+export const isLoopbackUrl = (url: string): boolean => {
+  try {
+    const { hostname } = new URL(url);
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '[::1]'
+    );
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Extract the protocol from a URL string.
  */
 export const getProtocol = (url: string): string | null => {

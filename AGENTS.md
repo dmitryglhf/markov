@@ -34,7 +34,7 @@ cargo build
 ```bash
 cargo build                   # debug
 cargo build --release         # release  
-just release-binary           # release binary
+just release                  # release binary
 ```
 
 ### Test

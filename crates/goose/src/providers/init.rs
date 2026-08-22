@@ -28,6 +28,7 @@ use super::{
     litellm::LiteLLMProvider,
     nanogpt::NanoGptProvider,
     openrouter::OpenRouterProvider,
+    pgpro::PgproProvider,
     pi_acp::PiAcpProvider,
     provider_registry::ProviderRegistry,
     snowflake_def::SnowflakeProviderDef,
@@ -142,6 +143,16 @@ async fn init_registry() -> RwLock<ProviderRegistry> {
                     .is_ok()
                     || config
                         .get_secret::<serde_json::Value>("LITELLM_API_KEY")
+                        .is_ok()
+            })),
+        );
+        registry.register_with_inventory::<PgproProvider>(
+            false,
+            Some(registrations::refresh_only().with_configured(|| {
+                let config = crate::config::Config::global();
+                config.get_param::<serde_json::Value>("PGPRO_HOST").is_ok()
+                    || config
+                        .get_secret::<serde_json::Value>("PGPRO_API_KEY")
                         .is_ok()
             })),
         );

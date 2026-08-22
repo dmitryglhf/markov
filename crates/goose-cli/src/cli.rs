@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Args, CommandFactory, Parser, Subcommand};
+use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use clap_complete::{generate, Shell as ClapShell};
 use clap_complete_nushell::Nushell as ClapNushell;
 use goose::agents::GoosePlatform;
@@ -29,6 +29,7 @@ use crate::commands::schedule::{
 };
 use crate::commands::session::{handle_session_list, handle_session_remove};
 use crate::commands::skills::handle_skills_list;
+use crate::markov::types::SessionPick;
 use crate::recipes::extract_from_cli::extract_recipe_info_from_cli;
 use crate::recipes::recipe::{explain_recipe, render_recipe_as_yaml};
 use crate::session::{build_session, SessionBuilderConfig};
@@ -65,7 +66,7 @@ impl From<ServePlatform> for GoosePlatform {
 }
 
 #[derive(Parser)]
-#[command(name = "goose", author, version, display_name = "", about, long_about = None)]
+#[command(name = "markov", author, version, display_name = "", about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -586,7 +587,7 @@ enum SessionCommand {
     )]
     Import {
         #[arg(
-            help = "Path to a goose session export, a Claude Code, Codex, or Pi .jsonl transcript, or a goose://sessions/nostr share link"
+            help = "Path to a markov session export, a Claude Code, Codex, or Pi .jsonl transcript, or a goose://sessions/nostr share link"
         )]
         input: String,
 
@@ -759,8 +760,8 @@ enum RecipeCommand {
         params: Vec<String>,
     },
 
-    /// Open a recipe in Goose Desktop
-    #[command(about = "Open a recipe in Goose Desktop")]
+    /// Open a recipe in Markov Desktop
+    #[command(about = "Open a recipe in Markov Desktop")]
     Open {
         /// Recipe name to get recipe file to open
         #[arg(help = "recipe name or full path to the recipe file")]
@@ -799,12 +800,12 @@ enum RecipeCommand {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Configure goose settings
-    #[command(about = "Configure goose settings")]
+    /// Configure markov settings
+    #[command(about = "Configure markov settings")]
     Configure {},
 
-    /// Display goose configuration information
-    #[command(about = "Display goose information")]
+    /// Display markov configuration information
+    #[command(about = "Display markov information")]
     Info {
         /// Show verbose information including current configuration
         #[arg(short, long, help = "Show verbose information including config.yaml")]
@@ -813,18 +814,18 @@ enum Command {
         check: bool,
     },
 
-    #[command(about = "Check that your Goose setup is working")]
+    #[command(about = "Check that your Markov setup is working")]
     Doctor {},
 
     /// Manage system prompts and behaviors
-    #[command(about = "Run one of the mcp servers bundled with goose")]
+    #[command(about = "Run one of the mcp servers bundled with markov")]
     Mcp {
         #[arg(value_parser = clap::value_parser!(McpCommand))]
         server: McpCommand,
     },
 
-    /// Run goose as an ACP (Agent Client Protocol) agent
-    #[command(about = "Run goose as an ACP agent server on stdio")]
+    /// Run markov as an ACP (Agent Client Protocol) agent
+    #[command(about = "Run markov as an ACP agent server on stdio")]
     Acp {
         /// Add builtin extensions by name
         #[arg(
@@ -906,7 +907,7 @@ enum Command {
             short,
             long,
             help = "Resume a previous session (last used or specified by --name/--session-id)",
-            long_help = "Continue from a previous session. If --name or --session-id is provided, resumes that specific session. Otherwise, resumes the most recently used session."
+            long_help = "Continue from a previous session. If --name or --session-id is provided, resumes that specific session. Otherwise, offers a choice of recent sessions, or resumes the most recent one when not on a terminal."
         )]
         resume: bool,
 
@@ -928,10 +929,11 @@ enum Command {
         )]
         edit: bool,
 
-        /// Show message history when resuming
+        /// Replay message history when resuming
         #[arg(
-            long,
-            help = "Show previous messages when resuming a session",
+            long = "no-history",
+            action = clap::ArgAction::SetFalse,
+            help = "Skip reprinting previous messages when resuming a session",
             requires = "resume"
         )]
         history: bool,
@@ -1009,34 +1011,42 @@ enum Command {
         command: GatewayCommand,
     },
 
-    /// Update the goose CLI version
+    /// Say how to update markov
     #[cfg(feature = "update")]
-    #[command(about = "Update the goose CLI version")]
+    #[command(about = "Say how to update markov")]
     Update {
         /// Update to canary version
+        // Nothing acts on these while the update itself is stubbed out, so they
+        // are still accepted but no longer advertised.
         #[arg(
             short,
             long,
             help = "Update to canary version",
-            long_help = "Update to the latest canary version of the goose CLI, otherwise updates to the latest stable version."
+            long_help = "Update to the latest canary version of the goose CLI, otherwise updates to the latest stable version.",
+            hide = cfg!(feature = "disable-update")
         )]
         canary: bool,
 
         /// Enforce to re-configure goose during update
-        #[arg(short, long, help = "Enforce to re-configure goose during update")]
+        #[arg(
+            short,
+            long,
+            help = "Enforce to re-configure goose during update",
+            hide = cfg!(feature = "disable-update")
+        )]
         reconfigure: bool,
     },
 
     /// Terminal-integrated session (one session per terminal)
     #[command(
-        about = "Terminal-integrated goose session",
-        long_about = "Runs a goose session tied to your terminal window.\n\
+        about = "Terminal-integrated markov session",
+        long_about = "Runs a markov session tied to your terminal window.\n\
                       Each terminal maintains its own persistent session that resumes automatically.\n\n\
                       Setup:\n  \
-                        eval \"$(goose term init zsh)\"  # zsh/bash\n  \
-                        let init = ($nu.cache-dir | path join \"goose-term-init.nu\"); ^goose term init nu | save --force $init; source $init\n\n\
+                        eval \"$(markov term init zsh)\"  # zsh/bash\n  \
+                        let init = ($nu.cache-dir | path join \"goose-term-init.nu\"); ^markov term init nu | save --force $init; source $init\n\n\
                       Usage:\n  \
-                        goose term run \"list files in this directory\"\n  \
+                        markov term run \"list files in this directory\"\n  \
                         @goose \"create a python script\"  # using alias\n  \
                         @g \"quick question\"  # short alias"
     )]
@@ -1082,7 +1092,7 @@ enum Command {
         #[arg(value_enum)]
         shell: CompletionShell,
 
-        #[arg(long, default_value = "goose", help = "Provide a custom binary name")]
+        #[arg(long, default_value = "markov", help = "Provide a custom binary name")]
         bin_name: String,
     },
 
@@ -1237,15 +1247,15 @@ enum TermCommand {
         long_about = "Prints shell configuration to set up terminal-integrated sessions.\n\
                       Each terminal gets a persistent goose session that automatically resumes.\n\n\
                       Setup:\n  \
-                        echo 'eval \"$(goose term init zsh)\"' >> ~/.zshrc\n  \
+                        echo 'eval \"$(markov term init zsh)\"' >> ~/.zshrc\n  \
                         source ~/.zshrc\n\n\
                         Nushell:\n  \
                         let init = ($nu.cache-dir | path join \"goose-term-init.nu\")\n  \
                         ^goose term init nu | save --force $init\n  \
                         source $init\n\n\
                       With --default (anything typed that isn't a command goes to goose):\n  \
-                        echo 'eval \"$(goose term init zsh --default)\"' >> ~/.zshrc\n  \
-                        ^goose term init nu --default | save --force $init"
+                        echo 'eval \"$(markov term init zsh --default)\"' >> ~/.zshrc\n  \
+                        ^markov term init nu --default | save --force $init"
     )]
     Init {
         /// Shell type (bash, zsh, fish, nu, powershell)
@@ -1362,7 +1372,7 @@ fn get_command_name(command: &Option<Command>) -> &'static str {
     }
 }
 
-async fn handle_mcp_command(server: McpCommand) -> Result<()> {
+pub async fn handle_mcp_command(server: McpCommand) -> Result<()> {
     let name = server.name();
     let _ = crate::logging::setup_logging(Some(&format!("mcp-{name}")));
     match server {
@@ -1450,7 +1460,7 @@ async fn handle_serve_command(args: ServeCommandArgs) -> Result<()> {
     let require_token = env_secret.is_some();
     if !require_token && !dangerously_unauthenticated {
         anyhow::bail!(
-            "{GOOSE_SERVER_SECRET_KEY_ENV} must be set to start `goose serve`; pass --dangerously-unauthenticated to run without ACP authentication"
+            "{GOOSE_SERVER_SECRET_KEY_ENV} must be set to start `markov serve`; pass --dangerously-unauthenticated to run without ACP authentication"
         );
     }
     if dangerously_unauthenticated && !require_token {
@@ -1563,12 +1573,16 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
             let session_identifier = if let Some(id) = identifier {
                 lookup_session_id(id).await?
             } else {
-                match crate::commands::session::prompt_interactive_session_selection(
-                    &session_manager,
-                )
-                .await
+                match crate::markov::hooks::hooks()
+                    .session_picker(&session_manager, "Select a session to export:", None)
+                    .await
                 {
-                    Ok(id) => id,
+                    Ok(SessionPick::Chosen(id)) => id,
+                    Ok(SessionPick::Cancelled) => return Ok(()),
+                    Ok(SessionPick::NoSessions) => {
+                        println!("No sessions to export.");
+                        return Ok(());
+                    }
                     Err(e) => {
                         eprintln!("Error: {}", e);
                         return Ok(());
@@ -1592,12 +1606,16 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
             let session_id = if let Some(id) = identifier {
                 lookup_session_id(id).await?
             } else {
-                match crate::commands::session::prompt_interactive_session_selection(
-                    &session_manager,
-                )
-                .await
+                match crate::markov::hooks::hooks()
+                    .session_picker(&session_manager, "Select a session to inspect:", None)
+                    .await
                 {
-                    Ok(id) => id,
+                    Ok(SessionPick::Chosen(id)) => id,
+                    Ok(SessionPick::Cancelled) => return Ok(()),
+                    Ok(SessionPick::NoSessions) => {
+                        println!("No sessions to inspect.");
+                        return Ok(());
+                    }
                     Err(e) => {
                         eprintln!("Error: {}", e);
                         return Ok(());
@@ -1610,7 +1628,7 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
     Ok(())
 }
 
-struct InteractiveSessionArgs {
+pub struct InteractiveSessionArgs {
     identifier: Option<Identifier>,
     resume: bool,
     fork: bool,
@@ -1621,7 +1639,7 @@ struct InteractiveSessionArgs {
     model_opts: ModelOptions,
 }
 
-async fn handle_interactive_session(args: InteractiveSessionArgs) -> Result<()> {
+pub async fn handle_interactive_session(args: InteractiveSessionArgs) -> Result<()> {
     let InteractiveSessionArgs {
         identifier,
         resume,
@@ -1663,6 +1681,30 @@ async fn handle_interactive_session(args: InteractiveSessionArgs) -> Result<()> 
             std::process::exit(1);
         }
     }
+
+    let identifier = match crate::markov::resume::resume_selection_needed(resume, &identifier) {
+        true => match crate::markov::hooks::hooks()
+            .session_picker(
+                &SessionManager::instance(),
+                "Resume which session?",
+                Some(&[SessionType::User]),
+            )
+            .await
+        {
+            Ok(SessionPick::Chosen(id)) => Some(Identifier {
+                session_id: Some(id),
+                name: None,
+                path: None,
+            }),
+            Ok(SessionPick::Cancelled) => return Ok(()),
+            Ok(SessionPick::NoSessions) => {
+                println!("No sessions yet. Run `markov` to start one.");
+                return Ok(());
+            }
+            Err(_) => identifier,
+        },
+        false => identifier,
+    };
 
     let goose_mode = Config::global().get_goose_mode().unwrap_or_default();
     let mut session_id = get_or_create_session_id(identifier, resume, false, goose_mode).await?;
@@ -1794,7 +1836,7 @@ fn parse_run_input(
         (Some(file), _, _) => {
             let contents = std::fs::read_to_string(file).unwrap_or_else(|err| {
                 eprintln!(
-                    "Instruction file not found — did you mean to use goose run --text?\n{}",
+                    "Instruction file not found — did you mean to use markov run --text?\n{}",
                     err
                 );
                 std::process::exit(1);
@@ -2188,8 +2230,13 @@ async fn handle_local_models_command(command: LocalModelsCommand) -> Result<()> 
 }
 
 async fn handle_default_session() -> Result<()> {
-    if !Config::global().exists() {
-        return handle_configure().await;
+    if Config::global().get_goose_provider().is_err() {
+        handle_configure().await?;
+        // Setup that saved nothing leaves no provider to talk to, and it has
+        // already said so; dropping into a chat here would only fail again.
+        if Config::global().get_goose_provider().is_err() {
+            return Ok(());
+        }
     }
 
     #[cfg(feature = "telemetry")]
@@ -2228,9 +2275,15 @@ async fn handle_default_session() -> Result<()> {
 }
 
 pub async fn cli() -> anyhow::Result<()> {
+    run_matches(&Cli::command().get_matches()).await
+}
+
+/// Dispatch already-parsed arguments. Split out of `cli` so a wrapper crate can
+/// compose its own command tree and hand the matches back here.
+pub async fn run_matches(matches: &clap::ArgMatches) -> anyhow::Result<()> {
     register_builtin_extensions(goose_mcp::BUILTIN_EXTENSIONS.clone());
 
-    let cli = Cli::parse();
+    let cli = Cli::from_arg_matches(matches)?;
 
     let command_name = get_command_name(&cli.command);
     tracing::info!(
@@ -2403,6 +2456,27 @@ pub async fn cli() -> anyhow::Result<()> {
 mod tests {
     use super::*;
 
+    /// Resuming replays the conversation unasked; the flag is there to stop it.
+    #[test]
+    fn resuming_replays_the_conversation_by_default() {
+        let cli = Cli::try_parse_from(["markov", "session", "--resume"]).expect("parse");
+        let Some(Command::Session { history, .. }) = cli.command else {
+            panic!("expected session");
+        };
+        assert!(history);
+    }
+
+    /// `--no-history` asks for something only resuming can do, but the default
+    /// it carries must not make every plain session look like it asked.
+    #[test]
+    fn a_new_session_is_not_taken_for_one_refusing_history() {
+        Cli::try_parse_from(["markov", "session"]).expect("parse");
+        assert!(
+            Cli::try_parse_from(["markov", "session", "--no-history"]).is_err(),
+            "--no-history without --resume"
+        );
+    }
+
     #[test]
     fn completion_command_accepts_nushell_alias() {
         let cli = Cli::try_parse_from(["goose", "completion", "nushell"]).expect("parse failed");
@@ -2486,6 +2560,26 @@ mod tests {
         assert!(script.contains("export use completions *"));
     }
 
+    /// The default came over from upstream naming the binary `goose`, so every
+    /// generated script registered completions for a command this fork does not
+    /// install and Tab did nothing for any of them.
+    #[test]
+    fn completions_are_generated_for_the_binary_that_is_actually_installed() {
+        let cli = Cli::try_parse_from(["markov", "completion", "fish"]).expect("parse");
+        let Some(Command::Completion { bin_name, .. }) = cli.command else {
+            panic!("expected the completion command");
+        };
+        assert_eq!(bin_name, "markov");
+
+        let mut cmd = Cli::command();
+        let mut buffer = Vec::new();
+        CompletionShell::Fish.generate(&mut cmd, &bin_name, &mut buffer);
+
+        let script = String::from_utf8(buffer).expect("utf8");
+        assert!(script.contains("complete -c markov"));
+        assert!(!script.contains("complete -c goose"));
+    }
+
     #[test]
     fn term_init_help_mentions_nushell() {
         let mut cmd = Cli::command();
@@ -2496,7 +2590,7 @@ mod tests {
         init.write_long_help(&mut buffer).expect("write help");
 
         let help = String::from_utf8(buffer).expect("utf8");
-        assert!(help.contains("goose term init nu"));
+        assert!(help.contains("markov term init nu"));
         assert!(help.contains("Supported for zsh, bash, and nu"));
     }
 
@@ -2512,18 +2606,6 @@ mod tests {
 
         let help = String::from_utf8(buffer).expect("utf8");
         assert!(help.contains("nu"));
-    }
-
-    #[test]
-    fn skills_command_accepts_list_subcommand() {
-        let cli = Cli::try_parse_from(["goose", "skills", "list"]).expect("parse failed");
-
-        match cli.command {
-            Some(Command::Skills {
-                command: SkillsCommand::List,
-            }) => {}
-            _ => panic!("expected skills list command"),
-        }
     }
 
     #[test]

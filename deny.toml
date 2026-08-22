@@ -1,3 +1,7 @@
+[graph]
+# CI scans with --all-features, which reaches crates no shipped build contains.
+exclude = ["nostr", "nostr-sdk"]
+
 [advisories]
 
 # Deny yanked crates to catch supply chain issues early.

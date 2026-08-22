@@ -134,9 +134,6 @@
   "baseChat.reconnecting": {
     "defaultMessage": "Mất kết nối. Đang kết nối lại…"
   },
-  "baseChat.retry": {
-    "defaultMessage": "Thử lại"
-  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Đã cập nhật tiện ích mở rộng"
   },
@@ -932,18 +929,6 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "Thư mục gần đây"
   },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "Không thể chuyển sang {branch}"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "Không tìm thấy nhánh"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "Tìm kiếm nhánh…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "Bạn có thể có các thay đổi chưa commit."
-  },
   "elicitationRequest.accept": {
     "defaultMessage": "Chấp nhận"
   },
@@ -1240,15 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Kết nối tới một máy chủ goose đang chạy ở nơi khác (cần khởi động lại ứng dụng)"
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "Thư mục làm việc từ xa (tùy chọn)"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "Đường dẫn tuyệt đối trên backend bên ngoài. Để trống để gửi thư mục làm việc cục bộ."
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "Đóng"
@@ -2384,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "Cuộc trò chuyện"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "Đã tạo"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "Thư mục"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "Mô hình"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "Trạng thái"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "Đã cập nhật"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "Không có cuộc trò chuyện gần đây"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "Lỗi"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "Nhàn rỗi"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "Đang truyền"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "Hoạt động chưa đọc"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Phiên chưa đặt tên"
@@ -2421,7 +2370,7 @@
     "defaultMessage": "Máy chủ có thể đang khởi động hoặc tạm thời không khả dụng."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Không thể kết nối với máy chủ Goose"
+    "defaultMessage": "Không thể kết nối với máy chủ Markov"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Thử lại"
@@ -2430,10 +2379,10 @@
     "defaultMessage": "Tác nhân AI cục bộ của bạn. Kết nối một nhà cung cấp mô hình AI để bắt đầu."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Chào mừng đến với goose"
+    "defaultMessage": "Chào mừng đến với Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "Bạn đã sẵn sàng bắt đầu sử dụng goose."
+    "defaultMessage": "Bạn đã sẵn sàng bắt đầu sử dụng Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Đã kết nối với {providerName}"
@@ -2441,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Bắt đầu"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Tìm hiểu thêm"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Mô hình cục bộ đã sẵn sàng"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Dữ liệu sử dụng ẩn danh giúp cải thiện goose. Chúng tôi không bao giờ thu thập cuộc trò chuyện, mã nguồn hoặc dữ liệu cá nhân của bạn."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Quyền riêng tư"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Chia sẻ dữ liệu sử dụng ẩn danh"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Giá trị mặc định"
@@ -3794,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "Xuất phiên"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Mở trong cửa sổ mới"
   },
@@ -3898,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Đã nhân bản phiên làm việc \"{name}\" thành công"
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "Không thể xuất phiên làm việc: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Đã xuất phiên làm việc thành công"
@@ -4133,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Lưu"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Cũng ở"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (không dùng)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Tham số"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Đóng"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Tệp"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Không dùng"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} mới là bản đáp lại tên này"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Mở thư mục"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Nguồn gốc"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Đường dẫn"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Được tích hợp sẵn trong ứng dụng nên không thể sửa ở đây."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "Đến từ một plugin, nơi giữ bản gốc. Sửa ở đây chỉ có tác dụng đến lần cập nhật plugin kế tiếp."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Hủy"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Hướng dẫn"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "Tác nhân nên làm gì sau khi kỹ năng này được nạp"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "Kỹ năng là một tệp SKILL.md mà tác nhân nạp khi mô tả của nó khớp với công việc."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "Kỹ năng mới"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Mô tả"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "Khi nào tác nhân nên dùng đến kỹ năng này"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "Tác nhân dựa vào mô tả để quyết định có nạp kỹ năng hay không"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Sửa kỹ năng"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Tên chỉ được chứa chữ thường, chữ số và dấu gạch ngang"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Tên kỹ năng không được để trống"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Tên không được bắt đầu hoặc kết thúc bằng dấu gạch ngang"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Tên dài tối đa 64 ký tự"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "Tên"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "chu-thuong-co-gach-ngang"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Lưu"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Đang lưu..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Mọi nơi"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Nó nên nằm ở đâu?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "Chỉ dự án này"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Thêm kỹ năng"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Hãy thử điều chỉnh từ khóa tìm kiếm của bạn"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Sắp ra mắt"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Xóa “{name}”?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "Thao tác này xóa toàn bộ thư mục: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Không xóa được kỹ năng"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Xóa kỹ năng"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Đã xóa kỹ năng"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Sửa {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Lỗi khi tải kỹ năng"
@@ -4149,13 +4188,37 @@
     "defaultMessage": "Không tìm thấy kỹ năng phù hợp"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Kỹ năng được tải từ các tệp SKILL.md trong ~/.config/agents/skills/, .goose/skills/, hoặc các thư mục được hỗ trợ khác."
+    "defaultMessage": "Kỹ năng là các tệp SKILL.md. Của bạn nằm trong ~/.agents/skills, hoặc trong .agents/skills bên trong một dự án."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "Chưa cài đặt kỹ năng nào"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "dựng sẵn"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "toàn cục"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "dự án"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Xóa {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Đã lưu kỹ năng"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Đã lưu nhưng không được dùng: {path} đã đáp lại tên “{name}”"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Tìm kiếm kỹ năng..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "bị che"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "Xem các kỹ năng đã cài đặt giúp mở rộng khả năng của Goose. {shortcut} để tìm kiếm."
@@ -4598,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "Chỉnh sửa"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "Hình ảnh đính kèm:"
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "Chỉnh sửa tại chỗ"
   },
@@ -4633,38 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Tạo một phiên làm việc mới với tin nhắn đã chỉnh sửa"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "Xóa hình ảnh khỏi tin nhắn"
-  },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "Gần đây"
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "Chọn mô hình"
-  },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "Không còn được dùng — hãy sử dụng {replacement}."
-  },
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "Đã tìm thấy bộ điều hợp ACP"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "Không tìm thấy bộ điều hợp ACP"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "Đăng nhập qua CLI của nhà cung cấp, sau đó kiểm tra lại."
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "Kiểm tra lại"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "Đang kiểm tra..."
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "Kết nối thành công"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "Hãy kiểm tra kết nối tài khoản trước khi tiếp tục."
   }
 }

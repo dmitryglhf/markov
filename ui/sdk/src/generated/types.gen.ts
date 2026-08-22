@@ -2026,6 +2026,13 @@ export type ListSourcesRequest_unstable = {
      * project-scoped sources (e.g. skills stored under `{workingDir}/.agents/skills/`).
      */
     includeProjectSources?: boolean;
+    /**
+     * When true, keep every copy of a repeated name instead of only the one
+     * discovery would use. Skills are found across many roots and only the
+     * first of a name is ever loaded, so a manager needs the rest to explain
+     * why editing one of them changed nothing.
+     */
+    includeShadowed?: boolean;
 };
 
 export type ListSourcesResponse_unstable = {

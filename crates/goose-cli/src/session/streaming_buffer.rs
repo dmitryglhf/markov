@@ -1,9 +1,10 @@
 //! Streaming markdown buffer for safe incremental rendering.
 //!
 //! This module provides a buffer that accumulates streaming markdown chunks
-//! and determines safe points to flush content for rendering. It tracks
-//! open markdown constructs (code blocks, bold, links, etc.) to ensure
-//! we only output complete, well-formed markdown.
+//! and determines safe points to flush content for rendering. Content is
+//! released at line boundaries once no markdown construct (code block, bold,
+//! link, etc.) is left open: the renderer indents every line it prints, so a
+//! piece that started mid-line would wear that indent inside a word.
 //!
 //! # Example
 //!
@@ -12,9 +13,9 @@
 //!
 //! let mut buf = MarkdownBuffer::new();
 //!
-//! // Partial bold - buffers until closed
-//! assert_eq!(buf.push("Hello **wor"), Some("Hello ".to_string()));
-//! assert_eq!(buf.push("ld**!"), Some("**world**!".to_string()));
+//! // A line is held until its newline arrives
+//! assert_eq!(buf.push("Hello **wor"), None);
+//! assert_eq!(buf.push("ld**!\n"), Some("Hello **world**!\n".to_string()));
 //!
 //! // At end of stream, flush remaining content
 //! let remaining = buf.flush();
@@ -393,15 +394,12 @@ impl MarkdownBuffer {
             let line_end = remaining.find('\n').map(|i| pos + i + 1).unwrap_or(len);
             let line_content = &self.buffer[pos..line_end];
 
+            // inline tokens only advance the parse state; a safe cut is never
+            // placed inside a line, because every rendered piece gets the reply
+            // indent on its first line and a mid-line piece would wear it as a
+            // gap in the middle of a word
             for cap in INLINE_TOKEN_RE.find_iter(line_content) {
-                let token = cap.as_str();
-                let token_end = pos + cap.end();
-
-                self.process_inline_token(&mut state, token);
-
-                if state.is_clean() {
-                    last_safe = token_end;
-                }
+                self.process_inline_token(&mut state, cap.as_str());
             }
 
             if line_end <= len && line_end > pos && bytes[line_end - 1] == b'\n' {
@@ -611,23 +609,28 @@ mod tests {
 
     #[test_case(
         &["I'll", " help", " you", " with", " that", "!"],
-        &["I'll", " help", " you", " with", " that", "!"]
-        ; "simple sentence streams through immediately without markdown"
+        &["I'll help you with that!"]
+        ; "prose without a line break arrives whole at flush"
     )]
     #[test_case(
         &["Here's the **important", "** part."],
-        &["Here's the ", "**important** part."]
+        &["Here's the **important** part."]
         ; "bold split mid-word"
     )]
     #[test_case(
         &["Use the `println!", "` macro."],
-        &["Use the ", "`println!` macro."]
+        &["Use the `println!` macro."]
         ; "inline code split"
     )]
     #[test_case(
         &["Check [the docs](https://doc", "s.rs) for more."],
-        &["Check ", "[the docs](https://docs.rs) for more."]
+        &["Check [the docs](https://docs.rs) for more."]
         ; "link url split"
+    )]
+    #[test_case(
+        &["Привет! Ч", "ем помочь?\nЕщё ", "строка.\n"],
+        &["Привет! Чем помочь?\n", "Ещё строка.\n"]
+        ; "a delta boundary inside a word never cuts the line"
     )]
     fn test_inline_streaming(chunks: &[&str], expected: &[&str]) {
         assert_eq!(stream(chunks), expected);
@@ -644,7 +647,7 @@ mod tests {
     )]
     #[test_case(
         &["Here's an exa", "mple:\n\n```python\nprint(\"``", "`nested```\")\n```\n\nNice!"],
-        &["Here's an exa", "mple:\n", "\n```python\nprint(\"```nested```\")\n```\n\nNice!"]
+        &["Here's an example:\n", "\n```python\nprint(\"```nested```\")\n```\n\n", "Nice!"]
         ; "code block with backticks in string literal"
     )]
     #[test_case(
@@ -672,7 +675,7 @@ mod tests {
 
     #[test_case(
         &["# Getting St", "arted\n\nFirst, install..."],
-        &["# Getting Started\n\nFirst, install..."]
+        &["# Getting Started\n\n", "First, install..."]
         ; "heading split mid-word"
     )]
     #[test_case(
@@ -690,7 +693,7 @@ mod tests {
 
     #[test_case(
         &["| Name | Value |\n", "|------|-------|\n", "| foo  | 42    |\n", "\nMore text"],
-        &["| Name | Value |\n|------|-------|\n| foo  | 42    |\n\nMore text"]
+        &["| Name | Value |\n|------|-------|\n| foo  | 42    |\n\n", "More text"]
         ; "table streamed row by row"
     )]
     #[test_case(
@@ -717,10 +720,8 @@ mod tests {
         ],
         &[
             "Here's how to do it:\n\n",
-            "1. First, run ",
-            "`cargo build`\n",
-            "2. Then check the ",
-            "**output**\n\n",
+            "1. First, run `cargo build`\n",
+            "2. Then check the **output**\n\n",
             "```rust\nfn main() {}\n```\n"
         ]
         ; "typical assistant response with list code and formatting"
@@ -732,9 +733,9 @@ mod tests {
             "Key points:\n- Use `Result` for errors\n- Prefer `Option` over null"
         ],
         &[
-            "See the ",
-            "[**Rust Book**](https://doc.rust-lang.org/book/) for more info.\n\n",
-            "Key points:\n- Use `Result` for errors\n- Prefer `Option` over null"
+            "See the [**Rust Book**](https://doc.rust-lang.org/book/) for more info.\n\n",
+            "Key points:\n- Use `Result` for errors\n",
+            "- Prefer `Option` over null"
         ]
         ; "link with nested bold and list"
     )]
@@ -744,7 +745,8 @@ mod tests {
             "reen.png)\n\nAs shown above..."
         ],
         &[
-            "![screenshot](./img/screen.png)\n\nAs shown above..."
+            "![screenshot](./img/screen.png)\n\n",
+            "As shown above..."
         ]
         ; "image with split url"
     )]
@@ -763,8 +765,8 @@ mod tests {
     )]
     #[test_case(
         &["Price: $100 * 2 = $200"],
-        &["Price: $100 ", "* 2 = $200"]
-        ; "asterisk in math context treated as italic marker"
+        &["Price: $100 * 2 = $200"]
+        ; "asterisk in math context does not split the line"
     )]
     #[test_case(
         &[""],
@@ -788,7 +790,7 @@ mod tests {
     )]
     #[test_case(
         &["~~stri", "ke~~ and **bo", "ld**"],
-        &["~~strike~~ and ", "**bold**"]
+        &["~~strike~~ and **bold**"]
         ; "strikethrough and bold split"
     )]
     fn test_edge_cases(chunks: &[&str], expected: &[&str]) {
@@ -801,17 +803,17 @@ mod tests {
 
     #[test_case(
         &["This is **incomplete bold"],
-        &["This is ", "**incomplete bold"]
+        &["This is **incomplete bold"]
         ; "unclosed bold flushes"
     )]
     #[test_case(
         &["Check [broken link](http://"],
-        &["Check ", "[broken link](http://"]
+        &["Check [broken link](http://"]
         ; "unclosed link flushes"
     )]
     #[test_case(
         &["Start of `code"],
-        &["Start of ", "`code"]
+        &["Start of `code"]
         ; "unclosed inline code flushes"
     )]
     fn test_incomplete_constructs(chunks: &[&str], expected: &[&str]) {

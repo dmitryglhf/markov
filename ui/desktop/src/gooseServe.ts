@@ -33,8 +33,6 @@ export interface StartGooseServeOptions extends FindGooseBinaryOptions {
   serverSecret: string;
   tls?: boolean;
   env?: Record<string, string | undefined>;
-  /** PATH from the user's login shell, appended so goosed can find CLI providers. */
-  loginShellPath?: string | null;
   logger?: Logger;
   diagnosticsDir?: string;
   readinessFetch?: ReadinessFetch;
@@ -64,12 +62,12 @@ const existingFile = (candidate: string): boolean => {
 
 export const findGooseBinaryPath = (options: FindGooseBinaryOptions = {}): string => {
   const { isPackaged = false, resourcesPath } = options;
-  const pathFromEnv = process.env.GOOSE_BINARY;
+  // A packaged app ships its own binary and nobody develops against it, so a
+  // stray override must not keep it from starting. It reaches an installed app
+  // easily: `open` passes the calling shell's environment through, and our own
+  // ink TUI sets this variable for the processes it spawns.
+  const pathFromEnv = isPackaged ? undefined : process.env.GOOSE_BINARY;
   if (pathFromEnv) {
-    if (isPackaged) {
-      throw new Error('GOOSE_BINARY is only supported in development builds');
-    }
-
     const resolvedPath = path.resolve(pathFromEnv);
     if (existingFile(resolvedPath)) {
       return resolvedPath;
@@ -77,7 +75,7 @@ export const findGooseBinaryPath = (options: FindGooseBinaryOptions = {}): strin
     throw new Error(`Invalid GOOSE_BINARY path: ${pathFromEnv} (pwd is ${process.cwd()})`);
   }
 
-  const binaryName = process.platform === 'win32' ? 'goose.exe' : 'goose';
+  const binaryName = process.platform === 'win32' ? 'markov.exe' : 'markov';
   const possiblePaths: string[] = [];
 
   if (isPackaged && resourcesPath) {
@@ -137,10 +135,7 @@ const appendErrorTail = (target: string[], lines: string[], maxLines = 100): voi
 const CERT_FINGERPRINT_PREFIX = 'GOOSED_CERT_FINGERPRINT=';
 const TLS_FINGERPRINT_TIMEOUT_MS = 5000;
 
-const fetchStatus = async (
-  statusUrl: string,
-  readinessFetch: ReadinessFetch
-): Promise<boolean> => {
+const fetchStatus = async (statusUrl: string, readinessFetch: ReadinessFetch): Promise<boolean> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 1000);
 
@@ -290,8 +285,7 @@ const withStartupDiagnosticsPath = (
 const buildGooseServeEnv = (
   serverSecret: string,
   binaryPath: string,
-  additionalEnv: Record<string, string | undefined>,
-  loginShellPath?: string | null
+  additionalEnv: Record<string, string | undefined>
 ): Record<string, string | undefined> => {
   const homeDir = process.env.HOME || os.homedir();
   const pathKey = process.platform === 'win32' ? 'Path' : 'PATH';
@@ -300,9 +294,7 @@ const buildGooseServeEnv = (
   const env: Record<string, string | undefined> = {
     ...process.env,
     HOME: homeDir,
-    [pathKey]: [path.dirname(binaryPath), currentPath, loginShellPath]
-      .filter(Boolean)
-      .join(path.delimiter),
+    [pathKey]: `${path.dirname(binaryPath)}${path.delimiter}${currentPath}`,
   };
 
   if (process.platform === 'win32') {
@@ -327,7 +319,6 @@ export const startGooseServe = async ({
   serverSecret,
   tls = false,
   env: additionalEnv = {},
-  loginShellPath,
   isPackaged,
   resourcesPath,
   logger = defaultLogger,
@@ -345,6 +336,9 @@ export const startGooseServe = async ({
   }
 
   let goosePath: string;
+  if (isPackaged && process.env.GOOSE_BINARY) {
+    startupTrace?.record('binary_override_ignored', { path: process.env.GOOSE_BINARY });
+  }
   try {
     goosePath = findGooseBinaryPath({ isPackaged, resourcesPath });
   } catch (error) {
@@ -391,7 +385,7 @@ export const startGooseServe = async ({
   }
 
   const spawnOptions = {
-    env: buildGooseServeEnv(secretKey, goosePath, additionalEnv, loginShellPath),
+    env: buildGooseServeEnv(secretKey, goosePath, additionalEnv),
     cwd: workingDir,
     windowsHide: true,
     shell: false as const,

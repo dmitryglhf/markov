@@ -1,12 +1,20 @@
 mod builder;
+#[path = "../markov/repl/completion.rs"]
 mod completion;
 pub mod editor;
 mod elicitation;
+#[path = "../markov/repl/input.rs"]
 mod input;
+#[path = "../markov/repl/output.rs"]
 mod output;
 mod paste;
 pub mod streaming_buffer;
 mod task_execution_display;
+// Ours, kept out of this file so upstream's edits around it merge on their own.
+// `#[path]` moves the file, not the module: as a child of `session` it still
+// reaches the private fields and the render modules next door.
+#[path = "../markov/session_ext.rs"]
+mod session_ext;
 mod thinking;
 
 use crate::session::task_execution_display::{
@@ -19,6 +27,11 @@ use std::str::FromStr;
 use tokio::signal::ctrl_c;
 use tokio_util::task::AbortOnDropHandle;
 
+use crate::markov::hooks::hooks;
+use crate::markov::turn::{
+    merge_fetched_models, until_interrupted, wait_for_ctrl_c, SESSION_NAME_GRACE,
+};
+use crate::markov::types::{Current, ExtensionChange};
 pub use builder::{build_session, SessionBuilderConfig};
 use console::Color;
 use goose::agents::platform_extensions::developer::shell::{
@@ -42,6 +55,7 @@ use goose::agents::{
 };
 use goose::config::extensions::name_to_key;
 use goose::config::{Config, GooseMode};
+use goose::slash_commands::types::SlashCommandEntry;
 use input::InputResult;
 use rmcp::model::ServerNotification;
 use rmcp::model::{ElicitationAction, PromptMessage};
@@ -52,7 +66,7 @@ use goose::config::paths::Paths;
 use goose::config::providers;
 use goose::conversation::message::{ActionRequiredData, Message, MessageContent};
 use goose::providers::inventory::ProviderInventoryService;
-use goose::session::SessionManager;
+use goose::session::{SessionManager, SessionType};
 use rustyline::EditMode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -225,11 +239,14 @@ pub enum HintStatus {
 pub struct CompletionCache {
     pub prompts: HashMap<String, Vec<String>>,
     pub prompt_info: HashMap<String, output::PromptInfo>,
+    pub slash_commands: Vec<SlashCommandEntry>,
     pub provider_names: Vec<String>,
     pub provider_models: HashMap<String, Vec<String>>,
     pub current_session_provider: String,
     pub last_updated: Instant,
     pub hint_status: HintStatus,
+    pub context_tokens: usize,
+    pub context_limit: usize,
 }
 
 impl CompletionCache {
@@ -237,11 +254,14 @@ impl CompletionCache {
         Self {
             prompts: HashMap::new(),
             prompt_info: HashMap::new(),
+            slash_commands: Vec::new(),
             provider_names: Vec::new(),
             provider_models: HashMap::new(),
             current_session_provider: String::new(),
             last_updated: Instant::now(),
             hint_status: HintStatus::Default,
+            context_tokens: 0,
+            context_limit: 0,
         }
     }
 }
@@ -443,37 +463,6 @@ impl CliSession {
             .collect()
     }
 
-    async fn add_and_persist_extensions(&mut self, configs: Vec<ExtensionConfig>) -> Result<()> {
-        for config in configs {
-            self.agent
-                .add_extension(config, &self.session_id)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to start extension: {}", e))?;
-        }
-
-        self.invalidate_completion_cache().await;
-
-        Ok(())
-    }
-
-    pub async fn add_extension(&mut self, extension_command: String) -> Result<()> {
-        let config = Self::parse_stdio_extension(&extension_command)?;
-        self.add_and_persist_extensions(vec![config]).await
-    }
-
-    pub async fn add_streamable_http_extension(&mut self, extension_url: String) -> Result<()> {
-        let config = Self::parse_streamable_http_extension(
-            &extension_url,
-            goose::config::DEFAULT_EXTENSION_TIMEOUT,
-        );
-        self.add_and_persist_extensions(vec![config]).await
-    }
-
-    pub async fn add_builtin(&mut self, builtin_name: String) -> Result<()> {
-        let configs = Self::parse_builtin_extensions(&builtin_name);
-        self.add_and_persist_extensions(configs).await
-    }
-
     pub async fn list_prompts(
         &mut self,
         extension: Option<String>,
@@ -551,6 +540,10 @@ impl CliSession {
         let result = self.run_interactive(prompt).await;
 
         self.agent
+            .wait_for_pending_session_name(SESSION_NAME_GRACE)
+            .await;
+
+        self.agent
             .emit_hook(goose::hooks::HookEvent::SessionEnd, &self.session_id)
             .await;
 
@@ -560,6 +553,9 @@ impl CliSession {
                 console::style("●").red(),
                 console::style(format!("session closed · {}", &self.session_id)).dim()
             );
+            if let Some(command) = self.resume_command().await {
+                println!("    {}", console::style(command).dim());
+            }
         }
 
         result
@@ -579,7 +575,7 @@ impl CliSession {
         history_manager.load(&mut editor);
 
         loop {
-            self.display_context_usage().await?;
+            self.update_context_gauge().await?;
 
             let conversation_strings: Vec<String> = self
                 .messages
@@ -595,6 +591,9 @@ impl CliSession {
                 .collect();
 
             output::run_status_hook("waiting");
+            // one empty line before every prompt, so the input stands apart from
+            // whatever was printed before it, banner included
+            println!();
             let input = input::get_input(&mut editor, Some(&conversation_strings))?;
             if matches!(input, InputResult::Exit) {
                 break;
@@ -609,8 +608,10 @@ impl CliSession {
     fn create_editor(
         &self,
     ) -> Result<rustyline::Editor<GooseCompleter, rustyline::history::DefaultHistory>> {
-        let builder =
-            rustyline::Config::builder().completion_type(rustyline::CompletionType::Circular);
+        let builder = rustyline::Config::builder()
+            .completion_type(rustyline::CompletionType::List)
+            .completion_show_all_if_ambiguous(true)
+            .bell_style(rustyline::config::BellStyle::None);
         let builder = match self.edit_mode {
             Some(mode) => builder.edit_mode(mode),
             None => builder.edit_mode(EditMode::Emacs),
@@ -637,19 +638,13 @@ impl CliSession {
                 self.handle_message_input(&content, history, editor).await?;
             }
             InputResult::Exit => unreachable!("Exit is handled in the main loop"),
-            InputResult::AddExtension(cmd) => {
+            InputResult::Mcp => {
                 history.save(editor);
-                match self.add_extension(cmd.clone()).await {
-                    Ok(_) => output::render_extension_success(&cmd),
-                    Err(e) => output::render_extension_error(&cmd, &e.to_string()),
-                }
+                self.handle_mcp().await;
             }
-            InputResult::AddBuiltin(names) => {
+            InputResult::Extensions => {
                 history.save(editor);
-                match self.add_builtin(names.clone()).await {
-                    Ok(_) => output::render_builtin_success(&names),
-                    Err(e) => output::render_builtin_error(&names, &e.to_string()),
-                }
+                self.handle_extensions().await;
             }
             InputResult::ToggleTheme => {
                 history.save(editor);
@@ -731,7 +726,7 @@ impl CliSession {
                     None => {
                         output::render_error(
                             "No editor found. Set one with:\n  \
-                                 goose configure set goose_prompt_editor \"vim\"\n  \
+                                 markov configure set goose_prompt_editor \"vim\"\n  \
                                  or set $VISUAL or $EDITOR in your shell.",
                         );
                     }
@@ -741,9 +736,9 @@ impl CliSession {
                 history.save(editor);
                 self.handle_load_skills(&names).await?;
             }
-            InputResult::ListSkills => {
+            InputResult::Skills => {
                 history.save(editor);
-                self.handle_list_skills().await?;
+                self.handle_skills().await;
             }
         }
         Ok(())
@@ -762,8 +757,8 @@ impl CliSession {
 
                 let _provider = self.agent.provider().await?;
 
-                println!();
                 output::run_status_hook("thinking");
+                output::begin_answer();
                 output::show_thinking();
                 let start_time = Instant::now();
                 self.process_agent_response(true, CancellationToken::default())
@@ -829,7 +824,7 @@ impl CliSession {
             println!(
                 "{}",
                 console::style(
-                    "✓ Full tool output enabled - tool parameters will no longer be truncated"
+                    "✓ Full tool output enabled - every parameter and every line of output is shown"
                 )
                 .green()
             );
@@ -837,7 +832,7 @@ impl CliSession {
             println!(
                 "{}",
                 console::style(
-                    "✓ Full tool output disabled - tool parameters will be truncated to fit terminal width"
+                    "✓ Full tool output disabled - a call takes one line and its output another"
                 )
                 .dim()
             );
@@ -845,6 +840,11 @@ impl CliSession {
     }
 
     async fn handle_goose_mode(&self, mode: &str) -> Result<()> {
+        if mode.is_empty() {
+            output::render_mode_usage(self.agent.goose_mode().await);
+            return Ok(());
+        }
+
         let config = Config::global();
         let mode = match GooseMode::from_str(&mode.to_lowercase()) {
             Ok(mode) => mode,
@@ -862,7 +862,13 @@ impl CliSession {
         Ok(())
     }
 
+    /// Turns the written form of the command into a provider and a model. The
+    /// bare command has neither, so it asks the manager for both.
     async fn handle_model(&mut self, options: input::ModelCommandOptions) -> Result<()> {
+        if options.provider.is_none() && options.model.is_none() {
+            return self.handle_model_dialog().await;
+        }
+
         let provider = self.agent.provider().await?;
         let current_provider_name = provider.get_name().to_string();
         let current_model_config = self
@@ -870,15 +876,6 @@ impl CliSession {
             .model_config_for_session(&self.session_id)
             .await?;
         let current_model_name = current_model_config.model_name.clone();
-
-        if options.provider.is_none() && options.model.is_none() {
-            output::goose_mode_message(&format!(
-                "Current session model: '{}' (provider '{}')\n\
-                 Tip: use '/model <name>' to switch model, or '/model --provider <name> [model]' to switch provider.",
-                current_model_name, current_provider_name
-            ));
-            return Ok(());
-        }
 
         let requested_provider = options
             .provider
@@ -902,21 +899,6 @@ impl CliSession {
                 return Ok(());
             }
         };
-
-        if target_provider_name.ends_with("-acp") {
-            output::render_error(
-                "Session model switching is not supported for ACP providers in the CLI.",
-            );
-            return Ok(());
-        }
-
-        if provider.manages_own_context() {
-            output::render_error(&format!(
-                "Session model or provider switching is not supported for provider '{}' because it manages its own conversation context.",
-                current_provider_name
-            ));
-            return Ok(());
-        }
 
         if options
             .model
@@ -948,91 +930,8 @@ impl CliSession {
             }
         };
 
-        let new_model_config = build_switched_model_config(
-            target_provider_name,
-            &target_model_name,
-            &current_model_config,
-        )?;
-
-        let configured_effort = Config::global().get_goose_thinking_effort();
-        let new_effort = new_model_config.thinking_effort().or(configured_effort);
-        let current_effort = current_model_config.thinking_effort().or(configured_effort);
-        let provider_unchanged = target_provider_name == current_provider_name;
-        if provider_unchanged
-            && new_model_config.model_name == current_model_config.model_name
-            && new_effort == current_effort
-        {
-            output::goose_mode_message(&format!(
-                "Session already using model '{}' for provider '{}'",
-                current_model_name, current_provider_name
-            ));
-            return Ok(());
-        }
-
-        if let Some(model_info) = target_entry
-            .metadata()
-            .known_models
-            .iter()
-            .find(|m| m.name == target_model_name)
-        {
-            if model_info.context_limit < current_model_config.context_limit.unwrap_or(0) {
-                eprintln!(
-                    "{}",
-                    console::style(format!(
-                        "Warning: '{}' has a smaller context window ({} tokens) than the current session ({} tokens). \
-                        You may need to use /compact.",
-                        target_model_name,
-                        model_info.context_limit,
-                        current_model_config.context_limit.unwrap_or(0)
-                    ))
-                    .yellow()
-                );
-            }
-        }
-
-        let extensions = self.agent.get_extension_configs().await;
-        let new_provider = match goose::providers::create(target_provider_name, extensions).await {
-            Ok(p) => p,
-            Err(e) => {
-                output::render_error(&format!(
-                    "Cannot switch to provider '{}': {}\n\
-                         Set credentials via `goose configure` or the appropriate environment variable.\n\
-                         Session continues with current provider '{}'.",
-                    target_provider_name, e, current_provider_name
-                ));
-                return Ok(());
-            }
-        };
-
-        if new_provider.manages_own_context() {
-            output::render_error(&format!(
-                "Session provider switching is not supported for '{}' because it manages its own conversation context.",
-                target_provider_name
-            ));
-            return Ok(());
-        }
-
-        self.agent
-            .update_provider(new_provider, new_model_config, &self.session_id)
-            .await?;
-
-        let mode = self.agent.goose_mode().await;
-        self.agent.update_goose_mode(mode, &self.session_id).await?;
-
-        self.update_completion_cache().await?;
-
-        if provider_unchanged {
-            output::goose_mode_message(&format!(
-                "Session model switched from '{}' to '{}' for provider '{}'",
-                current_model_name, target_model_name, current_provider_name
-            ));
-        } else {
-            output::goose_mode_message(&format!(
-                "Session switched from provider '{}' / model '{}' to provider '{}' / model '{}'",
-                current_provider_name, current_model_name, target_provider_name, target_model_name
-            ));
-        }
-        Ok(())
+        self.apply_model_switch(target_provider_name, &target_model_name)
+            .await
     }
 
     async fn handle_plan_mode(&mut self, options: input::PlanCommandOptions) -> Result<()> {
@@ -1237,45 +1136,6 @@ impl CliSession {
         Ok(())
     }
 
-    async fn handle_list_skills(&mut self) -> Result<()> {
-        use comfy_table::{presets, Cell, ContentArrangement, Table};
-        use goose::custom_requests::SourceType;
-        use goose::skills::list_installed_skills;
-        let cwd = std::env::current_dir().unwrap_or_default();
-        let skills = list_installed_skills(Some(&cwd));
-
-        if skills.is_empty() {
-            println!("{}", console::style("No skills available.").yellow());
-            return Ok(());
-        }
-
-        let mut table = Table::new();
-        table.set_content_arrangement(ContentArrangement::Dynamic);
-        table.load_preset(presets::ASCII_FULL);
-        table.set_header(vec!["Skill", "Location", "Description"]);
-
-        let mut sorted_skills = skills;
-        sorted_skills.sort_by(|a, b| a.name.cmp(&b.name));
-
-        for skill in &sorted_skills {
-            let location = if skill.source_type == SourceType::BuiltinSkill {
-                "built-in"
-            } else if skill.global {
-                "global"
-            } else {
-                "project"
-            };
-            table.add_row(vec![
-                Cell::new(&skill.name),
-                Cell::new(location),
-                Cell::new(&skill.description),
-            ]);
-        }
-
-        println!("{table}");
-        Ok(())
-    }
-
     async fn handle_compact(&mut self) -> Result<()> {
         let provider = self.agent.provider().await?;
         if provider.manages_own_context() {
@@ -1319,7 +1179,7 @@ impl CliSession {
         let plan_prompt = self.agent.get_plan_prompt(&self.session_id).await?;
         let provider_messages = planner_provider_messages(&plan_messages);
         output::show_thinking();
-        let (plan_response, _usage) = goose::session_context::with_session_id(
+        let planner_call = goose::session_context::with_session_id(
             Some(self.session_id.clone()),
             reasoner.complete(
                 &model_config,
@@ -1327,26 +1187,39 @@ impl CliSession {
                 provider_messages.messages(),
                 &[],
             ),
-        )
-        .await?;
+        );
+        let Some(planned) = until_interrupted(planner_call, wait_for_ctrl_c()).await else {
+            output::hide_thinking();
+            output::render_plan_interrupted();
+            return Ok(());
+        };
+        let (plan_response, _usage) = planned?;
         let classifier_text = planner_classification_text(&plan_response);
         let plan_response = plan_response.user_visible_content();
-        output::render_message(&plan_response, self.debug);
         output::hide_thinking();
+        println!();
+        output::render_message(&plan_response, self.debug);
         let classifier_text = classifier_text?;
         anyhow::ensure!(
             !plan_response.content.is_empty(),
             "Planner returned no user-visible content"
         );
-        let planner_response_type = classify_planner_response(
+        let classifier_call = classify_planner_response(
             &self.session_id,
             classifier_text,
             self.agent.provider().await?,
             self.agent
                 .model_config_for_session(&self.session_id)
                 .await?,
-        )
-        .await?;
+        );
+        // the plan is already on screen, so an interrupt here keeps it in the
+        // conversation the same way declining it would
+        let Some(classified) = until_interrupted(classifier_call, wait_for_ctrl_c()).await else {
+            output::render_plan_interrupted();
+            self.push_message(plan_response);
+            return Ok(());
+        };
+        let planner_response_type = classified?;
 
         match planner_response_type {
             PlannerResponseType::Plan => {
@@ -1369,11 +1242,13 @@ impl CliSession {
                 if should_act {
                     output::render_act_on_plan();
                     self.run_mode = RunMode::Normal;
-                    // set goose mode: auto if that isn't already the case
-                    let config = Config::global();
-                    let curr_goose_mode = config.get_goose_mode().unwrap_or_default();
-                    if curr_goose_mode != GooseMode::Auto {
-                        config.set_goose_mode(GooseMode::Auto).unwrap();
+                    // acting needs tools to run unasked, but only for this
+                    // session; the global config must never see this switch
+                    let prior_mode = self.agent.goose_mode().await;
+                    if prior_mode != GooseMode::Auto {
+                        self.agent
+                            .update_goose_mode(GooseMode::Auto, &self.session_id)
+                            .await?;
                     }
 
                     // clear the messages before acting on the plan
@@ -1383,18 +1258,24 @@ impl CliSession {
                     self.push_message(plan_message);
                     // act on the plan
                     output::show_thinking();
-                    self.process_agent_response(true, CancellationToken::default())
-                        .await?;
+                    let acted = self
+                        .process_agent_response(true, CancellationToken::default())
+                        .await;
                     output::hide_thinking();
 
-                    // Reset run & goose mode
-                    if curr_goose_mode != GooseMode::Auto {
-                        config.set_goose_mode(curr_goose_mode)?;
+                    // restored before the ?, so a failed act cannot leave the
+                    // session in auto
+                    if prior_mode != GooseMode::Auto {
+                        self.agent
+                            .update_goose_mode(prior_mode, &self.session_id)
+                            .await?;
                     }
+                    acted?;
                 } else {
                     // add the plan response (assistant message) & carry the conversation forward
                     // in the next round, the user might wanna slightly modify the plan
                     self.push_message(plan_response);
+                    output::render_plan_kept();
                 }
             }
             PlannerResponseType::ClarifyingQuestions => {
@@ -1412,6 +1293,9 @@ impl CliSession {
         let message = Message::user().with_text(&prompt);
         let result = self
             .process_message(message, CancellationToken::default(), false)
+            .await;
+        self.agent
+            .wait_for_pending_session_name(SESSION_NAME_GRACE)
             .await;
         self.agent
             .emit_hook(goose::hooks::HookEvent::SessionEnd, &self.session_id)
@@ -1620,13 +1504,11 @@ impl CliSession {
                             handle_agent_error(&e, is_stream_json_mode);
                             cancel_token_clone.cancel();
                             drop(stream);
-                            if let Err(e) = self.handle_interrupted_messages(false).await {
-                                eprintln!("Error handling interruption: {}", e);
-                            } else if !is_stream_json_mode {
+                            if !is_stream_json_mode {
                                 output::render_error(
                                     "The error above was an exception we were not able to handle.\n\
-                                    These errors are often related to connection or authentication\n\
-                                    We've removed the conversation up to the most recent user message\n\
+                                    These errors are often related to connection or authentication.\n\
+                                    Your last request stays in the conversation, marked as unfinished\n\
                                     - depending on the error you may be able to continue",
                                 );
                             }
@@ -1637,9 +1519,12 @@ impl CliSession {
                 }
                 _ = cancel_token_clone.cancelled() => {
                     drop(stream);
-                    if let Err(e) = self.handle_interrupted_messages(true).await {
-                        eprintln!("Error handling interruption: {}", e);
+                    // Whatever the model had already written belongs above the
+                    // interruption notice, not under it.
+                    if !is_json_mode && !is_stream_json_mode {
+                        output::flush_markdown_buffer_current_theme(&mut markdown_buffer);
                     }
+                    self.mark_interrupted();
                     break;
                 }
             }
@@ -1725,89 +1610,11 @@ impl CliSession {
         Ok(())
     }
 
-    async fn handle_interrupted_messages(&mut self, interrupt: bool) -> Result<()> {
-        if interrupt {
-            let mut cache = self.completion_cache.write().unwrap();
-            cache.hint_status = HintStatus::Interrupted;
-        }
-
-        let tool_requests = self
-            .messages
-            .last()
-            .filter(|msg| msg.role == rmcp::model::Role::Assistant)
-            .map_or(Vec::new(), |msg| {
-                msg.content
-                    .iter()
-                    .filter_map(|content| {
-                        if let MessageContent::ToolRequest(req) = content {
-                            Some((req.id.clone(), req.tool_call.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            });
-
-        let interrupt_prompt = "Yes — what would you like me to do?";
-
-        if !tool_requests.is_empty() {
-            let mut response_message = Message::user();
-
-            let notification = if interrupt {
-                "Interrupted by the user to make a correction".to_string()
-            } else {
-                "An uncaught error happened during tool use".to_string()
-            };
-            for (req_id, _) in &tool_requests {
-                response_message.content.push(MessageContent::tool_response(
-                    req_id.clone(),
-                    Err(ErrorData {
-                        code: ErrorCode::INTERNAL_ERROR,
-                        message: std::borrow::Cow::from(notification.clone()),
-                        data: None,
-                    }),
-                ));
-            }
-            self.push_message(response_message);
-            self.push_message(Message::assistant().with_text(interrupt_prompt));
-            output::render_message(
-                &Message::assistant().with_text(interrupt_prompt),
-                self.debug,
-            );
-        } else {
-            while self.messages.last().is_some_and(Message::is_turn_context) {
-                self.messages.pop();
-            }
-            if let Some(last_msg) = self.messages.last() {
-                if last_msg.role == rmcp::model::Role::User {
-                    match last_msg.content.first() {
-                        Some(MessageContent::ToolResponse(_)) => {
-                            self.push_message(Message::assistant().with_text(interrupt_prompt));
-                            output::render_message(
-                                &Message::assistant().with_text(interrupt_prompt),
-                                self.debug,
-                            );
-                        }
-                        Some(_) => {
-                            self.messages.pop();
-                            let assistant_msg = Message::assistant().with_text(interrupt_prompt);
-                            self.push_message(assistant_msg.clone());
-                            output::render_message(&assistant_msg, self.debug);
-                        }
-                        None => {
-                            // Empty message content — nothing to do, just continue gracefully
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub async fn update_completion_cache(&mut self) -> Result<()> {
         let prompts = self.agent.list_extension_prompts(&self.session_id).await;
         let all_providers = goose::providers::providers().await;
-        let session_provider = self.agent.provider().await?.get_name().to_string();
+        let session_provider_handle = self.agent.provider().await?;
+        let session_provider = session_provider_handle.get_name().to_string();
 
         let provider_ids: Vec<String> = all_providers.iter().map(|(m, _)| m.name.clone()).collect();
         let inventory_models: HashMap<String, Vec<String>> = {
@@ -1836,9 +1643,12 @@ impl CliSession {
             })
             .collect();
 
+        let slash_commands = input::agent_slash_commands();
+
         let mut cache = self.completion_cache.write().unwrap();
         cache.prompts.clear();
         cache.prompt_info.clear();
+        cache.slash_commands = slash_commands;
 
         for (extension, prompt_list) in prompts {
             let names: Vec<String> = prompt_list.iter().map(|p| p.name.clone()).collect();
@@ -1858,7 +1668,7 @@ impl CliSession {
         }
 
         cache.provider_names = all_providers.iter().map(|(m, _)| m.name.clone()).collect();
-        cache.current_session_provider = session_provider;
+        cache.current_session_provider = session_provider.clone();
         cache.provider_models.clear();
         for (metadata, _) in &all_providers {
             let mut models: Vec<String> = metadata
@@ -1885,6 +1695,9 @@ impl CliSession {
         }
 
         cache.last_updated = Instant::now();
+        drop(cache);
+
+        self.refresh_provider_models(session_provider_handle, session_provider);
         Ok(())
     }
 
@@ -1916,6 +1729,10 @@ impl CliSession {
 
         // Render each message
         for message in &messages {
+            match message.role {
+                rmcp::model::Role::User => output::begin_user_message(),
+                rmcp::model::Role::Assistant => output::begin_answer(),
+            }
             output::render_message(message, self.debug);
         }
 
@@ -1933,49 +1750,6 @@ impl CliSession {
     pub async fn get_total_token_usage(&self) -> Result<Option<i32>> {
         let metadata = self.get_session().await?;
         Ok(metadata.accumulated_usage.total_tokens)
-    }
-
-    /// Display enhanced context usage with session totals
-    pub async fn display_context_usage(&self) -> Result<()> {
-        let provider = self.agent.provider().await?;
-        let model_config = self
-            .agent
-            .model_config_for_session(&self.session_id)
-            .await?;
-        let context_limit = provider
-            .get_context_limit(&model_config)
-            .await
-            .unwrap_or_else(|_| model_config.context_limit());
-
-        let config = Config::global();
-        let show_cost = config
-            .get_param::<bool>("GOOSE_CLI_SHOW_COST")
-            .unwrap_or(false);
-
-        let provider_name = config
-            .get_goose_provider()
-            .unwrap_or_else(|_| "unknown".to_string());
-
-        match self.get_session().await {
-            Ok(metadata) => {
-                let total_tokens = metadata.usage.total_tokens.unwrap_or(0) as usize;
-
-                output::display_context_usage(total_tokens, context_limit);
-
-                if show_cost {
-                    output::display_cost_usage(
-                        &provider_name,
-                        &model_config.model_name,
-                        &metadata.usage,
-                    );
-                }
-            }
-            Err(_) => {
-                output::display_context_usage(0, context_limit);
-            }
-        }
-
-        Ok(())
     }
 
     /// Handle prompt command execution
@@ -2260,7 +2034,7 @@ fn prompt_tool_confirmation(security_prompt: &Option<String>) -> Result<Permissi
         println!("\n{}", security_message);
         "Do you allow this tool call?".to_string()
     } else {
-        "Goose would like to call the above tool, do you allow?".to_string()
+        "Markov would like to call the above tool, do you allow?".to_string()
     };
 
     let permission_result = if security_prompt.is_none() {
@@ -2377,6 +2151,7 @@ fn handle_mcp_notification(
                         if !is_json_mode {
                             output::render_subagent_tool_call(
                                 subagent_id,
+                                obj.get("label").and_then(|v| v.as_str()),
                                 tool_name,
                                 arguments.as_ref(),
                                 debug,
@@ -2693,20 +2468,18 @@ async fn get_reasoner(
     let provider = if let Ok(provider) = config.get_param::<String>("GOOSE_PLANNER_PROVIDER") {
         provider
     } else {
-        println!("WARNING: GOOSE_PLANNER_PROVIDER not found. Using default provider...");
         config
             .get_goose_provider()
-            .expect("No provider configured. Run 'goose configure' first")
+            .expect("No provider configured. Run 'markov configure' first")
     };
 
     // Try planner-specific model first, fall back to default model
     let model = if let Ok(model) = config.get_param::<String>("GOOSE_PLANNER_MODEL") {
         model
     } else {
-        println!("WARNING: GOOSE_PLANNER_MODEL not found. Using default model...");
         config
             .get_goose_model()
-            .expect("No model configured. Run 'goose configure' first")
+            .expect("No model configured. Run 'markov configure' first")
     };
 
     let planner_context_limit = match env::var(GOOSE_PLANNER_CONTEXT_LIMIT)
@@ -2742,11 +2515,12 @@ fn format_elapsed_time(duration: std::time::Duration) -> String {
 }
 
 fn build_switched_model_config(
+    config: &Config,
     provider_name: &str,
     model_name: &str,
     current_model_config: &goose_providers::model::ModelConfig,
 ) -> Result<goose_providers::model::ModelConfig> {
-    goose::model_config::model_config_from_user_config(provider_name, model_name)
+    goose::model_config::model_config_from_user_config_with(config, provider_name, model_name)
         .map(|config| {
             config
                 .with_temperature(current_model_config.temperature)
@@ -2764,6 +2538,14 @@ mod tests {
     use std::collections::HashMap;
     use std::time::Duration;
     use test_case::test_case;
+
+    /// Model resolution reads a configuration file, and a test that read the
+    /// developer's own would depend on whatever they happened to have set.
+    fn empty_config() -> (tempfile::TempDir, Config) {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config::new(dir.path().join("config.yaml"), "markov-test").unwrap();
+        (dir, config)
+    }
 
     #[test]
     fn planner_classification_excludes_user_only_content() {
@@ -2988,8 +2770,10 @@ mod tests {
             request_headers: None,
         };
 
+        let (_config_dir, config) = empty_config();
         let switched =
-            build_switched_model_config("openai", "gpt-5.4", &current_model_config).unwrap();
+            build_switched_model_config(&config, "openai", "gpt-5.4", &current_model_config)
+                .unwrap();
         let expected = goose_providers::model::ModelConfig::new("gpt-5.4")
             .with_canonical_limits("openai")
             .with_temperature(Some(0.25))
@@ -3025,7 +2809,8 @@ mod tests {
             Some(goose_providers::thinking::ThinkingEffort::High)
         );
 
-        let switched = build_switched_model_config("openai", "gpt-5.4", &current).unwrap();
+        let (_config_dir, config) = empty_config();
+        let switched = build_switched_model_config(&config, "openai", "gpt-5.4", &current).unwrap();
 
         assert_eq!(switched.model_name, current.model_name);
         assert_ne!(switched.thinking_effort(), current.thinking_effort());

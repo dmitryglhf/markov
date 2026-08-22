@@ -127,7 +127,6 @@ const CodeBlock = memo(function CodeBlock({
         language={language}
         PreTag="div"
         customStyle={{
-          background: 'var(--code-block-background, #282c34)',
           margin: 0,
           width: '100%',
           maxWidth: '100%',
@@ -302,7 +301,9 @@ const MarkdownContent = memo(function MarkdownContent({
       <ConfirmationModal
         isOpen={pendingLink !== null}
         title={intl.formatMessage(i18n.openExternalLink)}
-        message={intl.formatMessage(i18n.openProtocolLink, { protocol: pendingLink?.protocol ?? '' })}
+        message={intl.formatMessage(i18n.openProtocolLink, {
+          protocol: pendingLink?.protocol ?? '',
+        })}
         detail={intl.formatMessage(i18n.thisWillOpen, { href: pendingLink?.href ?? '' })}
         onConfirm={handleConfirmOpen}
         onCancel={handleCancelOpen}

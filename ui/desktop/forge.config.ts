@@ -6,7 +6,7 @@ const isLinuxVulkanBuild = process.env.GOOSE_DESKTOP_LINUX_VARIANT === 'vulkan';
 
 let cfg = {
   asar: true,
-  extraResource: ['src/bin', 'src/images', 'src/app-update.yml'],
+  extraResource: ['src/bin', 'src/images', 'src/app-update.yml', '../../LICENSE', '../../NOTICE'],
   icon: 'src/images/icon',
   // Windows specific configuration
   win32: {
@@ -16,13 +16,6 @@ let cfg = {
     rfc3161TimeStampServer: 'http://timestamp.digicert.com',
     signWithParams: '/fd sha256 /tr http://timestamp.digicert.com /td sha256',
   },
-  // Protocol registration
-  protocols: [
-    {
-      name: 'GooseProtocol',
-      schemes: ['goose'],
-    },
-  ],
   // macOS Info.plist extensions for drag-and-drop support
   extendInfo: {
     // Document types for drag-and-drop support onto dock icon
@@ -36,9 +29,9 @@ let cfg = {
     ],
     // Usage descriptions for macOS TCC (Transparency, Consent, and Control)
     NSMicrophoneUsageDescription:
-      'Goose needs access to your microphone for voice dictation.',
+      'Markov needs access to your microphone for voice dictation.',
     NSAppleEventsUsageDescription:
-      'Goose needs access to send Apple Events to control other apps on your behalf.',
+      'Markov needs access to send Apple Events to control other apps on your behalf.',
   },
 };
 
@@ -57,9 +50,40 @@ if (process.env.APPLE_TEAM_ID) {
   };
 }
 
+/**
+ * Packaging renames the app and rewrites Info.plist, which voids the signature
+ * Electron shipped with — `codesign -vv` then reports an invalid bundle. The
+ * fuses plugin re-signs only the executable, and osxSign with an ad-hoc identity
+ * leaves the nested Electron Framework on its old signature, which dyld refuses
+ * to load. Re-sealing the whole bundle inside-out is what actually holds.
+ *
+ * This is not a substitute for notarization: recipients still clear quarantine.
+ */
+const adHocSignBundle = async (
+  _forgeConfig: unknown,
+  options: { outputPaths: string[] }
+): Promise<void> => {
+  if (process.platform !== 'darwin' || process.env.APPLE_TEAM_ID) {
+    return;
+  }
+
+  const { execFileSync } = require('child_process');
+  const { readdirSync } = require('fs');
+  for (const outputPath of options.outputPaths) {
+    for (const entry of readdirSync(outputPath).filter((name: string) => name.endsWith('.app'))) {
+      execFileSync('codesign', ['--force', '--deep', '--sign', '-', resolve(outputPath, entry)], {
+        stdio: 'inherit',
+      });
+    }
+  }
+};
+
 module.exports = {
   packagerConfig: cfg,
   rebuildConfig: {},
+  hooks: {
+    postPackage: adHocSignBundle,
+  },
   publishers: [
     {
       name: '@electron-forge/publisher-github',
@@ -87,10 +111,10 @@ module.exports = {
     {
       name: '@electron-forge/maker-deb',
       config: {
-        name: 'Goose',
-        bin: 'Goose',
-        maintainer: 'AAIF (Agentic AI Foundation)',
-        homepage: 'https://goose-docs.ai/',
+        name: 'Markov',
+        bin: 'Markov',
+        maintainer: 'Postgres Professional',
+        homepage: 'https://postgrespro.ru/',
         categories: ['Development'],
         desktopTemplate: './forge.deb.desktop',
         options: {
@@ -103,10 +127,10 @@ module.exports = {
     {
       name: '@electron-forge/maker-rpm',
       config: {
-        name: 'Goose',
-        bin: 'Goose',
-        maintainer: 'AAIF (Agentic AI Foundation)',
-        homepage: 'https://goose-docs.ai/',
+        name: 'Markov',
+        bin: 'Markov',
+        maintainer: 'Postgres Professional',
+        homepage: 'https://postgrespro.ru/',
         categories: ['Development'],
         desktopTemplate: './forge.rpm.desktop',
         options: {
@@ -120,17 +144,16 @@ module.exports = {
       name: '@electron-forge/maker-flatpak',
       config: {
         options: {
-          id: 'io.github.block.Goose', // NOTE: kept for backwards compat with existing installs
+          id: 'ru.postgrespro.Markov',
           categories: ['Development'],
-          mimeType: ['x-scheme-handler/goose'],
           icon: {
             scalable: 'src/images/icon.svg',
             '512x512': 'src/images/icon-512.png',
           },
-          homepage: 'https://goose-docs.ai/',
+          homepage: 'https://postgrespro.ru/',
           runtimeVersion: '25.08',
           baseVersion: '25.08',
-          bin: 'Goose',
+          bin: 'Markov',
           modules: [
             {
               name: 'libbz2-shim',

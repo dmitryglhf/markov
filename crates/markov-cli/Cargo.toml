@@ -1,0 +1,76 @@
+[package]
+name = "markov-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "markov"
+path = "src/main.rs"
+
+[dependencies]
+goose-cli = { path = "../goose-cli", default-features = false }
+goose = { path = "../goose", default-features = false }
+goose-mcp = { path = "../goose-mcp", default-features = false }
+goose-providers = { path = "../goose-providers", default-features = false }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+cliclack = { version = "0.5", default-features = false }
+console = { version = "0.16", default-features = false, features = ["std"] }
+etcetera = { workspace = true }
+futures = { workspace = true }
+jsonc-parser = { version = "0.27.1", features = ["cst", "serde"] }
+serde = { workspace = true }
+tokio = { workspace = true }
+serde_json.workspace = true
+tempfile.workspace = true
+url.workspace = true
+reqwest = { workspace = true, features = ["stream"] }
+chrono.workspace = true
+
+[features]
+# Forwarded to goose-cli: this crate owns the binary, so the build flags land here.
+#
+# THIS LIST IS THE SHIPPED PRODUCT. goose-cli is pulled with
+# default-features = false above, so nothing reaches the binary except what is
+# named here — local builds, CI and release artefacts all read this one place
+# and pass no --features of their own.
+#
+# Dropped from upstream's list: telemetry and nostr (they phone home),
+# system-keyring (ad-hoc signing changes identity every build, so the keychain
+# re-asks and the prompt reads as a hang), local-inference (only adds a fourth
+# dictation provider, at the price of llama.cpp and cmake), aws-providers
+# (nobody uses Bedrock), tui (launches the npm package upstream deprecated in
+# 1.46). Every one of them stays available below to opt into.
+default = ["rustls-tls", "otel", "update", "disable-update"]
+# Off by default and no longer wired for us: the `vendor/v8` shim that pointed
+# `v8` at the CRT-patched v8-goose fork is gone, so enabling this now resolves
+# v8 straight from crates.io. Untested here — treat as opt-in at your own risk,
+# and prefer wiring code execution as an MCP server instead.
+code-mode = ["goose-cli/code-mode"]
+local-inference = ["goose-cli/local-inference"]
+aws-providers = ["goose-cli/aws-providers"]
+cuda = ["goose-cli/cuda"]
+vulkan = ["goose-cli/vulkan"]
+mlx = ["goose-cli/mlx"]
+telemetry = ["goose-cli/telemetry"]
+nostr = ["goose-cli/nostr"]
+otel = ["goose-cli/otel"]
+system-keyring = ["goose-cli/system-keyring"]
+tui = ["goose-cli/tui"]
+update = ["goose-cli/update"]
+disable-update = ["goose-cli/disable-update"]
+portable-default = ["goose-cli/portable-default"]
+rustls-tls = ["goose-cli/rustls-tls"]
+native-tls = ["goose-cli/native-tls"]
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,14 +1,20 @@
 import { useEffect, useState, useRef } from 'react';
 import { IpcRendererEvent } from 'electron';
-import { HashRouter, Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router';
+import {
+  HashRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  useSearchParams,
+} from 'react-router-dom';
 import { importNostrSessionFromDeepLink } from './sessionLinks';
 import { ErrorUI } from './components/ErrorBoundary';
 import { ExtensionInstallModal } from './components/ExtensionInstallModal';
 import RecipeParamsModalContainer from './components/RecipeParamsModalContainer';
-import { isRecipeParamsCancelled, isRecipeParameterScopesUnsupported } from './acp/errors';
+import { isRecipeParamsCancelled } from './acp/errors';
 import { toast, ToastContainer } from 'react-toastify';
 import AnnouncementModal from './components/AnnouncementModal';
-import TelemetryConsentPrompt from './components/TelemetryConsentPrompt';
 import OnboardingGuard from './components/onboarding/OnboardingGuard';
 import { createSession } from './sessions';
 import { acpListSessions, acpDeleteSession } from './acp/sessions';
@@ -74,7 +80,7 @@ export function resolveSessionInitialMessage(
   );
 }
 
-export const PairRouteWrapper = ({
+const PairRouteWrapper = ({
   activeSessions,
 }: {
   activeSessions: Array<{
@@ -134,11 +140,6 @@ export const PairRouteWrapper = ({
           });
         } catch (error) {
           if (isRecipeParamsCancelled(error)) {
-            navigate('/');
-            return;
-          }
-          if (isRecipeParameterScopesUnsupported(error)) {
-            toast.error(error.message);
             navigate('/');
             return;
           }
@@ -683,7 +684,6 @@ export default function App() {
             <AppInner />
           </HashRouter>
           <AnnouncementModal />
-          <TelemetryConsentPrompt />
         </ModelAndProviderProvider>
       </FeaturesProvider>
     </ThemeProvider>

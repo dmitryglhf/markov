@@ -218,7 +218,7 @@ pub async fn handle_term_init(
 
     let goose_bin = std::env::current_exe()
         .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| "goose".to_string());
+        .unwrap_or_else(|_| "markov".to_string());
 
     println!(
         "{}",
@@ -230,7 +230,7 @@ pub async fn handle_term_init(
 pub async fn handle_term_log(command: String) -> Result<()> {
     let session_id = std::env::var("AGENT_SESSION_ID").map_err(|_| {
         anyhow!(
-            "AGENT_SESSION_ID not set. Initialize terminal integration with `goose term init <shell>` and reload your shell first."
+            "AGENT_SESSION_ID not set. Initialize terminal integration with `markov term init <shell>` and reload your shell first."
         )
     })?;
 

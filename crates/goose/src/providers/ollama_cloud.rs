@@ -267,7 +267,7 @@ impl ProviderDef for OllamaCloudProvider {
         Box::pin(async {
             anyhow::bail!(
                 "Ollama Cloud must be configured as a declarative provider. \
-                 Run `goose configure` to set it up."
+                 Run `markov configure` to set it up."
             )
         })
     }

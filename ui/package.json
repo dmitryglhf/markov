@@ -1,11 +1,6 @@
 {
   "private": true,
-  "workspaces": [
-    "acp",
-    "text",
-    "desktop",
-    "goose-binary/*"
-  ],
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "changeset": "changeset",
     "version": "changeset version",

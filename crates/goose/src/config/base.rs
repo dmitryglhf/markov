@@ -17,6 +17,12 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 fn write_secrets_file(path: &Path, content: &str) -> std::io::Result<()> {
+    // On a first run the config directory does not exist yet, and the provider
+    // secret is the first thing anyone writes into it.
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
     #[cfg(unix)]
     {
         use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
@@ -2095,6 +2101,23 @@ mod tests {
         assert_eq!(value, "value");
         let mode = std::fs::metadata(&secrets_path)?.permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+
+        Ok(())
+    }
+
+    /// The very first `configure` run stores a provider key before anything has
+    /// created the config directory, and the open used to fail with ENOENT.
+    #[test]
+    fn a_secret_can_be_stored_before_the_config_directory_exists() -> Result<(), ConfigError> {
+        let dir = TempDir::new().unwrap();
+        let config_file = NamedTempFile::new().unwrap();
+        let secrets_path = dir.path().join("not-there-yet").join("secrets.yaml");
+
+        let config = Config::new_with_file_secrets(config_file.path(), &secrets_path)?;
+        config.set_secret("PGPRO_API_KEY", &"value")?;
+
+        let stored: String = config.get_secret("PGPRO_API_KEY")?;
+        assert_eq!(stored, "value");
 
         Ok(())
     }

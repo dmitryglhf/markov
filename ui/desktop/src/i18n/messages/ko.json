@@ -134,9 +134,6 @@
   "baseChat.reconnecting": {
     "defaultMessage": "연결이 끊어졌습니다. 다시 연결하는 중…"
   },
-  "baseChat.retry": {
-    "defaultMessage": "다시 시도"
-  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "익스텐션이 업데이트되었습니다."
   },
@@ -932,18 +929,6 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "최근 디렉터리"
   },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "{branch} 브랜치로 전환하지 못했습니다"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "브랜치를 찾을 수 없습니다"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "브랜치 검색…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "커밋되지 않은 변경 사항이 있을 수 있습니다."
-  },
   "elicitationRequest.accept": {
     "defaultMessage": "수락"
   },
@@ -1240,15 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "다른 곳에서 실행 중인 ACP 호환 백엔드에 연결합니다."
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "원격 작업 디렉터리(선택 사항)"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "외부 백엔드의 절대 경로입니다. 비워 두면 로컬 작업 디렉터리를 전송합니다."
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "닫기"
@@ -2384,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "채팅"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "생성됨"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "디렉터리"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "모델"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "상태"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "업데이트됨"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "최근 채팅 없음"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "오류"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "유휴"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "스트리밍"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "읽지 않은 활동"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "제목 없는 세션"
@@ -2421,7 +2370,7 @@
     "defaultMessage": "서버가 시작 중이거나 일시적으로 사용할 수 없습니다."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "goose 서버에 접속할 수 없습니다"
+    "defaultMessage": "Markov 서버에 접속할 수 없습니다"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "다시 시도"
@@ -2430,10 +2379,10 @@
     "defaultMessage": "로컬 AI 에이전트입니다. 시작하려면 AI 모델 제공업체를 연결하세요."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "goose에 오신 것을 환영합니다"
+    "defaultMessage": "Markov에 오신 것을 환영합니다"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "goose를 사용할 준비가 모두 완료되었습니다."
+    "defaultMessage": "Markov를 사용할 준비가 모두 완료되었습니다."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "{providerName}에 연결됨"
@@ -2441,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "시작하기"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "자세히 알아보기"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "로컬 모델 준비됨"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "익명의 사용 데이터는 goose 개선에 도움이 됩니다. 대화, 코드 또는 개인 데이터는 수집하지 않습니다."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "개인정보 보호"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "익명의 사용 데이터 공유"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "기본값"
@@ -3794,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "세션 내보내기"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "새 창에서 열기"
   },
@@ -3898,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "세션 \"{name}\"이(가) 성공적으로 복제되었습니다."
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "세션 내보내기 실패: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "세션을 성공적으로 내보냈습니다."
@@ -4133,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "저장"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "다른 위치"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path}(사용 안 함)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "인자"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "닫기"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "파일"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "사용 안 함"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "이 이름에는 {path}가 응답합니다"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "폴더 열기"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "출처"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "경로"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "앱에 내장되어 있어 여기서는 바꿀 수 없습니다."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "플러그인에서 온 것으로 원본은 그쪽에 있습니다. 여기서 수정해도 플러그인이 업데이트될 때까지만 유지됩니다."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "취소"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "지침"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "이 스킬을 불러온 뒤 에이전트가 할 일"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "스킬은 SKILL.md 파일이며, 설명이 작업과 맞을 때 에이전트가 불러옵니다."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "새 스킬"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "설명"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "에이전트가 이 스킬을 써야 할 때"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "에이전트는 설명을 보고 스킬을 불러올지 정합니다"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "스킬 편집"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "이름에는 소문자, 숫자, 하이픈만 쓸 수 있습니다"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "스킬 이름은 비워 둘 수 없습니다"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "이름은 하이픈으로 시작하거나 끝날 수 없습니다"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "이름은 최대 64자여야 합니다"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "이름"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "소문자와-하이픈"
+  },
+  "skillForm.save": {
+    "defaultMessage": "저장"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "저장 중..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "어디에서나"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "어디에 둘까요?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "이 프로젝트에만"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "스킬 추가"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "검색어를 조정해 보세요."
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "곧 출시 예정"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "“{name}”을(를) 삭제할까요?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "디렉터리 전체가 지워집니다: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "스킬을 삭제하지 못했습니다"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "스킬 삭제"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "스킬을 삭제했습니다"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} 편집"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "스킬 로딩 오류"
@@ -4149,13 +4188,37 @@
     "defaultMessage": "일치하는 스킬을 찾을 수 없습니다."
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "스킬은 ~/.config/agents/skills/, .goose/skills/ 또는 기타 지원되는 디렉터리의 SKILL.md 파일에서 로드됩니다."
+    "defaultMessage": "스킬은 SKILL.md 파일입니다. 내 스킬은 ~/.agents/skills 또는 프로젝트 안의 .agents/skills에 있습니다."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "설치된 스킬 없음"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "내장"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "전역"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "플러그인"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "프로젝트"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} 제거"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "스킬을 저장했습니다"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "저장했지만 사용되지 않습니다: “{name}”에는 이미 {path}가 응답합니다"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "스킬 검색..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "가려짐"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "goose 기능을 확장하는 스킬을 확인하세요. {shortcut}로 검색할 수 있습니다."
@@ -4598,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "편집"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "첨부된 이미지:"
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "바로 편집"
   },
@@ -4633,38 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "편집한 메시지로 새 세션 만들기"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "메시지에서 이미지 제거"
-  },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "최근"
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "모델 선택"
-  },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "더 이상 사용되지 않습니다. 대신 {replacement}을(를) 사용하세요."
-  },
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "ACP 어댑터를 찾았습니다"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "ACP 어댑터를 찾을 수 없습니다"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "제공업체 CLI에서 로그인한 후 다시 확인하세요."
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "다시 확인"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "확인 중..."
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "연결되었습니다"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "계속하기 전에 계정 연결을 확인하세요."
   }
 }

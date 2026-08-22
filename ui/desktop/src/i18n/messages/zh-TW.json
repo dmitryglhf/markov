@@ -134,9 +134,6 @@
   "baseChat.reconnecting": {
     "defaultMessage": "連線已中斷。正在重新連線…"
   },
-  "baseChat.retry": {
-    "defaultMessage": "重試"
-  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "擴充功能已更新"
   },
@@ -932,18 +929,6 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "最近的目錄"
   },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "無法切換至 {branch}"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "找不到分支"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "搜尋分支…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "你可能有尚未提交的變更。"
-  },
   "elicitationRequest.accept": {
     "defaultMessage": "接受"
   },
@@ -1240,15 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "連線至在其他位置執行的 goose 伺服器（需要重新啟動應用程式）"
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "遠端工作目錄（選用）"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "外部後端上的絕對路徑。留空時將傳送本機工作目錄。"
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "關閉"
@@ -2384,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "交談"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "建立時間"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "目錄"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "模型"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "狀態"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "更新時間"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "沒有最近的交談"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "錯誤"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "閒置"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "串流"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "未讀活動"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "未命名工作階段"
@@ -2421,7 +2370,7 @@
     "defaultMessage": "伺服器可能正在啟動或暫時無法使用。"
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "無法連線到 Goose 伺服器"
+    "defaultMessage": "無法連線到 Markov 伺服器"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "重試"
@@ -2430,10 +2379,10 @@
     "defaultMessage": "您的本機 AI 代理。連線 AI 模型供應商即可開始使用。"
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "歡迎使用 goose"
+    "defaultMessage": "歡迎使用 Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "一切就緒，您可以開始使用 goose 了。"
+    "defaultMessage": "一切就緒，您可以開始使用 Markov 了。"
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "已連線到 {providerName}"
@@ -2441,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "開始使用"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "瞭解更多"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "本機模型已就緒"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "匿名使用資料有助於改善 goose。我們絕不會收集您的對話、程式碼或個人資料。"
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "隱私權"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "分享匿名使用資料"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "預設值"
@@ -3794,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "匯出工作階段"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "在新視窗中開啟"
   },
@@ -3898,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "已成功複製工作階段「{name}」"
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "無法匯出工作階段：{error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "已成功匯出工作階段"
@@ -4133,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "儲存"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "另有副本"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path}（未使用）"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "參數"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "關閉"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "檔案"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "未使用"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "回應這個名稱的是 {path}"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "開啟資料夾"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "來源"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "路徑"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "它內建於應用程式中，因此無法在此修改。"
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "它來自外掛，原件保存在外掛裡。在此修改只能維持到外掛下次更新。"
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "取消"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "說明"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "載入這個技能後，代理人應該做什麼"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "技能是一個 SKILL.md 檔案，當它的描述符合任務時，代理人就會載入。"
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "新增技能"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "描述"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "代理人何時該使用這個技能"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "代理人正是依據描述來決定是否載入技能"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "編輯技能"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "名稱只能包含小寫字母、數字與連字號"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "技能名稱不能空白"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "名稱不可以連字號開頭或結尾"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "名稱最多 64 個字元"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "名稱"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "小寫字母-加連字號"
+  },
+  "skillForm.save": {
+    "defaultMessage": "儲存"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "儲存中..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "所有專案"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "它該放在哪裡？"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "僅限本專案"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "新增技能"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "請嘗試調整您的搜尋字詞"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "即將推出"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "刪除「{name}」？"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "這會刪除整個目錄：{path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "刪除技能失敗"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "刪除技能"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "技能已刪除"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "編輯 {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "載入技能時發生錯誤"
@@ -4149,13 +4188,37 @@
     "defaultMessage": "找不到符合的技能"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "技能會從 ~/.config/agents/skills/、.goose/skills/ 或其他支援目錄中的 SKILL.md 檔案載入。"
+    "defaultMessage": "技能就是 SKILL.md 檔案。你自己的技能位於 ~/.agents/skills，或專案內的 .agents/skills。"
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "未安裝任何技能"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "內建"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "全域"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "外掛"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "專案"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "移除 {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "技能已儲存"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "已儲存，但不會被使用：{path} 已經回應「{name}」"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "搜尋技能..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "被遮蔽"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "檢視可擴充 Goose 功能的已安裝技能。{shortcut} 即可搜尋。"
@@ -4598,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "編輯"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "附加圖片："
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "就地編輯"
   },
@@ -4633,38 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "以編輯後的訊息建立新的工作階段"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "從訊息中移除圖片"
-  },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "最近"
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "選擇模型"
-  },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "已棄用 — 請改用 {replacement}。"
-  },
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "已找到 ACP 轉接器"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "找不到 ACP 轉接器"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "請透過提供者 CLI 登入，然後再次檢查。"
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "再次檢查"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "正在檢查…"
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "連線成功"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "請先檢查帳戶連線，然後再繼續。"
   }
 }

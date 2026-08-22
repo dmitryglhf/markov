@@ -134,9 +134,6 @@
   "baseChat.reconnecting": {
     "defaultMessage": "कनेक्शन टूट गया। फिर से कनेक्ट किया जा रहा है…"
   },
-  "baseChat.retry": {
-    "defaultMessage": "पुनः प्रयास करें"
-  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "एक्सटेंशन अपडेट किया गया"
   },
@@ -932,18 +929,6 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "हाल की निर्देशिकाएँ"
   },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "{branch} पर स्विच नहीं किया जा सका"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "कोई ब्रांच नहीं मिली"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "ब्रांच खोजें…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "आपके कुछ बदलाव कमिट नहीं हुए हो सकते हैं।"
-  },
   "elicitationRequest.accept": {
     "defaultMessage": "स्वीकार करो"
   },
@@ -1240,15 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "कहीं और चल रहे goose सर्वर से कनेक्ट करें (ऐप पुनरारंभ की आवश्यकता है)"
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "रिमोट कार्य निर्देशिका (वैकल्पिक)"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "बाहरी बैकएंड पर पूर्ण पथ। स्थानीय कार्य निर्देशिका भेजने के लिए खाली छोड़ दें।"
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "बंद करें"
@@ -2384,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "चैट"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "बनाया गया"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "निर्देशिका"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "मॉडल"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "स्थिति"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "अपडेट किया गया"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "कोई हालिया चैट नहीं"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "त्रुटि"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "निष्क्रिय"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "स्ट्रीमिंग"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "अपठित गतिविधि"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "शीर्षकहीन सत्र"
@@ -2421,7 +2370,7 @@
     "defaultMessage": "सर्वर चालू हो सकता है या अस्थायी रूप से अनुपलब्ध हो सकता है।"
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Goose सर्वर से कनेक्ट करने में असमर्थ"
+    "defaultMessage": "Markov सर्वर से कनेक्ट करने में असमर्थ"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "पुनः प्रयास करें"
@@ -2430,10 +2379,10 @@
     "defaultMessage": "आपका स्थानीय एआई एजेंट। आरंभ करने के लिए किसी AI मॉडल प्रदाता से कनेक्ट करें।"
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "goose में आपका स्वागत है"
+    "defaultMessage": "Markov में आपका स्वागत है"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "आप goose का उपयोग शुरू करने के लिए पूरी तरह तैयार हैं।"
+    "defaultMessage": "आप Markov का उपयोग शुरू करने के लिए पूरी तरह तैयार हैं।"
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "{providerName} से कनेक्टेड"
@@ -2441,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "आरंभ करें"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "और जानें"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "स्थानीय मॉडल तैयार"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "अनाम उपयोग डेटा goose को बेहतर बनाने में मदद करता है। हम कभी भी आपकी बातचीत, कोड या व्यक्तिगत डेटा एकत्र नहीं करते हैं।"
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "गोपनीयता"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "अनाम उपयोग डेटा साझा करें"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "डिफ़ॉल्ट मान"
@@ -3794,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "निर्यात सत्र"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "नई विंडो में खोलें"
   },
@@ -3898,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "सत्र \"{name}\" सफलतापूर्वक दोहराया गया"
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "सत्र निर्यात करने में विफल: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "सत्र सफलतापूर्वक निर्यात किया गया"
@@ -4133,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "सहेजें"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "यहाँ भी"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (उपयोग में नहीं)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "आर्ग्युमेंट"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "बंद करें"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "फ़ाइलें"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "उपयोग में नहीं"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "इस नाम का उत्तर {path} देता है"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "फ़ोल्डर खोलें"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "स्रोत"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "पथ"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "यह ऐप में अंतर्निहित है, इसलिए इसे यहाँ बदला नहीं जा सकता।"
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "यह किसी प्लगइन से आया है, मूल प्रति वहीं रहती है। यहाँ किया गया बदलाव प्लगइन के अगले अपडेट तक ही टिकेगा।"
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "रद्द करें"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "निर्देश"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "यह स्किल लोड होने के बाद एजेंट को क्या करना चाहिए"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "स्किल एक SKILL.md फ़ाइल है, जिसे एजेंट तब लोड करता है जब उसका विवरण कार्य से मेल खाता है।"
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "नई स्किल"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "विवरण"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "एजेंट को यह स्किल कब लेनी चाहिए"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "विवरण के आधार पर ही एजेंट तय करता है कि स्किल लोड करनी है या नहीं"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "स्किल संपादित करें"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "नाम में केवल छोटे अक्षर, अंक और हाइफ़न हो सकते हैं"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "स्किल का नाम खाली नहीं हो सकता"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "नाम हाइफ़न से शुरू या समाप्त नहीं होना चाहिए"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "नाम अधिकतम 64 वर्ण का होना चाहिए"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "नाम"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "छोटे-अक्षर-हाइफ़न-सहित"
+  },
+  "skillForm.save": {
+    "defaultMessage": "सहेजें"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "सहेजा जा रहा है..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "हर जगह"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "यह कहाँ रहेगी?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "केवल इस प्रोजेक्ट में"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "कौशल जोड़ें"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "अपने खोज शब्दों को समायोजित करने का प्रयास करें"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "जल्द आ रहा है"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "“{name}” हटाएँ?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "इससे पूरी डायरेक्टरी हट जाती है: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "स्किल हटाने में विफल"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "स्किल हटाएँ"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "स्किल हटा दी गई"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "{name} संपादित करें"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "कौशल लोड करने में त्रुटि"
@@ -4149,13 +4188,37 @@
     "defaultMessage": "कोई मिलान कौशल नहीं मिला"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "कौशल SKILL.md फ़ाइलों से ~/.config/agents/skills/, .goose/skills/, या अन्य समर्थित निर्देशिकाओं में लोड किए जाते हैं।"
+    "defaultMessage": "स्किल SKILL.md फ़ाइलें होती हैं। आपकी ~/.agents/skills में, या किसी प्रोजेक्ट के .agents/skills में रहती हैं।"
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "कोई कौशल स्थापित नहीं"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "अंतर्निहित"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "वैश्विक"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "प्लगइन"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "प्रोजेक्ट"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "{name} हटाएँ"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "स्किल सहेजी गई"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "सहेजी गई, पर उपयोग में नहीं: “{name}” नाम का उत्तर पहले से {path} देता है"
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "खोज कौशल..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "ढकी हुई"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "स्थापित कौशल देखें जो Goose क्षमताओं का विस्तार करते हैं। {shortcut} खोजने के लिए."
@@ -4598,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "संपादित करें"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "संलग्न छवियाँ:"
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "यथास्थान संपादित करें"
   },
@@ -4633,38 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "संपादित संदेश के साथ एक नया सत्र बनाएं"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "संदेश से छवि हटाएँ"
-  },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "हाल के"
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "मॉडल चुनें"
-  },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "अप्रचलित — इसके बजाय {replacement} का उपयोग करें।"
-  },
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "ACP अडैप्टर मिल गया"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "ACP अडैप्टर नहीं मिला"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "प्रदाता CLI से साइन इन करें, फिर दोबारा जाँचें।"
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "दोबारा जाँचें"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "जाँच की जा रही है..."
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "सफलतापूर्वक कनेक्ट हो गया"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "आगे बढ़ने से पहले अपने खाते का कनेक्शन जाँचें।"
   }
 }

@@ -14,6 +14,10 @@ pub mod scenario_tests;
 pub mod session;
 pub mod signal;
 
+// Ours. Declared apart from the upstream list so a neighbour upstream deletes
+// cannot turn this line into a conflict.
+pub mod markov;
+
 // Re-export commonly used types
 pub use cli::Cli;
 pub use session::CliSession;

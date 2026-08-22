@@ -1,15 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ImagePreview from './ImagePreview';
 import MarkdownContent from './MarkdownContent';
-import {
-  getTextAndImageContent,
-  imageDataFromMessage,
-  type ImageData,
-  type Message,
-} from '../types/message';
+import { getTextAndImageContent, type Message } from '../types/message';
 import MessageCopyLink from './MessageCopyLink';
 import { formatMessageTimestamp } from '../utils/timeUtils';
-import Close from './icons/Close';
 import Edit from './icons/Edit';
 import { Button } from './ui/button';
 import { defineMessages, useIntl } from '../i18n';
@@ -76,27 +70,14 @@ const i18n = defineMessages({
     id: 'userMessage.editMessageTitle',
     defaultMessage: 'Edit message',
   },
-  removeImageFromEdit: {
-    id: 'userMessage.removeImageFromEdit',
-    defaultMessage: 'Remove image from message',
-  },
-  editImagesHeading: {
-    id: 'userMessage.editImagesHeading',
-    defaultMessage: 'Attached images:',
-  },
 });
 
 interface UserMessageProps {
   message: Message;
-  onMessageUpdate?: (
-    messageId: string,
-    newContent: string,
-    editType: 'fork' | 'edit',
-    retainedImages: ImageData[]
-  ) => void;
+  onMessageUpdate?: (messageId: string, newContent: string, editType?: 'fork' | 'edit') => void;
 }
 
-function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
+export default function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
   const intl = useIntl();
   const contentRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -107,39 +88,32 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
   const { textContent, imagePaths } = getTextAndImageContent(message);
   const timestamp = formatMessageTimestamp(message.created);
 
-  const messageImages: ImageData[] = imageDataFromMessage(message);
-
-  const [removedImageIndices, setRemovedImageIndices] = useState<Set<number>>(new Set());
-
+  // Effect to handle message content changes and ensure persistence
   useEffect(() => {
+    // If we're not editing, update the edit content to match the current message
     if (!isEditing) {
       setEditContent(textContent);
     }
   }, [message.content, textContent, message.id, isEditing]);
 
+  // Initialize edit mode with current message content
   const initializeEditMode = useCallback(() => {
     setEditContent(textContent);
     setError(null);
-    setRemovedImageIndices(new Set());
     window.electron.logInfo(`Entering edit mode with content: ${textContent}`);
   }, [textContent]);
 
-  const handleRemoveImage = useCallback((index: number) => {
-    setRemovedImageIndices((prev) => {
-      const next = new Set(prev);
-      next.add(index);
-      return next;
-    });
-  }, []);
-
+  // Handle edit button click
   const handleEditClick = useCallback(() => {
     const newEditingState = !isEditing;
     setIsEditing(newEditingState);
 
+    // Initialize edit content when entering edit mode
     if (newEditingState) {
       initializeEditMode();
       window.electron.logInfo(`Edit interface shown for message: ${message.id}`);
 
+      // Focus the textarea after a brief delay to ensure it's rendered
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
@@ -154,54 +128,43 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
     window.electron.logInfo(`Edit state toggled: ${newEditingState} for message: ${message.id}`);
   }, [isEditing, initializeEditMode, message.id]);
 
+  // Handle content changes in edit mode
   const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
     setEditContent(newContent);
-    setError(null);
+    setError(null); // Clear any previous errors
     window.electron.logInfo(`Content changed: ${newContent}`);
   }, []);
 
   const handleSave = useCallback(
-    (editType: 'fork' | 'edit') => {
-      const retainedImages = messageImages.filter((_, index) => !removedImageIndices.has(index));
-
-      if (editContent.trim().length === 0 && retainedImages.length === 0) {
+    (editType: 'fork' | 'edit' = 'fork') => {
+      if (editContent.trim().length === 0) {
         setError(intl.formatMessage(i18n.emptyError));
         return;
       }
 
       setIsEditing(false);
 
-      if (
-        editType === 'edit' &&
-        editContent.trim() === textContent.trim() &&
-        retainedImages.length === messageImages.length
-      ) {
+      if (editType === 'edit' && editContent.trim() === textContent.trim()) {
         return;
       }
 
       if (onMessageUpdate && message.id) {
-        onMessageUpdate(message.id, editContent, editType, retainedImages);
+        onMessageUpdate(message.id, editContent, editType);
       }
     },
-    [
-      editContent,
-      textContent,
-      onMessageUpdate,
-      message.id,
-      intl,
-      messageImages,
-      removedImageIndices,
-    ]
+    [editContent, textContent, onMessageUpdate, message.id, intl]
   );
 
+  // Handle cancel action
   const handleCancel = useCallback(() => {
     window.electron.logInfo('Cancel clicked - reverting to original content');
     setIsEditing(false);
-    setEditContent(textContent);
+    setEditContent(textContent); // Reset to original content
     setError(null);
   }, [textContent]);
 
+  // Handle keyboard events for accessibility
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       window.electron.logInfo(
@@ -214,12 +177,13 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
       } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         window.electron.logInfo('Cmd+Enter detected, calling handleSave');
-        handleSave('fork');
+        handleSave();
       }
     },
     [handleCancel, handleSave]
   );
 
+  // Auto-resize textarea based on content
   useEffect(() => {
     if (textareaRef.current && isEditing) {
       textareaRef.current.style.height = 'auto';
@@ -231,6 +195,7 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
     <div className="w-full mt-[16px] opacity-0 animate-[appear_150ms_ease-in_forwards]">
       <div className="flex flex-col group">
         {isEditing ? (
+          // Truly wide, centered, in-place edit box replacing the bubble
           <div className="w-full max-w-4xl mx-auto text-text-primary rounded-xl border border-border-primary shadow-lg py-4 px-4 my-2 transition-all duration-200 ease-in-out">
             <textarea
               ref={textareaRef}
@@ -251,31 +216,7 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
               aria-label={intl.formatMessage(i18n.editAriaLabel)}
               aria-describedby={error ? `error-${message.id}` : undefined}
             />
-            {messageImages.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs text-text-secondary mb-2">
-                  {intl.formatMessage(i18n.editImagesHeading)}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {messageImages.map((img, index) => {
-                    if (removedImageIndices.has(index)) return null;
-                    const dataUrl = `data:${img.mimeType};base64,${img.data}`;
-                    return (
-                      <div key={index} className="relative group/image">
-                        <ImagePreview src={dataUrl} />
-                        <button
-                          onClick={() => handleRemoveImage(index)}
-                          className="absolute -top-1.5 -right-1.5 bg-text-primary text-background-primary rounded-full p-0.5 transition-opacity hover:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                          aria-label={intl.formatMessage(i18n.removeImageFromEdit)}
-                        >
-                          <Close className="h-3 w-3" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Error message */}
             {error && (
               <div
                 id={`error-${message.id}`}
@@ -319,6 +260,7 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
             </div>
           </div>
         ) : (
+          // Normal message display
           <div className="message flex justify-end w-full">
             <div className="flex-col max-w-[85%] w-fit">
               <div className="flex flex-col group">
@@ -375,5 +317,3 @@ function UserMessage({ message, onMessageUpdate }: UserMessageProps) {
     </div>
   );
 }
-
-export default memo(UserMessage);

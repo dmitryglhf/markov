@@ -13,30 +13,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      docs-only: ${{ steps.filter.outputs.docs-only }}
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Check for file changes
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # pin@v3
-        id: filter
-        with:
-          filters: |
-            docs-only:
-              - 'documentation/**'
-            code:
-              - '!documentation/**'
-
   rust-format:
     name: Check Rust Code Format
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -51,8 +30,6 @@ jobs:
   rust-build-and-test:
     name: Build and Test Rust Project
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -74,35 +51,9 @@ jobs:
         env:
           RUST_MIN_STACK: 8388608
 
-  goose-sdk-uniffi:
-    name: Check goose-sdk UniFFI
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
-
-      - name: Install Dependencies
-        run: |
-          sudo apt update -y
-          sudo apt install -y libdbus-1-dev libxcb1-dev
-
-      - name: Check UniFFI feature
-        run: |
-          export CARGO_INCREMENTAL=0
-          cargo check -p goose-sdk --features uniffi --locked
-          cargo test -p goose-sdk --features uniffi --locked
-        env:
-          RUST_MIN_STACK: 8388608
-
   rust-build-and-test-tls:
     name: Build and Test TLS Backend (${{ matrix.tls-feature }})
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -121,7 +72,7 @@ jobs:
           sudo apt install -y libdbus-1-dev gnome-keyring libxcb1-dev
 
       - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
           key: ${{ matrix.tls-feature }}
 
@@ -129,10 +80,10 @@ jobs:
         run: |
           gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'foobar'
           export CARGO_INCREMENTAL=0
-          cargo test -p goose --no-default-features --features ${{ matrix.tls-feature }},code-mode
+          cargo test -p goose --no-default-features --features ${{ matrix.tls-feature }}
           cargo test -p goose-providers --no-default-features --features ${{ matrix.tls-feature }}
-          cargo test -p goose-cli --no-default-features --features ${{ matrix.tls-feature }},code-mode -- --skip scenario_tests::scenarios::tests
-          cargo test -p goose-cli --no-default-features --features ${{ matrix.tls-feature }},code-mode --jobs 1 scenario_tests::scenarios::tests
+          cargo test -p goose-cli --no-default-features --features ${{ matrix.tls-feature }} -- --skip scenario_tests::scenarios::tests
+          cargo test -p goose-cli --no-default-features --features ${{ matrix.tls-feature }} --jobs 1 scenario_tests::scenarios::tests
         env:
           RUST_MIN_STACK: 8388608
 
@@ -146,7 +97,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Cache Cargo artifacts
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4  # v2.9.1
         with:
           key: windows-ci
 
@@ -164,8 +115,6 @@ jobs:
   rust-msrv:
     name: Check MSRV
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -197,8 +146,6 @@ jobs:
   rust-lint:
     name: Lint Rust Code
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -211,13 +158,11 @@ jobs:
           # play nicely with hermit-managed rust
           hermit uninstall rustup
           export CARGO_INCREMENTAL=0
-          cargo clippy --workspace --all-targets --exclude v8 -- -D warnings
+          cargo clippy --workspace --all-targets -- -D warnings
 
   schema-check:
     name: Check Generated Schemas are Up-to-Date
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -240,17 +185,16 @@ jobs:
           source ./bin/activate-hermit
           just check-acp-schema
 
-      - name: Check ACP Client SDK
+      - name: Test ACP Client SDK
         run: |
           source ./bin/activate-hermit
           cd ui/sdk
-          pnpm run lint
+          pnpm test
+          pnpm run typecheck:test
 
   desktop-lint:
     name: Test and Lint Electron Desktop App
     runs-on: macos-latest
-    needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name != 'pull_request'
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

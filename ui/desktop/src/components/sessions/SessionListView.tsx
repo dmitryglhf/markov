@@ -35,12 +35,6 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
-import {
   acpDeleteSession,
   acpExportSession,
   acpForkSession,
@@ -50,7 +44,6 @@ import {
   acpShareSessionNostr,
   type SessionListItem,
 } from '../../acp/sessions';
-import type { SessionExportFormat } from '@aaif/goose-sdk';
 import { acpChatSessionActions } from '../../acp/chatSessionStore';
 import { cancelAcpPermissionRequestsForSession } from '../../acp/permissionRequests';
 import { cancelAcpElicitationRequestsForSession } from '../../acp/elicitationRequests';
@@ -129,10 +122,6 @@ const i18n = defineMessages({
     defaultMessage: 'Failed to import session: {error}',
   },
   exportSuccess: { id: 'sessions.toast.exported', defaultMessage: 'Session exported successfully' },
-  exportFailed: {
-    id: 'sessions.toast.exportFailed',
-    defaultMessage: 'Failed to export session: {error}',
-  },
   shareNostrSuccess: {
     id: 'sessions.toast.shareNostr',
     defaultMessage: 'Encrypted Nostr share link created',
@@ -147,8 +136,6 @@ const i18n = defineMessages({
   duplicateSession: { id: 'sessions.action.duplicate', defaultMessage: 'Duplicate session' },
   deleteSession: { id: 'sessions.action.delete', defaultMessage: 'Delete session' },
   exportSession: { id: 'sessions.action.export', defaultMessage: 'Export session' },
-  exportAsJson: { id: 'sessions.action.exportJson', defaultMessage: 'JSON' },
-  exportAsMarkdown: { id: 'sessions.action.exportMarkdown', defaultMessage: 'Markdown' },
   shareNostrSession: {
     id: 'sessions.action.shareNostr',
     defaultMessage: 'Share encrypted Nostr link',
@@ -576,27 +563,20 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
   }, []);
 
   const handleExportSession = useCallback(
-    async (session: SessionListItem, format: SessionExportFormat) => {
-      try {
-        const data = await acpExportSession(session.id, format);
-        const isMarkdown = format === 'markdown';
-        const blob = new Blob([data], {
-          type: isMarkdown ? 'text/markdown' : 'application/json',
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${session.name}.${isMarkdown ? 'md' : 'json'}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast.success(intl.formatMessage(i18n.exportSuccess));
-      } catch (error) {
-        toast.error(
-          intl.formatMessage(i18n.exportFailed, { error: errorMessage(error, 'Unknown error') })
-        );
-      }
+    async (session: SessionListItem, e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      const json = await acpExportSession(session.id);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${session.name}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(intl.formatMessage(i18n.exportSuccess));
     },
     [intl]
   );
@@ -722,7 +702,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
     onEditClick: (session: SessionListItem) => void;
     onDuplicateClick: (session: SessionListItem) => void;
     onDeleteClick: (session: SessionListItem) => void;
-    onExportClick: (session: SessionListItem, format: SessionExportFormat) => void;
+    onExportClick: (session: SessionListItem, e: React.MouseEvent) => void;
     onShareClick: (session: SessionListItem, e: React.MouseEvent) => void;
     onOpenInNewWindow: (session: SessionListItem, e: React.MouseEvent) => void;
     isSharing: boolean;
@@ -755,9 +735,9 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
       onSelectSession(session.id);
     }, [session.id]);
 
-    const handleExportSelect = useCallback(
-      (format: SessionExportFormat) => {
-        onExportClick(session, format);
+    const handleExportClick = useCallback(
+      (e: React.MouseEvent) => {
+        onExportClick(session, e);
       },
       [onExportClick, session]
     );
@@ -804,7 +784,7 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 has-data-[state=open]:opacity-100 transition-opacity">
+        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleOpenInNewWindowClick}
             className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
@@ -833,29 +813,13 @@ const SessionListView: React.FC<SessionListViewProps> = React.memo(({ onSelectSe
           >
             <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                title={intl.formatMessage(i18n.exportSession)}
-              >
-                <Download className="w-3 h-3 text-text-secondary hover:text-text-primary" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64" onClick={(e) => e.stopPropagation()}>
-              <DropdownMenuItem onSelect={() => handleExportSelect('json')}>
-                <div className="flex flex-col">
-                  <span>{intl.formatMessage(i18n.exportAsJson)}</span>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleExportSelect('markdown')}>
-                <div className="flex flex-col">
-                  <span>{intl.formatMessage(i18n.exportAsMarkdown)}</span>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            onClick={handleExportClick}
+            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+            title={intl.formatMessage(i18n.exportSession)}
+          >
+            <Download className="w-3 h-3 text-text-secondary hover:text-text-primary" />
+          </button>
           {nostrEnabled && (
             <button
               onClick={handleShareClick}

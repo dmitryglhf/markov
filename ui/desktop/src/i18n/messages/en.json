@@ -1,25 +1,4 @@
 {
-  "acpReadinessPanel.adapterFound": {
-    "defaultMessage": "ACP adapter found"
-  },
-  "acpReadinessPanel.adapterNotFound": {
-    "defaultMessage": "ACP adapter not found"
-  },
-  "acpReadinessPanel.authenticationHelp": {
-    "defaultMessage": "Sign in through the provider CLI, then check again."
-  },
-  "acpReadinessPanel.checkAgain": {
-    "defaultMessage": "Check again"
-  },
-  "acpReadinessPanel.checking": {
-    "defaultMessage": "Checking..."
-  },
-  "acpReadinessPanel.connected": {
-    "defaultMessage": "Connected successfully"
-  },
-  "acpReadinessPanel.connectionNotChecked": {
-    "defaultMessage": "Check your account connection before continuing."
-  },
   "alertBox.autoCompactAt": {
     "defaultMessage": "Auto compact at"
   },
@@ -154,9 +133,6 @@
   },
   "baseChat.reconnecting": {
     "defaultMessage": "Connection lost. Reconnecting…"
-  },
-  "baseChat.retry": {
-    "defaultMessage": "Retry"
   },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Extension Updated"
@@ -1249,27 +1225,6 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Connect to an ACP-compatible backend running elsewhere."
-  },
-  "externalBackendSection.workingDir": {
-    "defaultMessage": "Remote Working Directory (optional)"
-  },
-  "externalBackendSection.workingDirHelp": {
-    "defaultMessage": "Absolute path on the external backend. Leave blank to send the local working directory."
-  },
-  "externalBackendSection.workingDirPlaceholder": {
-    "defaultMessage": "/home/goose/workspace"
-  },
-  "gitBranchIndicator.failedToSwitch": {
-    "defaultMessage": "Failed to switch to {branch}"
-  },
-  "gitBranchIndicator.noBranchesFound": {
-    "defaultMessage": "No branches found"
-  },
-  "gitBranchIndicator.searchBranches": {
-    "defaultMessage": "Search branches…"
-  },
-  "gitBranchIndicator.uncommittedChanges": {
-    "defaultMessage": "You may have uncommitted changes."
   },
   "goosehintsModal.close": {
     "defaultMessage": "Close"
@@ -2366,9 +2321,6 @@
   "modelsBottomBar.localModelSettingsTitle": {
     "defaultMessage": "Local Model Settings — {modelName}"
   },
-  "modelsBottomBar.recentModels": {
-    "defaultMessage": "Recent"
-  },
   "modelsBottomBar.resolvedModel": {
     "defaultMessage": "Resolved model"
   },
@@ -2408,35 +2360,8 @@
   "navigationPanel.chats": {
     "defaultMessage": "Chats"
   },
-  "navigationPanel.metaCreated": {
-    "defaultMessage": "Created"
-  },
-  "navigationPanel.metaDirectory": {
-    "defaultMessage": "Directory"
-  },
-  "navigationPanel.metaModel": {
-    "defaultMessage": "Model"
-  },
-  "navigationPanel.metaStatus": {
-    "defaultMessage": "Status"
-  },
-  "navigationPanel.metaUpdated": {
-    "defaultMessage": "Updated"
-  },
   "navigationPanel.noChats": {
     "defaultMessage": "No recent chats"
-  },
-  "navigationPanel.statusError": {
-    "defaultMessage": "Error"
-  },
-  "navigationPanel.statusIdle": {
-    "defaultMessage": "Idle"
-  },
-  "navigationPanel.statusStreaming": {
-    "defaultMessage": "Streaming"
-  },
-  "navigationPanel.statusUnread": {
-    "defaultMessage": "Unread activity"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Untitled session"
@@ -2445,7 +2370,7 @@
     "defaultMessage": "The server may be starting up or temporarily unavailable."
   },
   "onboardingGuard.checkProviderErrorTitle": {
-    "defaultMessage": "Unable to connect to Goose server"
+    "defaultMessage": "Unable to connect to Markov server"
   },
   "onboardingGuard.retry": {
     "defaultMessage": "Retry"
@@ -2454,10 +2379,10 @@
     "defaultMessage": "Your local AI agent. Connect an AI model provider to get started."
   },
   "onboardingGuard.welcomeTitle": {
-    "defaultMessage": "Welcome to goose"
+    "defaultMessage": "Welcome to Markov"
   },
   "onboardingSuccess.allSet": {
-    "defaultMessage": "You're all set to start using goose."
+    "defaultMessage": "You're all set to start using Markov."
   },
   "onboardingSuccess.connectedTo": {
     "defaultMessage": "Connected to {providerName}"
@@ -2465,20 +2390,8 @@
   "onboardingSuccess.getStarted": {
     "defaultMessage": "Get Started"
   },
-  "onboardingSuccess.learnMore": {
-    "defaultMessage": "Learn more"
-  },
   "onboardingSuccess.localModelReady": {
     "defaultMessage": "Local model ready"
-  },
-  "onboardingSuccess.privacyDescription": {
-    "defaultMessage": "Anonymous usage data helps improve goose. We never collect your conversations, code, or personal data."
-  },
-  "onboardingSuccess.privacyTitle": {
-    "defaultMessage": "Privacy"
-  },
-  "onboardingSuccess.shareUsageData": {
-    "defaultMessage": "Share anonymous usage data"
   },
   "parameterInput.defaultValue": {
     "defaultMessage": "Default Value"
@@ -2741,9 +2654,6 @@
   "promptsSettings.unsavedChanges": {
     "defaultMessage": "You have unsaved changes"
   },
-  "providerCard.deprecatedReplacement": {
-    "defaultMessage": "Deprecated — use {replacement} instead."
-  },
   "providerCard.noMetadata": {
     "defaultMessage": "ProviderCard error: No metadata provided"
   },
@@ -2824,9 +2734,6 @@
   },
   "providerConfigurationModal.checkConfigAgain": {
     "defaultMessage": "Check your configuration again to use this provider."
-  },
-  "providerConfigurationModal.chooseModel": {
-    "defaultMessage": "Choose model"
   },
   "providerConfigurationModal.close": {
     "defaultMessage": "Close"
@@ -3824,12 +3731,6 @@
   "sessions.action.export": {
     "defaultMessage": "Export session"
   },
-  "sessions.action.exportJson": {
-    "defaultMessage": "JSON"
-  },
-  "sessions.action.exportMarkdown": {
-    "defaultMessage": "Markdown"
-  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Open in new window"
   },
@@ -3928,9 +3829,6 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Session \"{name}\" duplicated successfully"
-  },
-  "sessions.toast.exportFailed": {
-    "defaultMessage": "Failed to export session: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Session exported successfully"
@@ -4163,14 +4061,125 @@
   "shortcutRecorder.save": {
     "defaultMessage": "Save"
   },
+  "skillDetails.alsoAt": {
+    "defaultMessage": "Also at"
+  },
+  "skillDetails.alsoAtValue": {
+    "defaultMessage": "{path} (not used)"
+  },
+  "skillDetails.arguments": {
+    "defaultMessage": "Arguments"
+  },
+  "skillDetails.close": {
+    "defaultMessage": "Close"
+  },
+  "skillDetails.files": {
+    "defaultMessage": "Files"
+  },
+  "skillDetails.notUsed": {
+    "defaultMessage": "Not used"
+  },
+  "skillDetails.notUsedValue": {
+    "defaultMessage": "{path} answers to this name"
+  },
+  "skillDetails.openFolder": {
+    "defaultMessage": "Open folder"
+  },
+  "skillDetails.origin": {
+    "defaultMessage": "Origin"
+  },
+  "skillDetails.path": {
+    "defaultMessage": "Path"
+  },
+  "skillDetails.readOnlyBuiltin": {
+    "defaultMessage": "Built into the app, so it cannot be changed here."
+  },
+  "skillDetails.readOnlyPlugin": {
+    "defaultMessage": "This came from a plugin, which keeps the original. Editing it here would last only until the plugin updates."
+  },
+  "skillForm.cancel": {
+    "defaultMessage": "Cancel"
+  },
+  "skillForm.contentLabel": {
+    "defaultMessage": "Instructions"
+  },
+  "skillForm.contentPlaceholder": {
+    "defaultMessage": "What the agent should do once this skill is loaded"
+  },
+  "skillForm.createDescription": {
+    "defaultMessage": "A skill is a SKILL.md file the agent loads when its description fits the task."
+  },
+  "skillForm.createTitle": {
+    "defaultMessage": "New skill"
+  },
+  "skillForm.descriptionLabel": {
+    "defaultMessage": "Description"
+  },
+  "skillForm.descriptionPlaceholder": {
+    "defaultMessage": "When the agent should reach for this skill"
+  },
+  "skillForm.descriptionRequired": {
+    "defaultMessage": "The description is how the agent decides to load a skill"
+  },
+  "skillForm.editTitle": {
+    "defaultMessage": "Edit skill"
+  },
+  "skillForm.nameCharset": {
+    "defaultMessage": "Names may only contain lowercase letters, digits, and hyphens"
+  },
+  "skillForm.nameEmpty": {
+    "defaultMessage": "Skill name must not be empty"
+  },
+  "skillForm.nameHyphenEdge": {
+    "defaultMessage": "Names must not start or end with a hyphen"
+  },
+  "skillForm.nameLabel": {
+    "defaultMessage": "Name"
+  },
+  "skillForm.namePlaceholder": {
+    "defaultMessage": "lowercase-with-hyphens"
+  },
+  "skillForm.nameTooLong": {
+    "defaultMessage": "Names must be at most 64 characters"
+  },
+  "skillForm.save": {
+    "defaultMessage": "Save"
+  },
+  "skillForm.saving": {
+    "defaultMessage": "Saving..."
+  },
+  "skillForm.scopeGlobal": {
+    "defaultMessage": "Everywhere"
+  },
+  "skillForm.scopeLabel": {
+    "defaultMessage": "Where should it live?"
+  },
+  "skillForm.scopeProject": {
+    "defaultMessage": "This project only"
+  },
   "skillsView.addSkill": {
     "defaultMessage": "Add Skill"
   },
   "skillsView.adjustSearchTerms": {
     "defaultMessage": "Try adjusting your search terms"
   },
-  "skillsView.comingSoon": {
-    "defaultMessage": "Coming soon"
+  "skillsView.deleteConfirm": {
+    "defaultMessage": "Delete \"{name}\"?"
+  },
+  "skillsView.deleteDetail": {
+    "defaultMessage": "This removes the whole directory: {path}"
+  },
+  "skillsView.deleteFailed": {
+    "defaultMessage": "Failed to delete skill"
+  },
+  "skillsView.deleteTitle": {
+    "defaultMessage": "Delete skill"
+  },
+  "skillsView.deleted": {
+    "defaultMessage": "Skill deleted"
+  },
+  "skillsView.editSkill": {
+    "defaultMessage": "Edit {name}"
   },
   "skillsView.errorLoadingSkills": {
     "defaultMessage": "Error Loading Skills"
@@ -4179,13 +4188,37 @@
     "defaultMessage": "No matching skills found"
   },
   "skillsView.noSkillsDescription": {
-    "defaultMessage": "Skills are loaded from SKILL.md files in ~/.config/agents/skills/, .goose/skills/, or other supported directories."
+    "defaultMessage": "Skills are SKILL.md files. Yours live in ~/.agents/skills, or in .agents/skills inside a project."
   },
   "skillsView.noSkillsInstalled": {
     "defaultMessage": "No skills installed"
   },
+  "skillsView.originBuiltin": {
+    "defaultMessage": "builtin"
+  },
+  "skillsView.originGlobal": {
+    "defaultMessage": "global"
+  },
+  "skillsView.originPlugin": {
+    "defaultMessage": "plugin"
+  },
+  "skillsView.originProject": {
+    "defaultMessage": "project"
+  },
+  "skillsView.removeSkill": {
+    "defaultMessage": "Remove {name}"
+  },
+  "skillsView.saved": {
+    "defaultMessage": "Skill saved"
+  },
+  "skillsView.savedButShadowed": {
+    "defaultMessage": "Saved, but not in use: {path} already answers to \"{name}\""
+  },
   "skillsView.searchSkillsPlaceholder": {
     "defaultMessage": "Search skills..."
+  },
+  "skillsView.shadowed": {
+    "defaultMessage": "shadowed"
   },
   "skillsView.skillsDescription": {
     "defaultMessage": "View installed skills that extend Goose capabilities. {shortcut} to search."
@@ -4628,9 +4661,6 @@
   "userMessage.editButton": {
     "defaultMessage": "Edit"
   },
-  "userMessage.editImagesHeading": {
-    "defaultMessage": "Attached images:"
-  },
   "userMessage.editInPlace": {
     "defaultMessage": "Edit in Place"
   },
@@ -4663,8 +4693,5 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Create a new session with the edited message"
-  },
-  "userMessage.removeImageFromEdit": {
-    "defaultMessage": "Remove image from message"
   }
 }

@@ -189,7 +189,7 @@ pub fn resolve_api_key(
                 ConfigError::NotFound(_) => {
                     if config.requires_auth {
                         anyhow::bail!(
-                            "Required API key {} is not set. Configure it via `goose configure` or set the {} environment variable.",
+                            "Required API key {} is not set. Configure it via `markov configure` or set the {} environment variable.",
                             config.api_key_env,
                             config.api_key_env
                         );

@@ -30,36 +30,38 @@ pub fn setup_logging(name: Option<&str>) -> &'static Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use goose::config::paths::Paths;
     use goose::tracing::langfuse_layer;
     use std::env;
     use tempfile::TempDir;
 
-    fn setup_temp_home() -> TempDir {
+    /// Holds the env mutex for the whole test: the assertions below read the
+    /// home directory twice and must not see another test change it in between.
+    fn setup_temp_home() -> (TempDir, env_lock::EnvGuard<'static>) {
         let temp_dir = TempDir::new().unwrap();
-        if cfg!(windows) {
-            env::set_var("USERPROFILE", temp_dir.path());
-        } else {
-            env::set_var("HOME", temp_dir.path());
-        }
-        temp_dir
+        let home = temp_dir.path().to_string_lossy().into_owned();
+        let key = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+        let guard = env_lock::lock_env([(key, Some(home))]);
+        (temp_dir, guard)
     }
 
     #[test]
     fn test_log_directory_creation() {
-        let _temp_dir = setup_temp_home();
+        let (_temp_dir, _env) = setup_temp_home();
         let log_dir = goose::logging::prepare_log_directory("cli", true).unwrap();
         assert!(log_dir.exists());
         assert!(log_dir.is_dir());
 
+        assert!(log_dir.starts_with(Paths::state_dir()));
+
         let path_components: Vec<_> = log_dir.components().collect();
-        assert!(path_components.iter().any(|c| c.as_os_str() == "goose"));
         assert!(path_components.iter().any(|c| c.as_os_str() == "logs"));
         assert!(path_components.iter().any(|c| c.as_os_str() == "cli"));
     }
 
     #[tokio::test]
     async fn test_langfuse_layer_creation() {
-        let _temp_dir = setup_temp_home();
+        let (_temp_dir, _env) = setup_temp_home();
 
         let original_vars = [
             ("LANGFUSE_PUBLIC_KEY", env::var("LANGFUSE_PUBLIC_KEY").ok()),
@@ -106,7 +108,7 @@ mod tests {
     async fn test_default_filter_avoids_debug_by_default() {
         // The shared helper honours RUST_LOG; without it the defaults apply.
         // We just smoke-check that building the subscriber doesn't panic.
-        let _temp_dir = setup_temp_home();
+        let (_temp_dir, _env) = setup_temp_home();
         let config = goose::logging::LoggingConfig {
             component: "cli-test",
             name: None,

@@ -51,7 +51,7 @@ async fn remove_sessions(session_manager: &SessionManager, sessions: Vec<Session
     Ok(())
 }
 
-fn prompt_interactive_session_removal(sessions: &[Session]) -> Result<Vec<Session>> {
+pub(crate) fn prompt_interactive_session_removal(sessions: &[Session]) -> Result<Vec<Session>> {
     if sessions.is_empty() {
         println!("No sessions to delete.");
         return Ok(vec![]);
@@ -133,7 +133,8 @@ pub async fn handle_session_remove(
         if visible_sessions.is_empty() {
             return Err(anyhow::anyhow!("No sessions found."));
         }
-        matched_sessions = prompt_interactive_session_removal(&visible_sessions)?;
+        matched_sessions =
+            crate::markov::hooks::hooks().session_removal_picker(&visible_sessions)?;
     }
 
     if matched_sessions.is_empty() {

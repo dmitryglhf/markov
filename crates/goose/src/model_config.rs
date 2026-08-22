@@ -14,8 +14,19 @@ pub fn model_config_from_user_config(
     provider_name: &str,
     model_name: impl AsRef<str>,
 ) -> Result<ModelConfig> {
-    let model = base_model_config_from_user_config(provider_name, model_name.as_ref())?;
-    materialize_model_config(provider_name, model)
+    model_config_from_user_config_with(Config::global(), provider_name, model_name)
+}
+
+/// Resolves against an explicit configuration rather than the global one, so a
+/// test can point it at a file of its own instead of the developer's home.
+pub fn model_config_from_user_config_with(
+    config: &Config,
+    provider_name: &str,
+    model_name: impl AsRef<str>,
+) -> Result<ModelConfig> {
+    let model = base_model_config_from_user_config(config, provider_name, model_name.as_ref())?;
+    let model = materialize_model_config_inner(config, model, provider_name, true)?;
+    Ok(apply_canonical_limits(provider_name, model))
 }
 
 pub fn model_config_from_user_config_with_session_settings(
@@ -26,8 +37,8 @@ pub fn model_config_from_user_config_with_session_settings(
     context_limit: Option<usize>,
 ) -> Result<ModelConfig> {
     let config = Config::global();
-    let model = base_model_config_from_user_config(provider_name, model_name.as_ref())?;
-    let model = materialize_model_config_inner(model, provider_name, false)?
+    let model = base_model_config_from_user_config(config, provider_name, model_name.as_ref())?;
+    let model = materialize_model_config_inner(config, model, provider_name, false)?
         .with_context_limit(context_limit)
         .with_inherited_session_settings_from(previous, request_params)
         .with_default_thinking_effort(config.get_goose_thinking_effort());
@@ -36,7 +47,7 @@ pub fn model_config_from_user_config_with_session_settings(
 }
 
 pub fn materialize_model_config(provider_name: &str, model: ModelConfig) -> Result<ModelConfig> {
-    let model = materialize_model_config_inner(model, provider_name, true)?;
+    let model = materialize_model_config_inner(Config::global(), model, provider_name, true)?;
     Ok(apply_canonical_limits(provider_name, model))
 }
 
@@ -49,12 +60,11 @@ fn apply_canonical_limits(provider_name: &str, model: ModelConfig) -> ModelConfi
 }
 
 fn materialize_model_config_inner(
+    config: &Config,
     mut model: ModelConfig,
     provider_name: &str,
     include_default_thinking_effort: bool,
 ) -> Result<ModelConfig> {
-    let config = Config::global();
-
     if model.temperature.is_none() {
         model = model.with_temperature(get_goose_temperature(config)?);
     }
@@ -186,10 +196,10 @@ fn apply_openai_request_params(mut model: ModelConfig) -> ModelConfig {
 }
 
 fn base_model_config_from_user_config(
+    config: &Config,
     provider_name: &str,
     model_name: &str,
 ) -> Result<ModelConfig> {
-    let config = Config::global();
     let mut model = ModelConfig {
         model_name: model_name.to_string(),
         context_limit: None,
@@ -283,9 +293,16 @@ mod one_shot_tests {
 mod azure_foundry_tests {
     use super::*;
 
+    /// A configuration of its own, so the test does not read whatever the
+    /// developer happens to have in their home directory.
+    fn empty_config() -> Config {
+        let dir = tempfile::tempdir().unwrap();
+        Config::new(dir.keep().join("config.yaml"), "markov-test").unwrap()
+    }
+
     #[test]
     fn deployment_name_survives_thinking_effort_changes() {
-        let config = base_model_config_from_user_config("azure_foundry", "gpt-5-high")
+        let config = base_model_config_from_user_config(&empty_config(), "azure_foundry", "gpt-5-high")
             .unwrap()
             .with_thinking_effort(ThinkingEffort::Off);
 
@@ -296,7 +313,7 @@ mod azure_foundry_tests {
 
     #[test]
     fn none_suffixed_deployment_name_is_preserved() {
-        let config = base_model_config_from_user_config("azure_foundry", "gpt-5-none").unwrap();
+        let config = base_model_config_from_user_config(&empty_config(), "azure_foundry", "gpt-5-none").unwrap();
 
         assert_eq!(config.model_name, "gpt-5-none");
         assert_eq!(config.thinking_effort(), None);

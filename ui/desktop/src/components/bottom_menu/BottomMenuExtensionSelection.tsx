@@ -261,7 +261,7 @@ function SessionExtensionsMenu({ sessionId }: { sessionId: string }) {
 
   const loadSessionExtensions = useCallback(
     async (targetSessionId: string, signal?: GetSessionExtensionsSignal) => {
-      const extensions = await getAcpSessionExtensions(targetSessionId)
+      const extensions = await getAcpSessionExtensions(targetSessionId);
 
       if (signal?.aborted || latestSessionIdRef.current !== targetSessionId) {
         return;
