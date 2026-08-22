@@ -181,5 +181,5 @@ branch="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 echo "### Continue locally"
 echo
 echo '```sh'
-echo "git fetch github && git checkout $branch"
+echo "git fetch origin && git checkout $branch"
 echo '```'
