@@ -15,7 +15,7 @@ use crate::agents::{
     Agent, AgentConfig, ExtensionConfig, ExtensionLoadResult, GoosePlatform, SessionConfig,
 };
 use crate::config::base::CONFIG_YAML_NAME;
-use crate::config::extensions::get_enabled_extensions_with_config;
+use crate::config::extensions::{configured_enabled_state, get_enabled_extensions_with_config};
 use crate::config::paths::Paths;
 use crate::config::permission::PermissionManager;
 use crate::config::{Config, GooseMode};
@@ -41,17 +41,18 @@ use crate::utils::sanitize_unicode_tags;
 use agent_client_protocol::schema::v1::{
     AgentCapabilities, Annotations, AuthMethod, AuthMethodAgent, AuthenticateRequest,
     AuthenticateResponse, CancelNotification, CloseSessionRequest, CloseSessionResponse,
-    ConfigOptionUpdate, ContentBlock, ContentChunk, Cost, CurrentModeUpdate,
-    EmbeddedResourceResource, FileSystemCapabilities, ForkSessionRequest, ForkSessionResponse,
-    ImageContent, Implementation, InitializeRequest, InitializeResponse, ListSessionsRequest,
-    ListSessionsResponse, LoadSessionRequest, LoadSessionResponse, McpCapabilities, McpServer,
-    MessageId, Meta, NewSessionRequest, NewSessionResponse, PermissionOption, PermissionOptionKind,
-    PromptCapabilities, PromptRequest, PromptResponse, RequestPermissionOutcome,
-    RequestPermissionRequest, ResourceLink, SessionCapabilities, SessionCloseCapabilities,
-    SessionConfigOption, SessionId, SessionInfoUpdate, SessionListCapabilities,
-    SessionNotification, SessionUpdate, SetSessionConfigOptionRequest,
-    SetSessionConfigOptionResponse, SetSessionModeRequest, SetSessionModeResponse, StopReason,
-    TextContent, ToolCallId, ToolCallUpdate, Usage, UsageUpdate,
+    ConfigOptionUpdate, ContentBlock, Cost, CurrentModeUpdate, DeleteSessionRequest,
+    DeleteSessionResponse, EmbeddedResourceResource, FileSystemCapabilities, ForkSessionRequest,
+    ForkSessionResponse, ImageContent, Implementation, InitializeRequest, InitializeResponse,
+    ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, LoadSessionResponse,
+    McpCapabilities, McpServer, Meta, NewSessionRequest, NewSessionResponse, PermissionOption,
+    PermissionOptionKind, PromptCapabilities, PromptRequest, PromptResponse,
+    RequestPermissionOutcome, RequestPermissionRequest, ResourceLink, SessionCapabilities,
+    SessionCloseCapabilities, SessionConfigOption, SessionDeleteCapabilities, SessionId,
+    SessionInfoUpdate, SessionListCapabilities, SessionNotification, SessionUpdate,
+    SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, SetSessionModeRequest,
+    SetSessionModeResponse, StopReason, TextContent, ToolCallId, ToolCallUpdate, Usage,
+    UsageUpdate,
 };
 use agent_client_protocol::util::MatchDispatchFrom;
 use agent_client_protocol::{
@@ -75,9 +76,12 @@ use tracing::{debug, error, info, warn};
 use url::Url;
 use uuid::Uuid;
 
+use self::message_meta::{
+    content_chunk_for_message, message_meta_without_steer, populate_output_token_limit_content,
+};
 use self::tool_calls::chain::{breaks_consecutive_tool_calls, ReadyToolChain, ToolChainTracker};
 use self::tool_calls::conversion::{
-    build_initial_tool_call, build_permission_tool_call_update,
+    build_initial_tool_call_with_message_meta, build_permission_tool_call_update,
     tool_call_update_fields_from_response, trusted_update_meta,
 };
 use self::tool_calls::enrichment::{spawn_chain_summary_enrichment, spawn_tool_title_enrichment};
@@ -98,6 +102,7 @@ mod list_sessions;
 mod load_session;
 mod local_inference;
 mod manage_sessions;
+mod message_meta;
 mod new_session;
 mod onboarding;
 mod prompts;
@@ -116,6 +121,7 @@ pub type AcpProviderFactory = Arc<
             String,
             Vec<ExtensionConfig>,
             Option<PathBuf>,
+            bool,
         ) -> BoxFuture<'static, Result<Arc<dyn Provider>>>
         + Send
         + Sync,
@@ -153,6 +159,14 @@ impl<T, E: std::fmt::Display> ResultExt<T> for Result<T, E> {
     }
 }
 
+fn agent_creation_error(error: anyhow::Error, context: &str) -> agent_client_protocol::Error {
+    if crate::acp::is_auth_required(&error) {
+        agent_client_protocol::Error::auth_required()
+    } else {
+        agent_client_protocol::Error::internal_error().data(format!("{context}: {error}"))
+    }
+}
+
 pub(super) const DEFAULT_PROVIDER_ID: &str = "goose";
 pub(super) const DEFAULT_PROVIDER_LABEL: &str = "Goose (Default)";
 const PROVIDER_CONFIG_STATUS_CHECK_CONCURRENCY: usize = 16;
@@ -177,9 +191,15 @@ struct ActivePromptRun {
     cancel_token: CancellationToken,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct AcpBuiltinSelection {
+    pub defaults: Vec<String>,
+    pub explicit: Vec<String>,
+}
+
 pub struct GooseAcpAgentOptions {
     pub provider_factory: AcpProviderFactory,
-    pub builtins: Vec<String>,
+    pub builtin_selection: AcpBuiltinSelection,
     pub data_dir: std::path::PathBuf,
     pub config_dir: std::path::PathBuf,
     pub disable_session_naming: bool,
@@ -194,7 +214,7 @@ pub struct GooseAcpAgent {
     closed_session_ids: Arc<Mutex<HashSet<String>>>,
     agent_manager: Arc<AgentManager>,
     provider_factory: AcpProviderFactory,
-    builtins: Vec<String>,
+    builtin_selection: AcpBuiltinSelection,
     client_fs_capabilities: OnceCell<FileSystemCapabilities>,
     client_terminal: OnceCell<bool>,
     client_mcp_host_info: OnceCell<GooseMcpHostInfo>,
@@ -233,12 +253,9 @@ fn meta_string(
 
 fn agent_capabilities_meta() -> Option<Meta> {
     let mut goose = serde_json::Map::new();
+    goose.insert("recipeParameterScopes".to_string(), serde_json::json!({}));
     if cfg!(feature = "local-inference") {
         goose.insert("localInference".to_string(), serde_json::json!({}));
-    }
-
-    if goose.is_empty() {
-        return None;
     }
 
     let mut meta = serde_json::Map::new();
@@ -381,6 +398,9 @@ fn mcp_server_to_extension_config(mcp_server: McpServer) -> Result<ExtensionConf
                     .collect(),
                 timeout,
                 socket: None,
+                client_id: None,
+                client_secret_key: None,
+                scopes: vec![],
                 bundled: Some(false),
                 available_tools: vec![],
             })
@@ -388,6 +408,25 @@ fn mcp_server_to_extension_config(mcp_server: McpServer) -> Result<ExtensionConf
         McpServer::Sse(_) => Err("SSE is unsupported, migrate to streamable_http".to_string()),
         _ => Err("Unknown MCP server type".to_string()),
     }
+}
+
+fn selected_builtin_extensions(
+    config: &Config,
+    builtin_selection: &AcpBuiltinSelection,
+) -> Vec<ExtensionConfig> {
+    let mut extensions = Vec::new();
+
+    for builtin in &builtin_selection.defaults {
+        if configured_enabled_state(config, builtin) != Some(false) {
+            push_or_replace_extension(&mut extensions, builtin_to_extension_config(builtin));
+        }
+    }
+
+    for builtin in &builtin_selection.explicit {
+        push_or_replace_extension(&mut extensions, builtin_to_extension_config(builtin));
+    }
+
+    extensions
 }
 
 fn push_or_replace_extension(extensions: &mut Vec<ExtensionConfig>, extension: ExtensionConfig) {
@@ -488,6 +527,22 @@ fn build_prompt_usage(session: &Session) -> Option<Usage> {
     Some(Usage::new(total, input, output))
 }
 
+fn prompt_stop_reason(was_cancelled: bool, output_token_limit_reached: bool) -> StopReason {
+    if was_cancelled {
+        StopReason::Cancelled
+    } else if output_token_limit_reached {
+        StopReason::MaxTokens
+    } else {
+        StopReason::EndTurn
+    }
+}
+
+fn update_output_token_limit_reached(output_token_limit_reached: &mut bool, message: &Message) {
+    if message.role == Role::Assistant {
+        *output_token_limit_reached = message.metadata.output_token_limit_reached;
+    }
+}
+
 pub(super) struct UsageUpdates {
     pub(super) custom: GooseSessionNotification,
     pub(super) standard: UsageUpdate,
@@ -568,6 +623,23 @@ impl GooseAcpAgent {
         )
     }
 
+    pub(super) async fn prepare_session_setup_by_id(
+        &self,
+        session_id: &str,
+    ) -> Result<(Session, SessionUsageTotals), agent_client_protocol::Error> {
+        let session = self
+            .session_manager
+            .get_session(session_id, false)
+            .await
+            .internal_err_ctx("Failed to load session for setup notifications")?;
+        let totals = self
+            .session_manager
+            .get_session_usage_totals(session_id)
+            .await
+            .unwrap_or_default();
+        Ok((session, totals))
+    }
+
     pub(super) fn supports_recipe_param_requests(&self) -> bool {
         self.client_supports_recipe_param_requests
             .get()
@@ -617,7 +689,7 @@ impl GooseAcpAgent {
             closed_session_ids: Arc::new(Mutex::new(HashSet::new())),
             agent_manager,
             provider_factory: options.provider_factory,
-            builtins: options.builtins,
+            builtin_selection: options.builtin_selection,
             client_fs_capabilities: OnceCell::new(),
             client_terminal: OnceCell::new(),
             client_mcp_host_info: OnceCell::new(),
@@ -646,8 +718,15 @@ impl GooseAcpAgent {
         provider_name: &str,
         extensions: Vec<ExtensionConfig>,
         working_dir: Option<PathBuf>,
+        use_default_model: bool,
     ) -> Result<Arc<dyn Provider>> {
-        (self.provider_factory)(provider_name.to_string(), extensions, working_dir).await
+        (self.provider_factory)(
+            provider_name.to_string(),
+            extensions,
+            working_dir,
+            use_default_model,
+        )
+        .await
     }
 
     async fn maybe_refresh_provider_inventory_with_agent(
@@ -701,7 +780,7 @@ impl GooseAcpAgent {
                 },
             )
             .await
-            .internal_err_ctx("Failed to create agent")
+            .map_err(|error| agent_creation_error(error, "Failed to create agent"))
     }
 
     fn initial_session_extensions(
@@ -712,10 +791,7 @@ impl GooseAcpAgent {
         goose_extensions: Option<Vec<GooseExtension>>,
         recipe_extensions: Option<&[ExtensionConfig]>,
     ) -> Result<Vec<ExtensionConfig>, agent_client_protocol::Error> {
-        let mut extensions = Vec::new();
-        for builtin in &self.builtins {
-            push_or_replace_extension(&mut extensions, builtin_to_extension_config(builtin));
-        }
+        let mut extensions = selected_builtin_extensions(config, &self.builtin_selection);
 
         if let Some(recipe_extensions) = recipe_extensions {
             for extension in recipe_extensions {
@@ -985,27 +1061,22 @@ impl GooseAcpAgent {
         message
     }
 
-    #[allow(clippy::too_many_arguments)]
     async fn handle_message_content(
         &self,
         content_item: &MessageContent,
+        message: &Message,
         session_id: &SessionId,
-        session_id_str: &str,
-        message_id: Option<&str>,
-        message_created: i64,
-        role: &Role,
-        steer: bool,
         agent: &Arc<Agent>,
         tool_requests: &HashMap<String, ToolRequest>,
         cx: &ConnectionTo<Client>,
     ) -> Result<(), agent_client_protocol::Error> {
+        let role = &message.role;
+
         match content_item {
             MessageContent::Text(text) => {
                 let chunk = content_chunk_for_message(
+                    message,
                     ContentBlock::Text(TextContent::new(text.text.clone())),
-                    message_id,
-                    message_created,
-                    steer,
                 );
                 let update = match role {
                     Role::User => SessionUpdate::UserMessageChunk(chunk),
@@ -1014,7 +1085,7 @@ impl GooseAcpAgent {
                 cx.send_notification(SessionNotification::new(session_id.clone(), update))?;
             }
             MessageContent::ToolRequest(tool_request) => {
-                self.handle_tool_request(tool_request, session_id, session_id_str, agent, cx)
+                self.handle_tool_request(tool_request, message, session_id, agent, cx)
                     .await?;
             }
             MessageContent::ToolResponse(tool_response) => {
@@ -1030,10 +1101,8 @@ impl GooseAcpAgent {
                 cx.send_notification(SessionNotification::new(
                     session_id.clone(),
                     SessionUpdate::AgentThoughtChunk(content_chunk_for_message(
+                        message,
                         ContentBlock::Text(TextContent::new(thinking.thinking.clone())),
-                        message_id,
-                        message_created,
-                        steer,
                     )),
                 ))?;
             }
@@ -1056,20 +1125,21 @@ impl GooseAcpAgent {
                 }
                 ActionRequiredData::Elicitation {
                     id,
-                    message,
+                    message: elicitation_message,
                     requested_schema,
                 } => {
                     self.handle_form_elicitation(
                         cx,
                         session_id,
                         id,
-                        message,
+                        elicitation_message,
                         requested_schema,
-                        message_update_meta(message_id, message_created, false),
+                        message_meta_without_steer(message),
                     )
                     .await?;
                 }
                 ActionRequiredData::ElicitationResponse { .. } => {}
+                ActionRequiredData::ToolConfirmationResponse { .. } => {}
             },
             MessageContent::Image(image) => {
                 let mut image_content =
@@ -1090,12 +1160,7 @@ impl GooseAcpAgent {
                         ),
                     );
                 }
-                let chunk = content_chunk_for_message(
-                    ContentBlock::Image(image_content),
-                    message_id,
-                    message_created,
-                    steer,
-                );
+                let chunk = content_chunk_for_message(message, ContentBlock::Image(image_content));
                 let update = match role {
                     Role::User => SessionUpdate::UserMessageChunk(chunk),
                     Role::Assistant => SessionUpdate::AgentMessageChunk(chunk),
@@ -1109,6 +1174,16 @@ impl GooseAcpAgent {
                     session_id.0.as_ref(),
                     notification,
                 )?;
+            }
+            MessageContent::Error(error) => {
+                let chunk = content_chunk_for_message(
+                    message,
+                    ContentBlock::Text(TextContent::new(error.message.clone())),
+                );
+                cx.send_notification(SessionNotification::new(
+                    session_id.clone(),
+                    SessionUpdate::AgentMessageChunk(chunk),
+                ))?;
             }
             _ => {}
         }
@@ -1139,14 +1214,17 @@ impl GooseAcpAgent {
     async fn handle_tool_request(
         &self,
         tool_request: &ToolRequest,
+        message: &Message,
         session_id: &SessionId,
-        session_id_for_persist: &str,
         agent: &Arc<Agent>,
         cx: &ConnectionTo<Client>,
     ) -> Result<(), agent_client_protocol::Error> {
         let client_requests_label_enrichment = self.requests_tool_call_label_enrichment();
-        let initial_tool_call =
-            build_initial_tool_call(tool_request, client_requests_label_enrichment);
+        let initial_tool_call = build_initial_tool_call_with_message_meta(
+            tool_request,
+            message,
+            client_requests_label_enrichment,
+        );
         let tool_call_notifier = ToolCallNotifier::new(cx, session_id);
         tool_call_notifier.send_initial(initial_tool_call)?;
 
@@ -1159,7 +1237,7 @@ impl GooseAcpAgent {
                 agent,
                 tool_call_notifier,
                 &self.session_manager,
-                session_id_for_persist,
+                session_id.0.as_ref(),
                 tool_request,
             );
         }
@@ -1279,10 +1357,28 @@ fn prompt_error_from_message_content(
     content_item: &MessageContent,
 ) -> Option<agent_client_protocol::Error> {
     match content_item {
+        MessageContent::Error(error)
+            if error.kind == crate::conversation::message::MessageErrorKind::Authentication =>
+        {
+            Some(agent_client_protocol::Error::auth_required())
+        }
         MessageContent::SystemNotification(notification)
             if notification.notification_type == SystemNotificationType::CreditsExhausted =>
         {
             Some(credits_exhausted_prompt_error(notification))
+        }
+        MessageContent::Error(error)
+            if error.kind == crate::conversation::message::MessageErrorKind::CreditsExhausted =>
+        {
+            let mut data = serde_json::Map::new();
+            data.insert(
+                "reason".to_string(),
+                serde_json::Value::String("credits_exhausted".to_string()),
+            );
+            Some(
+                agent_client_protocol::Error::new(-32603, error.message.clone())
+                    .data(serde_json::Value::Object(data)),
+            )
         }
         _ => None,
     }
@@ -1390,35 +1486,6 @@ fn message_usage_update(
     }
 }
 
-fn message_update_meta(message_id: Option<&str>, created: i64, steer: bool) -> Meta {
-    let mut goose = serde_json::Map::new();
-    goose.insert("created".to_string(), serde_json::json!(created));
-    if let Some(id) = message_id {
-        goose.insert("messageId".to_string(), serde_json::json!(id));
-    }
-    if steer {
-        goose.insert("steer".to_string(), serde_json::json!(true));
-    }
-
-    let mut meta = serde_json::Map::new();
-    meta.insert("goose".to_string(), serde_json::Value::Object(goose));
-    meta
-}
-
-fn content_chunk_for_message(
-    content: ContentBlock,
-    message_id: Option<&str>,
-    created: i64,
-    steer: bool,
-) -> ContentChunk {
-    let mut chunk =
-        ContentChunk::new(content).meta(message_update_meta(message_id, created, steer));
-    if let Some(message_id) = message_id {
-        chunk = chunk.message_id(MessageId::new(message_id));
-    }
-    chunk
-}
-
 impl GooseAcpAgent {
     async fn on_initialize(
         &self,
@@ -1461,6 +1528,7 @@ impl GooseAcpAgent {
             .session_capabilities(
                 SessionCapabilities::new()
                     .list(SessionListCapabilities::new())
+                    .delete(SessionDeleteCapabilities::new())
                     .close(SessionCloseCapabilities::new()),
             )
             .prompt_capabilities(
@@ -1783,6 +1851,7 @@ impl GooseAcpAgent {
         };
 
         let mut was_cancelled = false;
+        let mut output_token_limit_reached = false;
         let mut tool_requests = HashMap::new();
         let mut chain_tracker = ToolChainTracker::default();
         let mut stream_error = None;
@@ -1794,9 +1863,8 @@ impl GooseAcpAgent {
             }
 
             match event {
-                Ok(crate::agents::AgentEvent::Message(message)) => {
-                    // Agent persists messages via session_manager.add_message() internally.
-                    let stored_message_id = message.id.clone();
+                Ok(crate::agents::AgentEvent::Message(mut message)) => {
+                    update_output_token_limit_reached(&mut output_token_limit_reached, &message);
 
                     let sessions = self.sessions.lock().await;
                     if !sessions.contains_key(&session_id) {
@@ -1807,6 +1875,7 @@ impl GooseAcpAgent {
                         break;
                     }
 
+                    populate_output_token_limit_content(&mut message);
                     for content_item in &message.content {
                         if let Some(error) = prompt_error_from_message_content(content_item) {
                             stream_error = Some(error);
@@ -1820,12 +1889,8 @@ impl GooseAcpAgent {
                         if let Err(error) = self
                             .handle_message_content(
                                 content_item,
+                                &message,
                                 &args.session_id,
-                                &session_id,
-                                stored_message_id.as_deref(),
-                                message.created,
-                                &message.role,
-                                message.metadata.steer,
                                 &agent,
                                 &tool_requests,
                                 cx,
@@ -1854,6 +1919,7 @@ impl GooseAcpAgent {
                             self.spawn_ready_chain_summary(chain, &agent, &args.session_id, cx);
                         }
                     }
+
                     if stream_error.is_some() {
                         break;
                     }
@@ -1921,11 +1987,7 @@ impl GooseAcpAgent {
             ))?;
         }
 
-        let stop_reason = if was_cancelled {
-            StopReason::Cancelled
-        } else {
-            StopReason::EndTurn
-        };
+        let stop_reason = prompt_stop_reason(was_cancelled, output_token_limit_reached);
 
         let mut response = PromptResponse::new(stop_reason);
         if let Some(usage) = build_prompt_usage(&session) {
@@ -2293,7 +2355,10 @@ pub async fn run(builtins: Vec<String>, enable_scheduler: bool) -> Result<()> {
 
     let server = crate::acp::server_factory::AcpServer::new(
         crate::acp::server_factory::AcpServerFactoryConfig {
-            builtins,
+            builtins: AcpBuiltinSelection {
+                explicit: builtins,
+                ..Default::default()
+            },
             data_dir: Paths::data_dir(),
             config_dir: Paths::config_dir(),
             goose_platform: GoosePlatform::GooseCli,
@@ -2318,6 +2383,125 @@ mod tests {
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
     use test_case::test_case;
+
+    #[test]
+    fn agent_creation_auth_error_maps_to_auth_required() {
+        let error = anyhow::Error::new(agent_client_protocol::Error::auth_required());
+
+        let error = agent_creation_error(error, "Failed to create agent");
+
+        assert_eq!(
+            error.code,
+            agent_client_protocol::schema::v1::ErrorCode::AuthRequired
+        );
+    }
+
+    #[test]
+    fn agent_creation_non_auth_error_remains_internal() {
+        let error = anyhow::Error::new(agent_client_protocol::Error::internal_error());
+
+        let error = agent_creation_error(error, "Failed to create agent");
+
+        assert_eq!(
+            error.code,
+            agent_client_protocol::schema::v1::ErrorCode::InternalError
+        );
+    }
+
+    fn config_with_yaml(yaml: &str) -> (Config, NamedTempFile, NamedTempFile) {
+        let config_file = NamedTempFile::new().unwrap();
+        let secrets_file = NamedTempFile::new().unwrap();
+        std::fs::write(config_file.path(), yaml).unwrap();
+        let config =
+            Config::new_with_file_secrets(config_file.path(), secrets_file.path()).unwrap();
+        (config, config_file, secrets_file)
+    }
+
+    fn has_developer(extensions: &[ExtensionConfig]) -> bool {
+        extensions.iter().any(|ext| ext.name() == "developer")
+    }
+
+    fn default_builtin(name: &str) -> AcpBuiltinSelection {
+        AcpBuiltinSelection {
+            defaults: vec![name.to_string()],
+            ..Default::default()
+        }
+    }
+
+    fn explicit_builtin(name: &str) -> AcpBuiltinSelection {
+        AcpBuiltinSelection {
+            explicit: vec![name.to_string()],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn default_builtin_developer_loads_when_config_is_empty() {
+        let (config, _c, _s) = config_with_yaml("");
+        let selected = selected_builtin_extensions(&config, &default_builtin("developer"));
+        assert!(
+            has_developer(&selected),
+            "developer should load by default on a fresh config"
+        );
+    }
+
+    #[test]
+    fn default_builtin_developer_loads_when_enabled() {
+        let (config, _c, _s) = config_with_yaml(
+            r#"
+extensions:
+  developer:
+    enabled: true
+    type: builtin
+    name: developer
+"#,
+        );
+        let selected = selected_builtin_extensions(&config, &default_builtin("developer"));
+        assert!(has_developer(&selected));
+    }
+
+    #[test]
+    fn default_builtin_developer_skipped_when_disabled() {
+        let (config, _c, _s) = config_with_yaml(
+            r#"
+extensions:
+  developer:
+    enabled: false
+    type: builtin
+    name: developer
+"#,
+        );
+        let selected = selected_builtin_extensions(&config, &default_builtin("developer"));
+        assert!(
+            !has_developer(&selected),
+            "developer must NOT load when the user disabled it (issue #10221)"
+        );
+    }
+
+    #[test]
+    fn explicit_builtin_developer_loads_when_disabled() {
+        let (config, _c, _s) = config_with_yaml(
+            r#"
+extensions:
+  developer:
+    enabled: false
+    type: builtin
+    name: developer
+"#,
+        );
+        let selected = selected_builtin_extensions(&config, &explicit_builtin("developer"));
+        assert!(has_developer(&selected));
+    }
+
+    #[test]
+    fn default_off_builtin_loads_when_explicitly_requested() {
+        let (config, _c, _s) = config_with_yaml("");
+        let selected = selected_builtin_extensions(&config, &explicit_builtin("chatrecall"));
+        assert!(
+            selected.iter().any(|ext| ext.name() == "chatrecall"),
+            "default-off builtins must load when explicitly requested via builtins"
+        );
+    }
 
     #[test_case(
         McpServer::Stdio(
@@ -2361,6 +2545,9 @@ mod tests {
             )]),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: Some(false),
             available_tools: vec![],
         })
@@ -2447,28 +2634,6 @@ print(\"hello, world\")
     }
 
     #[test]
-    fn test_message_update_meta_includes_created_and_message_id() {
-        let meta = message_update_meta(Some("msg_live"), 1_700_000_000, false);
-
-        assert_eq!(
-            meta.get("goose"),
-            Some(&serde_json::json!({
-                "created": 1_700_000_000,
-                "messageId": "msg_live",
-            })),
-        );
-
-        let chunk = content_chunk_for_message(
-            ContentBlock::Text(TextContent::new("hello")),
-            Some("msg_live"),
-            1_700_000_000,
-            true,
-        );
-
-        assert_eq!(chunk.message_id, Some(MessageId::new("msg_live")));
-    }
-
-    #[test]
     fn test_credits_exhausted_system_notification_maps_to_prompt_error() {
         let content = MessageContent::SystemNotification(SystemNotificationContent {
             notification_type: SystemNotificationType::CreditsExhausted,
@@ -2492,6 +2657,21 @@ print(\"hello, world\")
                     "url": "https://router.tetrate.ai/billing"
                 }
             })
+        );
+    }
+
+    #[test]
+    fn test_authentication_message_maps_to_auth_required() {
+        let content = MessageContent::error(
+            crate::conversation::message::MessageErrorKind::Authentication,
+            "Authentication required",
+        );
+
+        let error = prompt_error_from_message_content(&content).expect("expected prompt error");
+
+        assert_eq!(
+            error.code,
+            agent_client_protocol::schema::v1::ErrorCode::AuthRequired
         );
     }
 
@@ -2556,6 +2736,42 @@ print(\"hello, world\")
         assert!(build_prompt_usage(&session).is_none());
     }
 
+    #[test_case(false, false, StopReason::EndTurn; "normal completion")]
+    #[test_case(false, true, StopReason::MaxTokens; "output token limit")]
+    #[test_case(true, true, StopReason::Cancelled; "cancellation takes precedence")]
+    fn test_prompt_stop_reason(
+        was_cancelled: bool,
+        output_token_limit_reached: bool,
+        expected: StopReason,
+    ) {
+        assert_eq!(
+            prompt_stop_reason(was_cancelled, output_token_limit_reached),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_output_token_limit_state_tracks_latest_assistant_message() {
+        let mut output_token_limit_reached = false;
+        let mut marker = Message::assistant();
+        marker.metadata.output_token_limit_reached = true;
+
+        update_output_token_limit_reached(&mut output_token_limit_reached, &marker);
+        assert!(output_token_limit_reached);
+
+        update_output_token_limit_reached(
+            &mut output_token_limit_reached,
+            &Message::user().with_text("continue"),
+        );
+        assert!(output_token_limit_reached);
+
+        update_output_token_limit_reached(
+            &mut output_token_limit_reached,
+            &Message::assistant().with_text("Complete response"),
+        );
+        assert!(!output_token_limit_reached);
+    }
+
     #[test]
     fn test_build_usage_update_clamps_negative_used_to_zero() {
         let mut session = make_session_with_usage(
@@ -2594,14 +2810,23 @@ print(\"hello, world\")
 
     #[test]
     fn test_goose_custom_notifications_capability_defaults_to_false() {
-        let request =
-            InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::LATEST);
+        let request = InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::V1);
         let goose_client_capabilities =
             extract_client_capabilities_meta(&request).and_then(|meta| meta.goose);
 
         assert!(!extract_client_supports_goose_custom_notifications(
             goose_client_capabilities.as_ref()
         ));
+    }
+
+    #[test]
+    fn test_agent_capabilities_advertise_recipe_parameter_scopes() {
+        assert_eq!(
+            agent_capabilities_meta()
+                .and_then(|meta| meta.get("goose").cloned())
+                .and_then(|goose| goose.get("recipeParameterScopes").cloned()),
+            Some(serde_json::json!({}))
+        );
     }
 
     #[test]
@@ -2614,11 +2839,10 @@ print(\"hello, world\")
         let mut meta = serde_json::Map::new();
         meta.insert("goose".to_string(), serde_json::Value::Object(goose_meta));
 
-        let request =
-            InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::LATEST)
-                .client_capabilities(
-                    agent_client_protocol::schema::v1::ClientCapabilities::new().meta(meta),
-                );
+        let request = InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::V1)
+            .client_capabilities(
+                agent_client_protocol::schema::v1::ClientCapabilities::new().meta(meta),
+            );
         let goose_client_capabilities =
             extract_client_capabilities_meta(&request).and_then(|meta| meta.goose);
 
@@ -2629,8 +2853,7 @@ print(\"hello, world\")
 
     #[test]
     fn test_tool_call_label_enrichment_capability() {
-        let request =
-            InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::LATEST);
+        let request = InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::V1);
         let goose_client_capabilities =
             extract_client_capabilities_meta(&request).and_then(|meta| meta.goose);
         assert!(!goose_client_capabilities
@@ -2644,11 +2867,10 @@ print(\"hello, world\")
         );
         let mut meta = serde_json::Map::new();
         meta.insert("goose".to_string(), serde_json::Value::Object(goose_meta));
-        let request =
-            InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::LATEST)
-                .client_capabilities(
-                    agent_client_protocol::schema::v1::ClientCapabilities::new().meta(meta),
-                );
+        let request = InitializeRequest::new(agent_client_protocol::schema::ProtocolVersion::V1)
+            .client_capabilities(
+                agent_client_protocol::schema::v1::ClientCapabilities::new().meta(meta),
+            );
         let goose_client_capabilities =
             extract_client_capabilities_meta(&request).and_then(|meta| meta.goose);
         assert!(goose_client_capabilities

@@ -63,9 +63,15 @@ jobs:
       target: aarch64-apple-darwin
       package_cli: true
       package_desktop: true
+<<<<<<< HEAD
       # Signing certificates are optional: without the variable a tag builds
       # exactly what canary already proves, instead of failing on empty secrets.
       signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_APPLE_SIGNING == 'true' }}
+=======
+      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      environment: ${{ startsWith(github.ref, 'refs/tags/') && 'signing' || '' }}
+    secrets: inherit
+>>>>>>> v1.47.0
 
   # ------------------------------------------------------------
   # 4) Bundle CLI and Desktop (macOS x64)
@@ -78,7 +84,13 @@ jobs:
       target: x86_64-apple-darwin
       package_cli: true
       package_desktop: true
+<<<<<<< HEAD
       signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_APPLE_SIGNING == 'true' }}
+=======
+      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      environment: ${{ startsWith(github.ref, 'refs/tags/') && 'signing' || '' }}
+    secrets: inherit
+>>>>>>> v1.47.0
 
   # ------------------------------------------------------------
   # 5) Bundle Desktop App (Linux)
@@ -97,7 +109,26 @@ jobs:
     with:
       package_cli: true
       package_desktop: true
+<<<<<<< HEAD
       signing: ${{ startsWith(github.ref, 'refs/tags/') && vars.ENABLE_WINDOWS_SIGNING == 'true' }}
+=======
+      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      environment: ${{ startsWith(github.ref, 'refs/tags/') && 'signing' || '' }}
+    secrets: inherit
+
+  bundle-windows-cuda:
+    uses: ./.github/workflows/bundle-windows.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      package_cli: true
+      package_desktop: true
+      signing: ${{ startsWith(github.ref, 'refs/tags/') }}
+      environment: ${{ startsWith(github.ref, 'refs/tags/') && 'signing' || '' }}
+      windows_variant: cuda
+    secrets: inherit
+>>>>>>> v1.47.0
 
   # ------------------------------------
   # 7) Create/Update GitHub Release
@@ -116,6 +147,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Create source code bundles
+        run: |
+          git archive --format=tar.gz --prefix="goose-${GITHUB_REF_NAME}/" --output="goose-source-${GITHUB_REF_NAME}.tar.gz" HEAD
+          git archive --format=zip --prefix="goose-${GITHUB_REF_NAME}/" --output="goose-source-${GITHUB_REF_NAME}.zip" HEAD
+
       - name: Download release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
@@ -128,7 +164,7 @@ jobs:
 
       - name: Attest macOS update manifest
         if: ${{ env.ENABLE_MAC_NATIVE_AUTO_UPDATE == 'true' }}
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: latest-mac.yml
 
@@ -141,7 +177,7 @@ jobs:
           cat SHA256SUMS
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4.1.1
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
           subject-path: |
             markov-cli-*.tar.gz

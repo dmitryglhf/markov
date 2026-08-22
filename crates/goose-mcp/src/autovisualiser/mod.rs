@@ -4,8 +4,9 @@ use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
         CallToolResult, ContentBlock, ErrorCode, ErrorData, Implementation, InitializeResult,
-        ListResourcesResult, Meta, PaginatedRequestParams, ReadResourceRequestParams,
-        ReadResourceResult, Resource, ResourceContents, ServerCapabilities, ServerInfo,
+        ListResourcesResult, MetaObject, PaginatedRequestParams, ReadResourceRequestParams,
+        ReadResourceResponse, ReadResourceResult, Resource, ResourceContents, ServerCapabilities,
+        ServerInfo,
     },
     service::RequestContext,
     tool, tool_handler, tool_router, RoleServer, ServerHandler,
@@ -18,8 +19,8 @@ use std::path::PathBuf;
 const MCP_APPS_MIME_TYPE: &str = "text/html;profile=mcp-app";
 
 /// Build a Meta object with `_meta.ui.resourceUri` for linking a tool to a UI resource.
-fn ui_resource_meta(uri: &str) -> Meta {
-    let mut meta = Meta::new();
+fn ui_resource_meta(uri: &str) -> MetaObject {
+    let mut meta = MetaObject::new();
     meta.0
         .insert("ui".to_string(), json!({ "resourceUri": uri }));
     meta
@@ -694,6 +695,7 @@ impl ServerHandler for AutoVisualiserRouter {
             resources,
             next_cursor: None,
             meta: None,
+            ..Default::default()
         })
     }
 
@@ -701,10 +703,10 @@ impl ServerHandler for AutoVisualiserRouter {
         &self,
         params: ReadResourceRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<ReadResourceResult, ErrorData> {
+    ) -> Result<ReadResourceResponse, ErrorData> {
         let html = self.get_template_html(&params.uri)?;
 
-        let mut meta = Meta::new();
+        let mut meta = MetaObject::new();
         meta.0
             .insert("ui".to_string(), json!({ "prefersBorder": true }));
 
@@ -715,7 +717,7 @@ impl ServerHandler for AutoVisualiserRouter {
             meta: Some(meta),
         };
 
-        Ok(ReadResourceResult::new(vec![resource_contents]))
+        Ok(ReadResourceResult::new(vec![resource_contents]).into())
     }
 }
 
@@ -1717,6 +1719,64 @@ mod tests {
         let result = router.render_mermaid(params).await;
         assert!(result.is_ok());
         assert_mcp_apps_result(&result.unwrap(), "ui://autovisualiser/mermaid", "mermaid");
+    }
+
+    #[test]
+    fn donut_legend_renders_dynamic_values_as_text() {
+        let html = AutoVisualiserRouter::new()
+            .get_template_html("ui://autovisualiser/donut")
+            .unwrap();
+
+        assert!(!html.contains("legendEl.innerHTML"));
+        assert!(html.contains("labelEl.textContent = label"));
+        assert!(html.contains("valueEl.textContent = pct"));
+    }
+
+    #[test]
+    fn chord_tooltips_render_dynamic_values_as_text() {
+        let html = AutoVisualiserRouter::new()
+            .get_template_html("ui://autovisualiser/chord")
+            .unwrap();
+
+        assert!(!html.contains(".html("));
+        assert!(html.contains(".text(line)"));
+        assert!(html.contains("data.labels[d.source.index]"));
+        assert!(html.contains("data.labels[d.target.index]"));
+    }
+
+    #[test]
+    fn mermaid_errors_render_as_text_without_changing_svg_rendering() {
+        let html = AutoVisualiserRouter::new()
+            .get_template_html("ui://autovisualiser/mermaid")
+            .unwrap();
+
+        assert!(html.contains("errorEl.textContent = String(err.message || err)"));
+        assert!(html.contains("output.replaceChildren(errorEl)"));
+        assert!(html.contains("output.innerHTML = result.svg"));
+        assert!(!html.contains("'<div class=\"mermaid-error\">' +"));
+    }
+
+    #[test]
+    fn sankey_tooltips_render_dynamic_values_as_text() {
+        let html = AutoVisualiserRouter::new()
+            .get_template_html("ui://autovisualiser/sankey")
+            .unwrap();
+
+        assert!(!html.contains(".html("));
+        assert!(html.contains("tooltip.append(index === 0 ? \"strong\" : \"span\").text(line)"));
+        assert!(html.contains("d.source.name + \" → \" + d.target.name"));
+        assert!(html.contains("var lines = [d.name]"));
+    }
+
+    #[test]
+    fn treemap_tooltips_render_dynamic_values_as_text() {
+        let html = AutoVisualiserRouter::new()
+            .get_template_html("ui://autovisualiser/treemap")
+            .unwrap();
+
+        assert!(!html.contains("tt.innerHTML"));
+        assert!(html.contains("name.textContent = d.data.name"));
+        assert!(html.contains("document.createTextNode(d.data.category)"));
     }
 }
 
