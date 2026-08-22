@@ -86,7 +86,7 @@ if [ -n "$hand_rows" ]; then
 fi
 
 if [ -n "$lock_rows" ]; then
-    echo "### Regenerate, do not edit — $(blocks "$lock_total")"
+    echo "**Regenerate, do not edit — $(blocks "$lock_total")**"
     echo
     render_rows "$lock_rows"
     echo
@@ -99,17 +99,7 @@ if [ -z "$uu" ]; then
     echo
 fi
 
-# --- deletions, both directions ----------------------------------------------
-
-if [ -n "$du" ]; then
-    echo "### Our deletions kept — $(files "$(count "$du")")"
-    echo
-    echo "Upstream modified these; this fork had deleted them, and ours won. Check"
-    echo "that the list holds nothing worth bringing back."
-    echo
-    printf '%s\n' "$du" | sed 's/^/- `/; s/$/`/'
-    echo
-fi
+# --- deletions and collisions: the rest of the hand work ----------------------
 
 if [ -n "$ud" ]; then
     echo "### Need a decision — $(files "$(count "$ud")")"
@@ -129,57 +119,47 @@ if [ -n "$aa" ]; then
     echo
 fi
 
-# --- what the merge policy threw away, which the diff cannot show -------------
-
-ours_dropped="$(
-    comm -12 \
-        <(git diff --name-only "$BASE" HEAD | git check-attr --stdin merge \
-            | sed -n 's/: merge: ours$//p' | sort) \
-        <(git diff --name-only "$BASE" "$TAG" | sort)
-)"
-if [ -n "$ours_dropped" ]; then
-    n="$(printf '%s\n' "$ours_dropped" | wc -l | tr -d ' ')"
-    echo "### Upstream changes dropped by the merge policy — $(files "$n")"
-    echo
-    echo "\`merge=ours\` from \`.gitattributes\`. These are not conflicts: upstream's"
-    echo "changes to these files were discarded whole, non-overlapping ones included,"
-    echo "and **the diff does not show it**."
-    echo
-    echo '<details><summary>show</summary>'
-    echo
-    printf '%s\n' "$ours_dropped" | sed 's/^/- `/; s/$/`/'
-    echo
-    echo '</details>'
-    echo
-fi
-
-# --- upstream work that landed in code we have forked ------------------------
-
-ours="$(git diff --name-only --diff-filter=M "$BASE" HEAD | tr '\n' ' ')"
-if [ -n "$ours" ]; then
-    all="$(git rev-list --count "$BASE..$TAG")"
-    # Unquoted on purpose: one pathspec per file. No path in this repo has a space.
-    mine="$(git log --oneline --no-decorate "$BASE..$TAG" -- $ours 2>/dev/null)"
-    n="$(count "$mine")"
-    echo "### Upstream work in files this fork touched — $n of $all commits"
-    echo
-    echo '<details><summary>show</summary>'
-    echo
-    echo '```'
-    printf '%s\n' "$mine"
-    echo '```'
-    echo
-    echo '</details>'
-    echo
-fi
-
 # --- how to pick this up locally ---------------------------------------------
 
 # In a detached worktree `rev-parse --abbrev-ref` answers "HEAD"; the
 # workflow knows the real name and passes it.
 branch="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+
+has_lock() { printf '%b' "$lock_rows" | grep -q "	$1$"; }
+
 echo "### Continue locally"
 echo
 echo '```sh'
 echo "git fetch origin && git checkout $branch"
+echo
+echo "# 1. work through the markers, file by file, in the order listed above"
+echo
+
+if has_lock Cargo.lock || has_lock ui/pnpm-lock.yaml; then
+    echo "# 2. lockfiles are regenerated, never merged: take the upstream copy,"
+    echo "#    then let each tool re-resolve it against our own manifests"
+    has_lock Cargo.lock && {
+        echo "git checkout HEAD^2 -- Cargo.lock"
+        echo "cargo metadata --format-version 1 >/dev/null"
+    }
+    has_lock ui/pnpm-lock.yaml && {
+        echo "git checkout HEAD^2 -- ui/pnpm-lock.yaml"
+        echo "(cd ui && pnpm install --lockfile-only)"
+    }
+    echo
+fi
+
+echo "# 3. verify before handing it back"
+echo "source ./bin/activate-hermit"
+echo "cargo check --workspace --locked"
+echo "just check-acp-schema"
+echo
+echo "# 4. publish"
+echo "git add -A"
+echo "git commit -m 'resolve upstream $TAG'"
+echo "git push"
+echo "gh pr ready"
 echo '```'
+echo
+echo "\`HEAD^2\` is the upstream side of this merge, so those two lines only work"
+echo "while the merge commit is still the tip of the branch."

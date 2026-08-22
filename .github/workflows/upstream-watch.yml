@@ -137,7 +137,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
-        run: scripts/upstream-explain.sh >> /tmp/body.md
+        run: scripts/upstream-explain.sh > /tmp/explain.md
 
       # Always: --no-commit left the merge open even when it went through cleanly.
       - name: Commit the merge as it came out
@@ -167,8 +167,15 @@ jobs:
           draft=--draft
           [ '${{ steps.policy.outputs.clean }}' = 'true' ] && draft=""
 
-          gh pr create $draft \
+          url="$(gh pr create $draft \
             --base main --head "$branch" \
             --title "merge upstream $tag" \
             --label upstream-merge \
-            --body-file /tmp/body.md
+            --body-file /tmp/body.md)"
+          echo "$url"
+
+          # The model's reading of the hunks goes in a comment, not the body:
+          # it is the one part of this pull request nobody verified.
+          if [ -s /tmp/explain.md ]; then
+            gh pr comment "$url" --body-file /tmp/explain.md
+          fi
