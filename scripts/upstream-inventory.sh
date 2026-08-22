@@ -125,41 +125,14 @@ fi
 # workflow knows the real name and passes it.
 branch="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
-has_lock() { printf '%b' "$lock_rows" | grep -q "	$1$"; }
-
 echo "### Continue locally"
 echo
 echo '```sh'
-echo "git fetch origin && git checkout $branch"
+echo "git fetch origin"
+echo "git switch $branch"
 echo
-echo "# 1. work through the markers, file by file, in the order listed above"
-echo
-
-if has_lock Cargo.lock || has_lock ui/pnpm-lock.yaml; then
-    echo "# 2. lockfiles are regenerated, never merged: take the upstream copy,"
-    echo "#    then let each tool re-resolve it against our own manifests"
-    has_lock Cargo.lock && {
-        echo "git checkout HEAD^2 -- Cargo.lock"
-        echo "cargo metadata --format-version 1 >/dev/null"
-    }
-    has_lock ui/pnpm-lock.yaml && {
-        echo "git checkout HEAD^2 -- ui/pnpm-lock.yaml"
-        echo "(cd ui && pnpm install --lockfile-only)"
-    }
-    echo
-fi
-
-echo "# 3. verify before handing it back"
-echo "source ./bin/activate-hermit"
-echo "cargo check --workspace --locked"
-echo "just check-acp-schema"
-echo
-echo "# 4. publish"
-echo "git add -A"
-echo "git commit -m 'resolve upstream $TAG'"
+echo "# resolve the conflicts, then"
+echo "git add -A && git commit"
 echo "git push"
 echo "gh pr ready"
 echo '```'
-echo
-echo "\`HEAD^2\` is the upstream side of this merge, so those two lines only work"
-echo "while the merge commit is still the tip of the branch."
