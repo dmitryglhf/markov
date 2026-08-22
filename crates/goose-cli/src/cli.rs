@@ -322,7 +322,7 @@ impl Default for OutputOptions {
     }
 }
 
-/// Model/provider override options for the run command
+/// Model/provider override options
 #[derive(Args, Debug, Clone, Default)]
 pub struct ModelOptions {
     /// Provider to use for this run (overrides environment variable)
@@ -943,6 +943,9 @@ enum Command {
 
         #[command(flatten)]
         extension_opts: ExtensionOptions,
+
+        #[command(flatten)]
+        model_opts: ModelOptions,
     },
 
     /// Execute commands from an instruction file
@@ -1147,6 +1150,7 @@ enum Command {
         /// (capped at 4 concurrent), bounding wall-clock to the slowest
         /// single check rather than waiting on the model to issue
         /// dispatches.
+        /// Checks with an explicit tool allowlist require the default orchestrator.
         #[arg(long = "no-orchestrate")]
         no_orchestrate: bool,
 
@@ -1396,6 +1400,7 @@ struct ServeCommandArgs {
 
 async fn handle_serve_command(args: ServeCommandArgs) -> Result<()> {
     use axum::http::HeaderValue;
+    use goose::acp::server::AcpBuiltinSelection;
     use goose::acp::server_factory::{AcpServer, AcpServerFactoryConfig};
     use goose::acp::transport::create_router;
     use goose::config::paths::Paths;
@@ -1417,9 +1422,15 @@ async fn handle_serve_command(args: ServeCommandArgs) -> Result<()> {
     } = args;
 
     let builtins = if builtins.is_empty() {
-        vec!["developer".to_string()]
+        AcpBuiltinSelection {
+            defaults: vec!["developer".to_string()],
+            explicit: Vec::new(),
+        }
     } else {
-        builtins
+        AcpBuiltinSelection {
+            defaults: Vec::new(),
+            explicit: builtins,
+        }
     };
 
     let additional_source_roots = Config::global()
@@ -1470,6 +1481,9 @@ async fn handle_serve_command(args: ServeCommandArgs) -> Result<()> {
         })
         .collect::<Result<Vec<_>>>()?;
     let secret_key = env_secret.unwrap_or_else(generate_serve_secret_key);
+    if let Err(error) = server.start_scheduler().await {
+        warn!("Scheduler failed to start; scheduled jobs will not run until a client connects: {error}");
+    }
     let router = create_router(
         server,
         secret_key,
@@ -1614,15 +1628,28 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
     Ok(())
 }
 
-pub async fn handle_interactive_session(
-    identifier: Option<Identifier>,
-    resume: bool,
-    fork: bool,
-    edit: bool,
-    history: bool,
-    session_opts: SessionOptions,
-    extension_opts: ExtensionOptions,
-) -> Result<()> {
+pub struct InteractiveSessionArgs {
+    pub identifier: Option<Identifier>,
+    pub resume: bool,
+    pub fork: bool,
+    pub edit: bool,
+    pub history: bool,
+    pub session_opts: SessionOptions,
+    pub extension_opts: ExtensionOptions,
+    pub model_opts: ModelOptions,
+}
+
+pub async fn handle_interactive_session(args: InteractiveSessionArgs) -> Result<()> {
+    let InteractiveSessionArgs {
+        identifier,
+        resume,
+        fork,
+        edit,
+        history,
+        session_opts,
+        extension_opts,
+        model_opts,
+    } = args;
     #[cfg(feature = "telemetry")]
     if get_telemetry_choice().is_none() {
         configure_telemetry_consent_dialog()?;
@@ -1721,8 +1748,8 @@ pub async fn handle_interactive_session(
         no_profile: extension_opts.no_profile,
         recipe: None,
         additional_system_prompt: None,
-        provider: None,
-        model: None,
+        provider: model_opts.provider,
+        model: model_opts.model,
         debug: session_opts.debug,
         max_tool_repetitions: session_opts.max_tool_repetitions,
         max_turns: session_opts.max_turns,
@@ -2317,8 +2344,9 @@ pub async fn run_matches(matches: &clap::ArgMatches) -> anyhow::Result<()> {
             history,
             session_opts,
             extension_opts,
+            model_opts,
         }) => {
-            handle_interactive_session(
+            handle_interactive_session(InteractiveSessionArgs {
                 identifier,
                 resume,
                 fork,
@@ -2326,7 +2354,8 @@ pub async fn run_matches(matches: &clap::ArgMatches) -> anyhow::Result<()> {
                 history,
                 session_opts,
                 extension_opts,
-            )
+                model_opts,
+            })
             .await
         }
         Some(Command::Run {
@@ -2458,6 +2487,63 @@ mod tests {
                 ..
             }) => {}
             _ => panic!("expected nu completion shell"),
+        }
+    }
+
+    #[test]
+    fn session_resume_accepts_provider_and_model_overrides() {
+        let cli = Cli::try_parse_from([
+            "goose",
+            "session",
+            "--resume",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-5.4",
+        ])
+        .expect("parse failed");
+
+        match cli.command {
+            Some(Command::Session {
+                resume, model_opts, ..
+            }) => {
+                assert!(resume);
+                assert_eq!(model_opts.provider.as_deref(), Some("openai"));
+                assert_eq!(model_opts.model.as_deref(), Some("gpt-5.4"));
+            }
+            _ => panic!("expected session command"),
+        }
+    }
+
+    #[test]
+    fn session_accepts_provider_override_without_resume() {
+        let cli = Cli::try_parse_from(["goose", "session", "--provider", "openai"])
+            .expect("provider override should work for a new session");
+
+        match cli.command {
+            Some(Command::Session {
+                resume, model_opts, ..
+            }) => {
+                assert!(!resume);
+                assert_eq!(model_opts.provider.as_deref(), Some("openai"));
+            }
+            _ => panic!("expected session command"),
+        }
+    }
+
+    #[test]
+    fn session_accepts_model_override_without_resume() {
+        let cli = Cli::try_parse_from(["goose", "session", "--model", "gpt-5.4"])
+            .expect("model override should work for a new session");
+
+        match cli.command {
+            Some(Command::Session {
+                resume, model_opts, ..
+            }) => {
+                assert!(!resume);
+                assert_eq!(model_opts.model.as_deref(), Some("gpt-5.4"));
+            }
+            _ => panic!("expected session command"),
         }
     }
 

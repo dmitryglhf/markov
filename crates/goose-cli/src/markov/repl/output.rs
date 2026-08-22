@@ -1,4 +1,4 @@
-use anstream::println;
+use anstream::{adapter::strip_str, println};
 use bat::WrappingMode;
 use console::{measure_text_width, style, Color, StyledObject, Term};
 use goose::config::{Config, GooseMode};
@@ -353,6 +353,9 @@ pub fn render_message(message: &Message, debug: bool) {
                 ActionRequiredData::ElicitationResponse { id, .. } => {
                     println!("action_required(elicitation_response): {}", id)
                 }
+                ActionRequiredData::ToolConfirmationResponse { id, .. } => {
+                    println!("action_required(tool_confirmation_response): {}", id)
+                }
             },
             MessageContent::Text(text) => print_markdown(&text.text, theme),
             MessageContent::ToolRequest(req) => render_tool_request(req, theme, debug),
@@ -443,6 +446,9 @@ pub fn render_message_streaming(
                     }
                     ActionRequiredData::ElicitationResponse { id, .. } => {
                         println!("action_required(elicitation_response): {}", id)
+                    }
+                    ActionRequiredData::ToolConfirmationResponse { id, .. } => {
+                        println!("action_required(tool_confirmation_response): {}", id)
                     }
                 }
             }
@@ -798,6 +804,15 @@ fn render_tool_response(resp: &ToolResponse, debug: bool) {
     }
 }
 
+/// Tool output is untrusted text: an escape sequence in it would otherwise
+/// repaint the screen, rewrite the window title or reach the clipboard.
+pub(super) fn sanitize_terminal_line(line: &str) -> String {
+    strip_str(line)
+        .flat_map(str::chars)
+        .filter(|character| *character == '\t' || !character.is_control())
+        .collect()
+}
+
 fn print_tool_output(text: &str, is_error: bool, is_the_answer: bool) {
     if text.is_empty() {
         return;
@@ -830,7 +845,7 @@ fn print_tool_output(text: &str, is_error: bool, is_the_answer: bool) {
         usize::MAX
     };
     let paint = |line: &str| {
-        let styled = style(line.to_string());
+        let styled = style(sanitize_terminal_line(line));
         if is_error {
             styled.red()
         } else {
@@ -1804,6 +1819,14 @@ fn shorten_path(path: &str, debug: bool) -> String {
     shortened.join("/")
 }
 
+pub fn display_banner(banners: &[String]) {
+    for banner in banners {
+        for line in banner.lines() {
+            println!("{}", line);
+        }
+    }
+}
+
 pub fn display_session_info(
     resume: bool,
     provider: &str,
@@ -1973,7 +1996,7 @@ pub fn display_cost_usage(provider: &str, model: &str, usage: &Usage) {
 pub struct McpSpinners {
     bars: HashMap<String, ProgressBar>,
     log_spinner: Option<ProgressBar>,
-
+    shell_output_lines: VecDeque<String>,
     multi_bar: MultiProgress,
 }
 
@@ -1982,6 +2005,7 @@ impl McpSpinners {
         McpSpinners {
             bars: HashMap::new(),
             log_spinner: None,
+            shell_output_lines: VecDeque::new(),
             multi_bar: MultiProgress::new(),
         }
     }
@@ -2002,6 +2026,13 @@ impl McpSpinners {
         });
 
         spinner.set_message(message.to_string());
+    }
+
+    pub fn log_shell_output(&mut self, lines: Vec<String>, max_lines: usize) {
+        let message = update_recent_lines(&mut self.shell_output_lines, lines, max_lines);
+        if !message.is_empty() {
+            self.log(&message);
+        }
     }
 
     pub fn update(&mut self, token: &str, value: f64, total: Option<f64>, message: Option<&str>) {
@@ -2030,8 +2061,25 @@ impl McpSpinners {
         if let Some(spinner) = self.log_spinner.as_mut() {
             spinner.disable_steady_tick();
         }
+        self.shell_output_lines.clear();
         self.multi_bar.clear()
     }
+}
+
+fn update_recent_lines(
+    recent_lines: &mut VecDeque<String>,
+    lines: impl IntoIterator<Item = String>,
+    max_lines: usize,
+) -> String {
+    recent_lines.extend(lines);
+    while recent_lines.len() > max_lines {
+        recent_lines.pop_front();
+    }
+    recent_lines
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join("\n  ")
 }
 
 #[cfg(test)]

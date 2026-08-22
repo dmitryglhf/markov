@@ -181,7 +181,7 @@ pub enum ExtensionConfig {
         description: String,
         cmd: String,
         args: Vec<String>,
-        #[serde(default)]
+        #[serde(default, alias = "env")]
         envs: Envs,
         #[serde(default)]
         env_keys: Vec<String>,
@@ -249,6 +249,26 @@ pub enum ExtensionConfig {
         /// Use `@name` for Linux abstract sockets.
         #[serde(default)]
         socket: Option<String>,
+        /// OAuth client ID pre-registered with the server's authorization
+        /// server. When set, it is used directly for the authorization flow
+        /// instead of Client ID Metadata Documents or Dynamic Client
+        /// Registration — required for authorization servers that support
+        /// neither. Supports `$VAR`/`${VAR}` substitution.
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        client_id: Option<String>,
+        /// Name of the env/secret key holding the OAuth client secret paired
+        /// with `client_id`. The value is resolved from `envs`/`env_keys` or
+        /// the config secret store — never stored inline. Optional: public
+        /// clients using PKCE have no secret.
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        client_secret_key: Option<String>,
+        /// OAuth scopes to request with `client_id`. When empty, scopes are
+        /// selected from server metadata, which may be broader than needed.
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        scopes: Vec<String>,
         #[serde(default)]
         bundled: Option<bool>,
         #[serde(default)]
@@ -390,6 +410,9 @@ impl ExtensionConfig {
             description: description.into(),
             timeout: Some(timeout.into()),
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: Vec::new(),
             bundled: None,
             available_tools: Vec::new(),
         }
@@ -561,10 +584,22 @@ impl ExtensionConfig {
                 headers,
                 timeout,
                 socket,
+                client_id,
+                client_secret_key,
+                scopes,
                 bundled,
                 available_tools,
             } => {
-                let merged = merge_environments(&envs, &env_keys, &name, config).await?;
+                // Resolve the OAuth client secret alongside env_keys so that
+                // rotating it changes the resolved config, which is what
+                // add_extension compares to decide whether to restart.
+                let mut secret_keys = env_keys;
+                if let Some(key) = &client_secret_key {
+                    if !secret_keys.contains(key) {
+                        secret_keys.push(key.clone());
+                    }
+                }
+                let merged = merge_environments(&envs, &secret_keys, &name, config).await?;
                 let headers = headers
                     .into_iter()
                     .map(|(k, v)| {
@@ -573,6 +608,7 @@ impl ExtensionConfig {
                     })
                     .collect();
                 let socket = socket.map(|s| substitute_env_vars(&s, &merged));
+                let client_id = client_id.map(|c| substitute_env_vars(&c, &merged));
                 Ok(Self::StreamableHttp {
                     name,
                     description,
@@ -582,6 +618,9 @@ impl ExtensionConfig {
                     headers,
                     timeout,
                     socket,
+                    client_id,
+                    client_secret_key,
+                    scopes,
                     bundled,
                     available_tools,
                 })
@@ -804,6 +843,77 @@ available_tools: []
     }
 
     #[test]
+    fn test_deserialize_streamable_http_oauth_client_fields() {
+        let config: ExtensionConfig = serde_yaml::from_str(
+            "type: streamable_http
+name: remote
+uri: https://example.com/mcp
+client_id: registered-client.example
+client_secret_key: OAUTH_CLIENT_SECRET
+scopes:
+  - scope.read
+  - scope.write
+timeout: 300",
+        )
+        .unwrap();
+
+        let ExtensionConfig::StreamableHttp {
+            client_id,
+            client_secret_key,
+            scopes,
+            ..
+        } = config
+        else {
+            panic!("expected streamable_http config");
+        };
+
+        assert_eq!(client_id.as_deref(), Some("registered-client.example"));
+        assert_eq!(client_secret_key.as_deref(), Some("OAUTH_CLIENT_SECRET"));
+        assert_eq!(scopes, vec!["scope.read", "scope.write"]);
+    }
+
+    #[test]
+    fn test_deserialize_streamable_http_without_oauth_client_fields() {
+        let config: ExtensionConfig = serde_yaml::from_str(
+            "type: streamable_http
+name: remote
+uri: https://example.com/mcp
+timeout: 300",
+        )
+        .unwrap();
+
+        let ExtensionConfig::StreamableHttp {
+            client_id,
+            client_secret_key,
+            scopes,
+            ..
+        } = config
+        else {
+            panic!("expected streamable_http config");
+        };
+
+        assert_eq!(client_id, None);
+        assert_eq!(client_secret_key, None);
+        assert!(scopes.is_empty());
+    }
+
+    #[test]
+    fn serialization_omits_unset_oauth_client_fields() {
+        let config = ExtensionConfig::streamable_http(
+            "remote",
+            "https://example.com/mcp",
+            "remote extension",
+            300u64,
+        );
+
+        let yaml = serde_yaml::to_string(&config).unwrap();
+
+        assert!(!yaml.contains("client_id"));
+        assert!(!yaml.contains("client_secret_key"));
+        assert!(!yaml.contains("scopes"));
+    }
+
+    #[test]
     fn envs_deserialization_filters_disallowed_keys() {
         let envs: extension::Envs =
             serde_yaml::from_str("LD_PRELOAD: /tmp/injected.so\nSAFE_VAR: ok\n").unwrap();
@@ -884,6 +994,9 @@ available_tools: []
             .collect(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         },
@@ -905,6 +1018,9 @@ available_tools: []
             .collect(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         }
@@ -983,6 +1099,9 @@ available_tools: []
             .collect(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         },
@@ -1001,6 +1120,9 @@ available_tools: []
                 .collect(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         }
@@ -1016,6 +1138,9 @@ available_tools: []
             headers: std::collections::HashMap::new(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         },
@@ -1032,6 +1157,9 @@ available_tools: []
             headers: std::collections::HashMap::new(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         }
@@ -1072,6 +1200,80 @@ available_tools: []
         }
         ; "env_key_skipped_when_already_in_envs"
     )]
+    #[test_case(
+        ExtensionConfig::StreamableHttp {
+            name: "test".into(),
+            description: String::new(),
+            uri: "https://example.com/mcp".into(),
+            envs: extension::Envs::default(),
+            env_keys: vec!["MY_SECRET".into()],
+            headers: std::collections::HashMap::new(),
+            timeout: None,
+            socket: None,
+            client_id: Some("${MY_SECRET}".into()),
+            client_secret_key: Some("MY_SECRET".into()),
+            scopes: vec!["scope.read".into()],
+            bundled: None,
+            available_tools: vec![],
+        },
+        ExtensionConfig::StreamableHttp {
+            name: "test".into(),
+            description: String::new(),
+            uri: "https://example.com/mcp".into(),
+            envs: extension::Envs::new({
+                let mut m = std::collections::HashMap::new();
+                m.insert("MY_SECRET".to_string(), "secret_value".to_string());
+                m
+            }),
+            env_keys: vec![],
+            headers: std::collections::HashMap::new(),
+            timeout: None,
+            socket: None,
+            client_id: Some("secret_value".into()),
+            client_secret_key: Some("MY_SECRET".into()),
+            scopes: vec!["scope.read".into()],
+            bundled: None,
+            available_tools: vec![],
+        }
+        ; "http_client_id_substitution_and_oauth_fields_preserved"
+    )]
+    #[test_case(
+        ExtensionConfig::StreamableHttp {
+            name: "test".into(),
+            description: String::new(),
+            uri: "https://example.com/mcp".into(),
+            envs: extension::Envs::default(),
+            env_keys: vec![],
+            headers: std::collections::HashMap::new(),
+            timeout: None,
+            socket: None,
+            client_id: Some("registered-client".into()),
+            client_secret_key: Some("MY_SECRET".into()),
+            scopes: vec![],
+            bundled: None,
+            available_tools: vec![],
+        },
+        ExtensionConfig::StreamableHttp {
+            name: "test".into(),
+            description: String::new(),
+            uri: "https://example.com/mcp".into(),
+            envs: extension::Envs::new({
+                let mut m = std::collections::HashMap::new();
+                m.insert("MY_SECRET".to_string(), "secret_value".to_string());
+                m
+            }),
+            env_keys: vec![],
+            headers: std::collections::HashMap::new(),
+            timeout: None,
+            socket: None,
+            client_id: Some("registered-client".into()),
+            client_secret_key: Some("MY_SECRET".into()),
+            scopes: vec![],
+            bundled: None,
+            available_tools: vec![],
+        }
+        ; "http_client_secret_key_resolved_without_env_keys_entry"
+    )]
     #[tokio::test]
     async fn test_resolve(config: ExtensionConfig, expected: ExtensionConfig) {
         let dir = tempfile::tempdir().unwrap();
@@ -1095,6 +1297,9 @@ available_tools: []
             headers: std::collections::HashMap::new(),
             timeout: None,
             socket: Some("@egress.sock".to_string()),
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         };
@@ -1115,6 +1320,9 @@ available_tools: []
             headers: std::collections::HashMap::new(),
             timeout: None,
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: vec![],
             bundled: None,
             available_tools: vec![],
         };

@@ -29,6 +29,7 @@ pub enum InputResult {
     Plan(PlanCommandOptions),
     EndPlan,
     Clear,
+    New,
     Recipe(Option<String>),
     Compact,
     ToggleFullToolOutput,
@@ -326,6 +327,7 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
     const CMD_PLAN: &str = "/plan";
     const CMD_ENDPLAN: &str = "/endplan";
     const CMD_CLEAR: &str = "/clear";
+    const CMD_NEW: &str = "/new";
     const CMD_RECIPE: &str = "/recipe";
     const CMD_COMPACT: &str = "/compact";
     const CMD_SUMMARIZE_DEPRECATED: &str = "/summarize";
@@ -419,6 +421,7 @@ fn handle_slash_command(input: &str) -> Option<InputResult> {
         }
         s if s == CMD_ENDPLAN => Some(InputResult::EndPlan),
         s if s == CMD_CLEAR => Some(InputResult::Clear),
+        s if s == CMD_NEW => Some(InputResult::New),
         s if s.starts_with(CMD_RECIPE) => parse_recipe_command(s),
         s if s == CMD_COMPACT => Some(InputResult::Compact),
         // Match "/skills" exactly or "/skills " with args - avoids matching e.g. "/skillsextra"
@@ -652,6 +655,7 @@ fn help_text() -> String {
 /skills - Browse, create, edit or remove skills. With names, loads them (usage: /skills [<name>...])
 /? or /help - Display this help message
 /clear - Clears the current chat history
+/new - Start a fresh session in this process, keeping the current provider, model and extensions
 
 Navigation:
 Enter - Send message

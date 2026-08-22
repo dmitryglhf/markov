@@ -1,4 +1,25 @@
 {
+  "acpReadinessPanel.adapterFound": {
+    "defaultMessage": "ACP adapter found"
+  },
+  "acpReadinessPanel.adapterNotFound": {
+    "defaultMessage": "ACP adapter not found"
+  },
+  "acpReadinessPanel.authenticationHelp": {
+    "defaultMessage": "Sign in through the provider CLI, then check again."
+  },
+  "acpReadinessPanel.checkAgain": {
+    "defaultMessage": "Check again"
+  },
+  "acpReadinessPanel.checking": {
+    "defaultMessage": "Checking..."
+  },
+  "acpReadinessPanel.connected": {
+    "defaultMessage": "Connected successfully"
+  },
+  "acpReadinessPanel.connectionNotChecked": {
+    "defaultMessage": "Check your account connection before continuing."
+  },
   "alertBox.autoCompactAt": {
     "defaultMessage": "Auto compact at"
   },
@@ -133,6 +154,9 @@
   },
   "baseChat.reconnecting": {
     "defaultMessage": "Connection lost. Reconnecting…"
+  },
+  "baseChat.retry": {
+    "defaultMessage": "Retry"
   },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Extension Updated"
@@ -1225,6 +1249,27 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Connect to an ACP-compatible backend running elsewhere."
+  },
+  "externalBackendSection.workingDir": {
+    "defaultMessage": "Remote Working Directory (optional)"
+  },
+  "externalBackendSection.workingDirHelp": {
+    "defaultMessage": "Absolute path on the external backend. Leave blank to send the local working directory."
+  },
+  "externalBackendSection.workingDirPlaceholder": {
+    "defaultMessage": "/home/goose/workspace"
+  },
+  "gitBranchIndicator.failedToSwitch": {
+    "defaultMessage": "Failed to switch to {branch}"
+  },
+  "gitBranchIndicator.noBranchesFound": {
+    "defaultMessage": "No branches found"
+  },
+  "gitBranchIndicator.searchBranches": {
+    "defaultMessage": "Search branches…"
+  },
+  "gitBranchIndicator.uncommittedChanges": {
+    "defaultMessage": "You may have uncommitted changes."
   },
   "goosehintsModal.close": {
     "defaultMessage": "Close"
@@ -2321,6 +2366,9 @@
   "modelsBottomBar.localModelSettingsTitle": {
     "defaultMessage": "Local Model Settings — {modelName}"
   },
+  "modelsBottomBar.recentModels": {
+    "defaultMessage": "Recent"
+  },
   "modelsBottomBar.resolvedModel": {
     "defaultMessage": "Resolved model"
   },
@@ -2360,8 +2408,35 @@
   "navigationPanel.chats": {
     "defaultMessage": "Chats"
   },
+  "navigationPanel.metaCreated": {
+    "defaultMessage": "Created"
+  },
+  "navigationPanel.metaDirectory": {
+    "defaultMessage": "Directory"
+  },
+  "navigationPanel.metaModel": {
+    "defaultMessage": "Model"
+  },
+  "navigationPanel.metaStatus": {
+    "defaultMessage": "Status"
+  },
+  "navigationPanel.metaUpdated": {
+    "defaultMessage": "Updated"
+  },
   "navigationPanel.noChats": {
     "defaultMessage": "No recent chats"
+  },
+  "navigationPanel.statusError": {
+    "defaultMessage": "Error"
+  },
+  "navigationPanel.statusIdle": {
+    "defaultMessage": "Idle"
+  },
+  "navigationPanel.statusStreaming": {
+    "defaultMessage": "Streaming"
+  },
+  "navigationPanel.statusUnread": {
+    "defaultMessage": "Unread activity"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Untitled session"
@@ -2654,6 +2729,9 @@
   "promptsSettings.unsavedChanges": {
     "defaultMessage": "You have unsaved changes"
   },
+  "providerCard.deprecatedReplacement": {
+    "defaultMessage": "Deprecated — use {replacement} instead."
+  },
   "providerCard.noMetadata": {
     "defaultMessage": "ProviderCard error: No metadata provided"
   },
@@ -2734,6 +2812,9 @@
   },
   "providerConfigurationModal.checkConfigAgain": {
     "defaultMessage": "Check your configuration again to use this provider."
+  },
+  "providerConfigurationModal.chooseModel": {
+    "defaultMessage": "Choose model"
   },
   "providerConfigurationModal.close": {
     "defaultMessage": "Close"
@@ -3731,6 +3812,12 @@
   "sessions.action.export": {
     "defaultMessage": "Export session"
   },
+  "sessions.action.exportJson": {
+    "defaultMessage": "JSON"
+  },
+  "sessions.action.exportMarkdown": {
+    "defaultMessage": "Markdown"
+  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Open in new window"
   },
@@ -3829,6 +3916,9 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Session \"{name}\" duplicated successfully"
+  },
+  "sessions.toast.exportFailed": {
+    "defaultMessage": "Failed to export session: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Session exported successfully"
@@ -4661,6 +4751,9 @@
   "userMessage.editButton": {
     "defaultMessage": "Edit"
   },
+  "userMessage.editImagesHeading": {
+    "defaultMessage": "Attached images:"
+  },
   "userMessage.editInPlace": {
     "defaultMessage": "Edit in Place"
   },
@@ -4693,5 +4786,8 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Create a new session with the edited message"
+  },
+  "userMessage.removeImageFromEdit": {
+    "defaultMessage": "Remove image from message"
   }
 }

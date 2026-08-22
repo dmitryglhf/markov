@@ -134,6 +134,9 @@
   "baseChat.reconnecting": {
     "defaultMessage": "接続が失われました。再接続しています…"
   },
+  "baseChat.retry": {
+    "defaultMessage": "再試行"
+  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "拡張機能を更新しました"
   },
@@ -929,6 +932,18 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "最近のディレクトリ"
   },
+  "gitBranchIndicator.failedToSwitch": {
+    "defaultMessage": "{branch} への切り替えに失敗しました"
+  },
+  "gitBranchIndicator.noBranchesFound": {
+    "defaultMessage": "ブランチが見つかりません"
+  },
+  "gitBranchIndicator.searchBranches": {
+    "defaultMessage": "ブランチを検索…"
+  },
+  "gitBranchIndicator.uncommittedChanges": {
+    "defaultMessage": "コミットされていない変更がある可能性があります。"
+  },
   "elicitationRequest.accept": {
     "defaultMessage": "承諾"
   },
@@ -1225,6 +1240,15 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "別の場所で実行中の goose サーバーに接続します（アプリの再起動が必要）"
+  },
+  "externalBackendSection.workingDir": {
+    "defaultMessage": "リモート作業ディレクトリ（任意）"
+  },
+  "externalBackendSection.workingDirHelp": {
+    "defaultMessage": "外部バックエンド上の絶対パスです。空欄の場合はローカルの作業ディレクトリを送信します。"
+  },
+  "externalBackendSection.workingDirPlaceholder": {
+    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "閉じる"
@@ -2360,8 +2384,35 @@
   "navigationPanel.chats": {
     "defaultMessage": "チャット"
   },
+  "navigationPanel.metaCreated": {
+    "defaultMessage": "作成"
+  },
+  "navigationPanel.metaDirectory": {
+    "defaultMessage": "ディレクトリ"
+  },
+  "navigationPanel.metaModel": {
+    "defaultMessage": "モデル"
+  },
+  "navigationPanel.metaStatus": {
+    "defaultMessage": "ステータス"
+  },
+  "navigationPanel.metaUpdated": {
+    "defaultMessage": "更新"
+  },
   "navigationPanel.noChats": {
     "defaultMessage": "最近のチャットはありません"
+  },
+  "navigationPanel.statusError": {
+    "defaultMessage": "エラー"
+  },
+  "navigationPanel.statusIdle": {
+    "defaultMessage": "アイドル"
+  },
+  "navigationPanel.statusStreaming": {
+    "defaultMessage": "ストリーミング"
+  },
+  "navigationPanel.statusUnread": {
+    "defaultMessage": "未読のアクティビティ"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "無題のセッション"
@@ -3731,6 +3782,12 @@
   "sessions.action.export": {
     "defaultMessage": "セッションをエクスポート"
   },
+  "sessions.action.exportJson": {
+    "defaultMessage": "JSON"
+  },
+  "sessions.action.exportMarkdown": {
+    "defaultMessage": "Markdown"
+  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "新しいウィンドウで開く"
   },
@@ -3829,6 +3886,9 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "セッション「{name}」を複製しました"
+  },
+  "sessions.toast.exportFailed": {
+    "defaultMessage": "セッションをエクスポートできませんでした: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "セッションをエクスポートしました"
@@ -4661,6 +4721,9 @@
   "userMessage.editButton": {
     "defaultMessage": "編集"
   },
+  "userMessage.editImagesHeading": {
+    "defaultMessage": "添付画像:"
+  },
   "userMessage.editInPlace": {
     "defaultMessage": "その場で編集"
   },
@@ -4693,5 +4756,38 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "編集したメッセージで新しいセッションを作成"
+  },
+  "userMessage.removeImageFromEdit": {
+    "defaultMessage": "メッセージから画像を削除"
+  },
+  "modelsBottomBar.recentModels": {
+    "defaultMessage": "最近"
+  },
+  "providerConfigurationModal.chooseModel": {
+    "defaultMessage": "モデルを選択"
+  },
+  "providerCard.deprecatedReplacement": {
+    "defaultMessage": "非推奨です。代わりに {replacement} を使用してください。"
+  },
+  "acpReadinessPanel.adapterFound": {
+    "defaultMessage": "ACPアダプターが見つかりました"
+  },
+  "acpReadinessPanel.adapterNotFound": {
+    "defaultMessage": "ACPアダプターが見つかりません"
+  },
+  "acpReadinessPanel.authenticationHelp": {
+    "defaultMessage": "プロバイダーのCLIからサインインし、もう一度確認してください。"
+  },
+  "acpReadinessPanel.checkAgain": {
+    "defaultMessage": "もう一度確認"
+  },
+  "acpReadinessPanel.checking": {
+    "defaultMessage": "確認中..."
+  },
+  "acpReadinessPanel.connected": {
+    "defaultMessage": "接続しました"
+  },
+  "acpReadinessPanel.connectionNotChecked": {
+    "defaultMessage": "続行する前にアカウントの接続を確認してください。"
   }
 }

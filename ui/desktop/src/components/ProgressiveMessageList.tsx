@@ -26,7 +26,12 @@ import {
   CreditsExhaustedNotification,
   getCreditsExhaustedNotification,
 } from './context_management/CreditsExhaustedNotification';
-import type { Message, NotificationEvent, SystemNotificationContent } from '../types/message';
+import type {
+  ImageData,
+  Message,
+  NotificationEvent,
+  SystemNotificationContent,
+} from '../types/message';
 import LoadingGoose from './LoadingGoose';
 import { ChatType } from '../types/chat';
 import { identifyConsecutiveToolCalls, isInChain } from '../utils/toolCallChaining';
@@ -59,7 +64,12 @@ interface ProgressiveMessageListProps {
   // Custom render function for messages
   renderMessage?: (message: Message, index: number) => React.ReactNode | null;
   isStreamingMessage?: boolean; // Whether messages are currently being streamed
-  onMessageUpdate?: (messageId: string, newContent: string, editType?: 'fork' | 'edit') => void;
+  onMessageUpdate?: (
+    messageId: string,
+    newContent: string,
+    editType: 'fork' | 'edit',
+    retainedImages: ImageData[]
+  ) => void;
   onRenderingComplete?: () => void; // Callback when all messages are rendered
   submitElicitationResponse?: (
     elicitationId: string,

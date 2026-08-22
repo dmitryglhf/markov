@@ -134,6 +134,9 @@
   "baseChat.reconnecting": {
     "defaultMessage": "Connexion perdue. Reconnexion…"
   },
+  "baseChat.retry": {
+    "defaultMessage": "Réessayer"
+  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Extension mise à jour"
   },
@@ -929,6 +932,18 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "Répertoires récents"
   },
+  "gitBranchIndicator.failedToSwitch": {
+    "defaultMessage": "Impossible de basculer vers {branch}"
+  },
+  "gitBranchIndicator.noBranchesFound": {
+    "defaultMessage": "Aucune branche trouvée"
+  },
+  "gitBranchIndicator.searchBranches": {
+    "defaultMessage": "Rechercher des branches…"
+  },
+  "gitBranchIndicator.uncommittedChanges": {
+    "defaultMessage": "Vous avez peut-être des modifications non validées."
+  },
   "elicitationRequest.accept": {
     "defaultMessage": "Accepter"
   },
@@ -1225,6 +1240,15 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Se connecter à un serveur goose exécuté ailleurs (nécessite le redémarrage de l'application)"
+  },
+  "externalBackendSection.workingDir": {
+    "defaultMessage": "Répertoire de travail distant (facultatif)"
+  },
+  "externalBackendSection.workingDirHelp": {
+    "defaultMessage": "Chemin absolu sur le backend externe. Laissez vide pour envoyer le répertoire de travail local."
+  },
+  "externalBackendSection.workingDirPlaceholder": {
+    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "Fermer"
@@ -2360,8 +2384,35 @@
   "navigationPanel.chats": {
     "defaultMessage": "Discussions"
   },
+  "navigationPanel.metaCreated": {
+    "defaultMessage": "Créé"
+  },
+  "navigationPanel.metaDirectory": {
+    "defaultMessage": "Répertoire"
+  },
+  "navigationPanel.metaModel": {
+    "defaultMessage": "Modèle"
+  },
+  "navigationPanel.metaStatus": {
+    "defaultMessage": "Statut"
+  },
+  "navigationPanel.metaUpdated": {
+    "defaultMessage": "Mis à jour"
+  },
   "navigationPanel.noChats": {
     "defaultMessage": "Aucune discussion récente"
+  },
+  "navigationPanel.statusError": {
+    "defaultMessage": "Erreur"
+  },
+  "navigationPanel.statusIdle": {
+    "defaultMessage": "Inactif"
+  },
+  "navigationPanel.statusStreaming": {
+    "defaultMessage": "Diffusion en continu"
+  },
+  "navigationPanel.statusUnread": {
+    "defaultMessage": "Activité non lue"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Session sans titre"
@@ -3731,6 +3782,12 @@
   "sessions.action.export": {
     "defaultMessage": "Exporter la session"
   },
+  "sessions.action.exportJson": {
+    "defaultMessage": "JSON"
+  },
+  "sessions.action.exportMarkdown": {
+    "defaultMessage": "Markdown"
+  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Ouvrir dans une nouvelle fenêtre"
   },
@@ -3829,6 +3886,9 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "Session « {name} » dupliquée avec succès"
+  },
+  "sessions.toast.exportFailed": {
+    "defaultMessage": "Échec de l'exportation de la session : {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Session exportée avec succès"
@@ -4661,6 +4721,9 @@
   "userMessage.editButton": {
     "defaultMessage": "Modifier"
   },
+  "userMessage.editImagesHeading": {
+    "defaultMessage": "Images jointes :"
+  },
   "userMessage.editInPlace": {
     "defaultMessage": "Modifier sur place"
   },
@@ -4693,5 +4756,38 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Créer une nouvelle session avec le message modifié"
+  },
+  "userMessage.removeImageFromEdit": {
+    "defaultMessage": "Supprimer l'image du message"
+  },
+  "modelsBottomBar.recentModels": {
+    "defaultMessage": "Récents"
+  },
+  "providerConfigurationModal.chooseModel": {
+    "defaultMessage": "Choisir un modèle"
+  },
+  "providerCard.deprecatedReplacement": {
+    "defaultMessage": "Obsolète — utilisez plutôt {replacement}."
+  },
+  "acpReadinessPanel.adapterFound": {
+    "defaultMessage": "Adaptateur ACP trouvé"
+  },
+  "acpReadinessPanel.adapterNotFound": {
+    "defaultMessage": "Adaptateur ACP introuvable"
+  },
+  "acpReadinessPanel.authenticationHelp": {
+    "defaultMessage": "Connectez-vous à partir de la CLI du fournisseur, puis vérifiez à nouveau."
+  },
+  "acpReadinessPanel.checkAgain": {
+    "defaultMessage": "Vérifier à nouveau"
+  },
+  "acpReadinessPanel.checking": {
+    "defaultMessage": "Vérification..."
+  },
+  "acpReadinessPanel.connected": {
+    "defaultMessage": "Connexion réussie"
+  },
+  "acpReadinessPanel.connectionNotChecked": {
+    "defaultMessage": "Vérifiez la connexion de votre compte avant de continuer."
   }
 }

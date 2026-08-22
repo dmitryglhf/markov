@@ -210,15 +210,16 @@ async fn dispatch(command: MarkovCommand) -> Result<()> {
             session_opts,
             extension_opts,
         } => {
-            goose_cli::cli::handle_interactive_session(
-                resume_identifier(session),
-                true,
+            goose_cli::cli::handle_interactive_session(goose_cli::cli::InteractiveSessionArgs {
+                identifier: resume_identifier(session),
+                resume: true,
                 fork,
                 edit,
                 history,
                 session_opts,
                 extension_opts,
-            )
+                model_opts: Default::default(),
+            })
             .await
         }
         MarkovCommand::Skills { command } => match command {

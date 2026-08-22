@@ -134,6 +134,9 @@
   "baseChat.reconnecting": {
     "defaultMessage": "Bağlantı kesildi. Yeniden bağlanılıyor…"
   },
+  "baseChat.retry": {
+    "defaultMessage": "Yeniden dene"
+  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "Uzantı Güncellendi"
   },
@@ -929,6 +932,18 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "Son dizinler"
   },
+  "gitBranchIndicator.failedToSwitch": {
+    "defaultMessage": "{branch} dalına geçilemedi"
+  },
+  "gitBranchIndicator.noBranchesFound": {
+    "defaultMessage": "Dal bulunamadı"
+  },
+  "gitBranchIndicator.searchBranches": {
+    "defaultMessage": "Dal ara…"
+  },
+  "gitBranchIndicator.uncommittedChanges": {
+    "defaultMessage": "Commit edilmemiş değişiklikleriniz olabilir."
+  },
   "elicitationRequest.accept": {
     "defaultMessage": "Kabul et"
   },
@@ -1225,6 +1240,15 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "Başka bir yerde çalışan bir goose sunucusuna bağlanın (uygulamanın yeniden başlatılmasını gerektirir)"
+  },
+  "externalBackendSection.workingDir": {
+    "defaultMessage": "Uzak çalışma dizini (isteğe bağlı)"
+  },
+  "externalBackendSection.workingDirHelp": {
+    "defaultMessage": "Harici arka uçtaki mutlak yol. Yerel çalışma dizinini göndermek için boş bırakın."
+  },
+  "externalBackendSection.workingDirPlaceholder": {
+    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "Kapat"
@@ -2360,8 +2384,35 @@
   "navigationPanel.chats": {
     "defaultMessage": "Sohbetler"
   },
+  "navigationPanel.metaCreated": {
+    "defaultMessage": "Oluşturuldu"
+  },
+  "navigationPanel.metaDirectory": {
+    "defaultMessage": "Dizin"
+  },
+  "navigationPanel.metaModel": {
+    "defaultMessage": "Model"
+  },
+  "navigationPanel.metaStatus": {
+    "defaultMessage": "Durum"
+  },
+  "navigationPanel.metaUpdated": {
+    "defaultMessage": "Güncellendi"
+  },
   "navigationPanel.noChats": {
     "defaultMessage": "Son sohbet yok"
+  },
+  "navigationPanel.statusError": {
+    "defaultMessage": "Hata"
+  },
+  "navigationPanel.statusIdle": {
+    "defaultMessage": "Boşta"
+  },
+  "navigationPanel.statusStreaming": {
+    "defaultMessage": "Akış"
+  },
+  "navigationPanel.statusUnread": {
+    "defaultMessage": "Okunmamış etkinlik"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "Başlıksız oturum"
@@ -3731,6 +3782,12 @@
   "sessions.action.export": {
     "defaultMessage": "Oturumu dışa aktar"
   },
+  "sessions.action.exportJson": {
+    "defaultMessage": "JSON"
+  },
+  "sessions.action.exportMarkdown": {
+    "defaultMessage": "Markdown"
+  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "Yeni pencerede aç"
   },
@@ -3829,6 +3886,9 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "\"{name}\" oturumu başarıyla kopyalandı"
+  },
+  "sessions.toast.exportFailed": {
+    "defaultMessage": "Oturum dışa aktarılamadı: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "Oturum başarıyla dışa aktarıldı"
@@ -4661,6 +4721,9 @@
   "userMessage.editButton": {
     "defaultMessage": "Düzenle"
   },
+  "userMessage.editImagesHeading": {
+    "defaultMessage": "Ekli görseller:"
+  },
   "userMessage.editInPlace": {
     "defaultMessage": "Yerinde Düzenle"
   },
@@ -4668,7 +4731,7 @@
     "defaultMessage": "Mesajı yerinde düzenleyin"
   },
   "userMessage.editInPlaceDescription": {
-    "defaultMessage": "<b>Edit in Place</b> bu oturumu günceller • <b>Fork Session</b> yeni bir oturum oluşturur"
+    "defaultMessage": "<b>Yerinde Düzenle</b> bu oturumu günceller • <b>Oturumu Çatalla</b> yeni bir oturum oluşturur"
   },
   "userMessage.editInPlaceTitle": {
     "defaultMessage": "Bu oturumdaki mesajı güncelleyin"
@@ -4693,5 +4756,38 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "Düzenlenen mesajla yeni bir oturum oluşturun"
+  },
+  "userMessage.removeImageFromEdit": {
+    "defaultMessage": "Görseli mesajdan kaldır"
+  },
+  "modelsBottomBar.recentModels": {
+    "defaultMessage": "Son kullanılan"
+  },
+  "providerConfigurationModal.chooseModel": {
+    "defaultMessage": "Modeli seçin"
+  },
+  "providerCard.deprecatedReplacement": {
+    "defaultMessage": "Kullanımdan kaldırıldı — bunun yerine {replacement} kullanın."
+  },
+  "acpReadinessPanel.adapterFound": {
+    "defaultMessage": "ACP bağdaştırıcısı bulundu"
+  },
+  "acpReadinessPanel.adapterNotFound": {
+    "defaultMessage": "ACP bağdaştırıcısı bulunamadı"
+  },
+  "acpReadinessPanel.authenticationHelp": {
+    "defaultMessage": "Sağlayıcı CLI üzerinden oturum açın, ardından tekrar kontrol edin."
+  },
+  "acpReadinessPanel.checkAgain": {
+    "defaultMessage": "Tekrar kontrol et"
+  },
+  "acpReadinessPanel.checking": {
+    "defaultMessage": "Kontrol ediliyor..."
+  },
+  "acpReadinessPanel.connected": {
+    "defaultMessage": "Başarıyla bağlanıldı"
+  },
+  "acpReadinessPanel.connectionNotChecked": {
+    "defaultMessage": "Devam etmeden önce hesap bağlantınızı kontrol edin."
   }
 }

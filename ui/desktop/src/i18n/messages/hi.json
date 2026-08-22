@@ -134,6 +134,9 @@
   "baseChat.reconnecting": {
     "defaultMessage": "कनेक्शन टूट गया। फिर से कनेक्ट किया जा रहा है…"
   },
+  "baseChat.retry": {
+    "defaultMessage": "पुनः प्रयास करें"
+  },
   "bottomMenuExtensionSelection.extensionUpdated": {
     "defaultMessage": "एक्सटेंशन अपडेट किया गया"
   },
@@ -929,6 +932,18 @@
   "dirSwitcher.recentDirectories": {
     "defaultMessage": "हाल की निर्देशिकाएँ"
   },
+  "gitBranchIndicator.failedToSwitch": {
+    "defaultMessage": "{branch} पर स्विच नहीं किया जा सका"
+  },
+  "gitBranchIndicator.noBranchesFound": {
+    "defaultMessage": "कोई ब्रांच नहीं मिली"
+  },
+  "gitBranchIndicator.searchBranches": {
+    "defaultMessage": "ब्रांच खोजें…"
+  },
+  "gitBranchIndicator.uncommittedChanges": {
+    "defaultMessage": "आपके कुछ बदलाव कमिट नहीं हुए हो सकते हैं।"
+  },
   "elicitationRequest.accept": {
     "defaultMessage": "स्वीकार करो"
   },
@@ -1225,6 +1240,15 @@
   },
   "externalBackendSection.useExternalServerDescription": {
     "defaultMessage": "कहीं और चल रहे goose सर्वर से कनेक्ट करें (ऐप पुनरारंभ की आवश्यकता है)"
+  },
+  "externalBackendSection.workingDir": {
+    "defaultMessage": "रिमोट कार्य निर्देशिका (वैकल्पिक)"
+  },
+  "externalBackendSection.workingDirHelp": {
+    "defaultMessage": "बाहरी बैकएंड पर पूर्ण पथ। स्थानीय कार्य निर्देशिका भेजने के लिए खाली छोड़ दें।"
+  },
+  "externalBackendSection.workingDirPlaceholder": {
+    "defaultMessage": "/home/goose/workspace"
   },
   "goosehintsModal.close": {
     "defaultMessage": "बंद करें"
@@ -2360,8 +2384,35 @@
   "navigationPanel.chats": {
     "defaultMessage": "चैट"
   },
+  "navigationPanel.metaCreated": {
+    "defaultMessage": "बनाया गया"
+  },
+  "navigationPanel.metaDirectory": {
+    "defaultMessage": "निर्देशिका"
+  },
+  "navigationPanel.metaModel": {
+    "defaultMessage": "मॉडल"
+  },
+  "navigationPanel.metaStatus": {
+    "defaultMessage": "स्थिति"
+  },
+  "navigationPanel.metaUpdated": {
+    "defaultMessage": "अपडेट किया गया"
+  },
   "navigationPanel.noChats": {
     "defaultMessage": "कोई हालिया चैट नहीं"
+  },
+  "navigationPanel.statusError": {
+    "defaultMessage": "त्रुटि"
+  },
+  "navigationPanel.statusIdle": {
+    "defaultMessage": "निष्क्रिय"
+  },
+  "navigationPanel.statusStreaming": {
+    "defaultMessage": "स्ट्रीमिंग"
+  },
+  "navigationPanel.statusUnread": {
+    "defaultMessage": "अपठित गतिविधि"
   },
   "navigationPanel.untitledSession": {
     "defaultMessage": "शीर्षकहीन सत्र"
@@ -3731,6 +3782,12 @@
   "sessions.action.export": {
     "defaultMessage": "निर्यात सत्र"
   },
+  "sessions.action.exportJson": {
+    "defaultMessage": "JSON"
+  },
+  "sessions.action.exportMarkdown": {
+    "defaultMessage": "Markdown"
+  },
   "sessions.action.openNewWindow": {
     "defaultMessage": "नई विंडो में खोलें"
   },
@@ -3829,6 +3886,9 @@
   },
   "sessions.toast.duplicated": {
     "defaultMessage": "सत्र \"{name}\" सफलतापूर्वक दोहराया गया"
+  },
+  "sessions.toast.exportFailed": {
+    "defaultMessage": "सत्र निर्यात करने में विफल: {error}"
   },
   "sessions.toast.exported": {
     "defaultMessage": "सत्र सफलतापूर्वक निर्यात किया गया"
@@ -4661,6 +4721,9 @@
   "userMessage.editButton": {
     "defaultMessage": "संपादित करें"
   },
+  "userMessage.editImagesHeading": {
+    "defaultMessage": "संलग्न छवियाँ:"
+  },
   "userMessage.editInPlace": {
     "defaultMessage": "यथास्थान संपादित करें"
   },
@@ -4693,5 +4756,38 @@
   },
   "userMessage.forkSessionTitle": {
     "defaultMessage": "संपादित संदेश के साथ एक नया सत्र बनाएं"
+  },
+  "userMessage.removeImageFromEdit": {
+    "defaultMessage": "संदेश से छवि हटाएँ"
+  },
+  "modelsBottomBar.recentModels": {
+    "defaultMessage": "हाल के"
+  },
+  "providerConfigurationModal.chooseModel": {
+    "defaultMessage": "मॉडल चुनें"
+  },
+  "providerCard.deprecatedReplacement": {
+    "defaultMessage": "अप्रचलित — इसके बजाय {replacement} का उपयोग करें।"
+  },
+  "acpReadinessPanel.adapterFound": {
+    "defaultMessage": "ACP अडैप्टर मिल गया"
+  },
+  "acpReadinessPanel.adapterNotFound": {
+    "defaultMessage": "ACP अडैप्टर नहीं मिला"
+  },
+  "acpReadinessPanel.authenticationHelp": {
+    "defaultMessage": "प्रदाता CLI से साइन इन करें, फिर दोबारा जाँचें।"
+  },
+  "acpReadinessPanel.checkAgain": {
+    "defaultMessage": "दोबारा जाँचें"
+  },
+  "acpReadinessPanel.checking": {
+    "defaultMessage": "जाँच की जा रही है..."
+  },
+  "acpReadinessPanel.connected": {
+    "defaultMessage": "सफलतापूर्वक कनेक्ट हो गया"
+  },
+  "acpReadinessPanel.connectionNotChecked": {
+    "defaultMessage": "आगे बढ़ने से पहले अपने खाते का कनेक्शन जाँचें।"
   }
 }

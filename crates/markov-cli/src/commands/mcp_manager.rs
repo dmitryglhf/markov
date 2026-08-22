@@ -1087,6 +1087,9 @@ fn build_config(
             description: target.to_string(),
             timeout: Some(DEFAULT_EXTENSION_TIMEOUT),
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: Vec::new(),
             bundled: None,
             available_tools: Vec::new(),
         },
@@ -1733,6 +1736,9 @@ mod tests {
             bundled: None,
             available_tools: Vec::new(),
             socket: None,
+            client_id: None,
+            client_secret_key: None,
+            scopes: Vec::new(),
         };
         // The header names, in a fixed order, and never the derived storage keys.
         assert_eq!(credential_slots(&remote), ["Authorization", "X-Tenant"]);

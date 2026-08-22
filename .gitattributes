@@ -1,13 +1,1 @@
 crates/goose/src/agents/snapshots/*.snap linguist-language=Text
-
-# The merge=ours / merge=theirs names below are NOT understood by git on
-# their own — it ships no such drivers. scripts/upstream-merge-policy.sh
-# applies them after the merge, and upstream-watch.yml runs it. A plain
-# `git merge` by hand does not: run the script yourself afterwards.
-
-# fork pins its own inputs, upstream churn here is never worth a conflict
-flake.lock merge=ours
-
-# desktop is frozen until upstream replaces Electron with Tauri; resolving
-# conflicts in code we plan to throw away buys nothing
-ui/desktop/** merge=ours
