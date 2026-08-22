@@ -1648,8 +1648,14 @@ mod tests {
                 .expect("the second question should be stored");
 
             assert_eq!(marker, second_question - 1);
+            // the agent appends its own user-role turn-context message after the
+            // question, so only the questions themselves are checked here
+            let questions: Vec<&Message> = messages
+                .iter()
+                .filter(|message| !message.is_turn_context())
+                .collect();
             assert!(
-                !messages
+                !questions
                     .windows(2)
                     .any(|pair| pair[0].role == Role::User && pair[1].role == Role::User),
                 "two user messages in a row would be merged into one prompt",

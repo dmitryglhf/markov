@@ -897,10 +897,12 @@ mod tests {
         &["intro\n\n", "```rust\ncode\n```\n"]
         ; "blank line drained before fence arrives"
     )]
+    // upstream drains at each closed inline construct; here a cut is only ever
+    // placed at a line end, so the two constructs come out with their lines
     #[test_case(
         &["a **b", "** c\nd `e", "` f\n"],
-        &["a ", "**b** c\nd ", "`e` f\n"]
-        ; "consecutive split constructs drain independently"
+        &["a **b** c\n", "d `e` f\n"]
+        ; "consecutive split constructs drain at their line ends"
     )]
     fn test_checkpoint_boundaries(chunks: &[&str], expected: &[&str]) {
         assert_eq!(stream(chunks), expected);

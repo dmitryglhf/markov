@@ -1629,14 +1629,14 @@ async fn handle_session_subcommand(command: SessionCommand) -> Result<()> {
 }
 
 pub struct InteractiveSessionArgs {
-    identifier: Option<Identifier>,
-    resume: bool,
-    fork: bool,
-    edit: bool,
-    history: bool,
-    session_opts: SessionOptions,
-    extension_opts: ExtensionOptions,
-    model_opts: ModelOptions,
+    pub identifier: Option<Identifier>,
+    pub resume: bool,
+    pub fork: bool,
+    pub edit: bool,
+    pub history: bool,
+    pub session_opts: SessionOptions,
+    pub extension_opts: ExtensionOptions,
+    pub model_opts: ModelOptions,
 }
 
 pub async fn handle_interactive_session(args: InteractiveSessionArgs) -> Result<()> {
