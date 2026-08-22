@@ -63,7 +63,6 @@ Dockerfile
 docker-compose.yml
 
 # Development scripts that aren't needed in build
-scripts/bench-postprocess-scripts/
 
 # macOS
 .DS_Store
