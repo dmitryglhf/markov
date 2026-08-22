@@ -120,6 +120,18 @@ if [ -n "$aa" ]; then
     echo
 fi
 
+# --- the answers that never change -------------------------------------------
+
+echo "### Standing answers"
+echo
+echo "- Lockfiles are regenerated against the merged manifests, never resolved by"
+echo "  hand. A lock with no conflict markers still disagrees with the manifests."
+echo "- \`README.md\` is ours end to end; upstream's describes a different product."
+echo "- \`.github/**\` is ours: our runners, our secrets, our artifact names, our"
+echo "  signing gates. Read upstream's diff for the workflows this fork still"
+echo "  carries, though — their fixes to shared steps are worth taking."
+echo
+
 # --- how to pick this up locally ---------------------------------------------
 
 # In a detached worktree `rev-parse --abbrev-ref` answers "HEAD"; the
@@ -132,7 +144,6 @@ echo '```sh'
 echo "git fetch origin"
 echo "git switch $branch"
 echo "git merge origin/main"
-echo "scripts/upstream-merge-policy.sh MERGE_HEAD"
 echo
 echo "# resolve the conflicts, then"
 echo "git add -A && git commit"

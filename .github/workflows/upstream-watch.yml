@@ -121,9 +121,32 @@ jobs:
           # apply it once here instead of asking a hundred times.
           bw="$(mktemp -d)"
           git worktree add -q --detach "$bw" "$TAG"
-          comm -12 \
-            <(git diff --diff-filter=D --name-only "$base" "$ours" | sort) \
-            <(git ls-tree -r --name-only "$TAG" | sort) > /tmp/dropped
+          git diff --diff-filter=D --name-only "$base" "$ours" | sort > /tmp/deleted
+          # A file upstream added after the fork point was never "deleted by
+          # the fork", so the list above cannot see it, and it arrives even
+          # when it sits in a directory this fork removed whole. v1.47 leaked
+          # four documentation/ files that way. Collect the directories the
+          # fork emptied out and drop everything upstream keeps under them.
+          while IFS= read -r p; do
+            case "$p" in */*) ;; *) continue ;; esac
+            d="${p%/*}"
+            while : ; do
+              printf '%s\n' "$d"
+              case "$d" in */*) d="${d%/*}" ;; *) break ;; esac
+            done
+          done < /tmp/deleted | sort -u > /tmp/candidate_dirs
+          : > /tmp/emptied_dirs
+          while IFS= read -r d; do
+            if [ -z "$(git ls-tree -r --name-only "$ours" -- "$d/")" ]; then
+              printf '%s\n' "$d"
+            fi
+          done < /tmp/candidate_dirs > /tmp/emptied_dirs
+          {
+            comm -12 /tmp/deleted <(git ls-tree -r --name-only "$TAG" | sort)
+            while IFS= read -r d; do
+              git ls-tree -r --name-only "$TAG" -- "$d/"
+            done < /tmp/emptied_dirs
+          } | sort -u > /tmp/dropped
           if [ -s /tmp/dropped ]; then
             tr '\n' '\0' < /tmp/dropped | xargs -0 git -C "$bw" rm -q --
             git -C "$bw" commit -q \
@@ -136,7 +159,6 @@ jobs:
           git worktree add -q --detach "$tw" "$ours"
           git -C "$tw" merge --no-ff --no-commit "$TAG" \
             || echo "conflicts, as expected"
-          ( cd "$tw" && scripts/upstream-merge-policy.sh )
           if [ -z "$(git -C "$tw" ls-files --unmerged)" ]; then clean=true; else clean=false; fi
           echo "clean=$clean" >> "$GITHUB_OUTPUT"
           ( cd "$tw" && scripts/upstream-inventory.sh "$TAG" ) > /tmp/body.md
