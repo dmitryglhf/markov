@@ -302,9 +302,10 @@ mod azure_foundry_tests {
 
     #[test]
     fn deployment_name_survives_thinking_effort_changes() {
-        let config = base_model_config_from_user_config(&empty_config(), "azure_foundry", "gpt-5-high")
-            .unwrap()
-            .with_thinking_effort(ThinkingEffort::Off);
+        let config =
+            base_model_config_from_user_config(&empty_config(), "azure_foundry", "gpt-5-high")
+                .unwrap()
+                .with_thinking_effort(ThinkingEffort::Off);
 
         assert_eq!(config.model_name, "gpt-5-high");
         assert_eq!(config.context_limit, None);
@@ -313,7 +314,9 @@ mod azure_foundry_tests {
 
     #[test]
     fn none_suffixed_deployment_name_is_preserved() {
-        let config = base_model_config_from_user_config(&empty_config(), "azure_foundry", "gpt-5-none").unwrap();
+        let config =
+            base_model_config_from_user_config(&empty_config(), "azure_foundry", "gpt-5-none")
+                .unwrap();
 
         assert_eq!(config.model_name, "gpt-5-none");
         assert_eq!(config.thinking_effort(), None);
