@@ -14,9 +14,6 @@ ui/desktop/src/bin/
 .gitignore
 
 # Documentation builds
-documentation/build/
-documentation/.docusaurus/
-documentation/.cache-loader/
 
 # IDE and editor files
 .vscode/

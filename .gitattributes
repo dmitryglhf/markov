@@ -11,6 +11,3 @@ flake.lock merge=ours
 # desktop is frozen until upstream replaces Electron with Tauri; resolving
 # conflicts in code we plan to throw away buys nothing
 ui/desktop/** merge=ours
-
-# the site is not published from this fork
-documentation/** merge=theirs

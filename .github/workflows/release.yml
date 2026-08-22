@@ -1,8 +1,6 @@
 # This workflow builds release artifacts for release branches and publishes tagged releases.
 on:
   push:
-    paths-ignore:
-      - "documentation/**"
     branches:
       - "release/*"
     tags:

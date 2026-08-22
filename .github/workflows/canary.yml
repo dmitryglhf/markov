@@ -4,8 +4,6 @@
 #  - GitHub Release tagged as "canary"
 on:
   push:
-    paths-ignore:
-      - "documentation/**"
     branches:
       - main
 

@@ -8,7 +8,7 @@ set -euo pipefail
 #   scripts/publish.sh --dry-run    package only, print what would be uploaded
 #
 # Expects a desktop bundle and a release CLI to exist already:
-#   just markov-make-ui
+#   just make-ui
 #
 # Assets carry no version in their names, so a moving tag can serve the current
 # build. Everything is published twice: under the version tag and under
@@ -53,8 +53,8 @@ esac
 
 DESKTOP_BUILT="ui/desktop/out/make/zip/darwin/$FORGE_ARCH/Markov-darwin-$FORGE_ARCH-$VERSION.zip"
 CLI_BUILT="target/release/markov"
-[ -f "$DESKTOP_BUILT" ] || die "no desktop bundle at $DESKTOP_BUILT — run: just markov-make-ui"
-[ -f "$CLI_BUILT" ] || die "no CLI at $CLI_BUILT — run: just markov-release"
+[ -f "$DESKTOP_BUILT" ] || die "no desktop bundle at $DESKTOP_BUILT — run: just make-ui"
+[ -f "$CLI_BUILT" ] || die "no CLI at $CLI_BUILT — run: just release"
 
 echo "Packaging Markov $VERSION from $(git rev-parse --short HEAD) ($TARGET)"
 
