@@ -172,8 +172,10 @@ jobs:
         run: |
           mv "package/internal-markov-${TARGET}" package/markov
           chmod +x package/markov
+          # Apache-2.0 section 4(a): a recipient of the binary gets the license with it
+          cp LICENSE NOTICE package/
           mkdir -p dist
-          tar -cf - -C package markov | gzip -n > "dist/markov-cli-${TARGET}.tar.gz"
+          tar -cf - -C package markov LICENSE NOTICE | gzip -n > "dist/markov-cli-${TARGET}.tar.gz"
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

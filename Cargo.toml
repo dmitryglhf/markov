@@ -6,10 +6,10 @@ resolver = "2"
 edition = "2021"
 version = "1.45.0-pgpro"
 rust-version = "1.94.1"
-authors = ["AAIF <ai-oss-tools@block.xyz>"]
+authors = ["Dmitry Gilemkhanov"]
 license = "Apache-2.0"
-repository = "https://github.com/aaif-goose/goose"
-description = "An AI agent"
+repository = "https://github.com/dmitryglhf/markov"
+description = "An AI agent, forked from Goose (see NOTICE)"
 
 [workspace.lints.clippy]
 uninlined_format_args = "allow"

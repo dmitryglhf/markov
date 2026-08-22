@@ -1,0 +1,16 @@
+markov
+Copyright 2026 Dmitry Gilemkhanov
+
+This product is a modified distribution of Goose.
+
+Goose
+Copyright 2024 Block, Inc. and the Goose contributors
+https://github.com/aaif-goose/goose
+
+Goose is licensed under the Apache License, Version 2.0. A copy of the
+license is distributed with this product in the LICENSE file, and the
+original is available at http://www.apache.org/licenses/LICENSE-2.0
+
+This distribution differs from Goose upstream. Files across the workspace
+have been modified, added or removed, and the product is renamed. The git
+history of this repository records every change and its author.

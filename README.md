@@ -48,5 +48,3 @@ That leaves a `markov` binary in `target/release`. Running `just install` builds
 ## Documentation
 
 Guides for the agent itself live in the upstream project and are kept current there, so what is written about providers, extensions, recipes and the desktop application holds for this fork too. Anything specific to this fork is documented next to the code it describes.
-
-markov is licensed under Apache 2.0, the same terms as the project it comes from.

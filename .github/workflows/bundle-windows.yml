@@ -116,6 +116,8 @@ jobs:
         run: |
           mkdir -p markov-package
           cp package/markov.exe markov-package/
+          # Apache-2.0 section 4(a): a recipient of the binary gets the license with it
+          cp LICENSE NOTICE markov-package/
           7z a -tzip "markov-cli-x86_64-pc-windows-msvc.zip" markov-package/
 
       - name: Upload CLI artifact

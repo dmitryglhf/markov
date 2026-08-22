@@ -146,9 +146,11 @@ jobs:
           mkdir -p "target/${TARGET}/release/markov-package"
 
           cp "target/${TARGET}/release/markov" "target/${TARGET}/release/markov-package/"
+          # Apache-2.0 section 4(a): a recipient of the binary gets the license with it
+          cp LICENSE NOTICE "target/${TARGET}/release/markov-package/"
 
           cd "target/${TARGET}/release"
-          tar -cf - -C markov-package markov | gzip -n > "markov-cli-${TARGET}.tar.gz"
+          tar -cf - -C markov-package markov LICENSE NOTICE | gzip -n > "markov-cli-${TARGET}.tar.gz"
           echo "ARTIFACT_GZ=target/${TARGET}/release/markov-cli-${TARGET}.tar.gz" >> $GITHUB_ENV
 
       - name: Upload CLI artifact
